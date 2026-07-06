@@ -849,7 +849,8 @@ function runPipeline(parsed){
       pickupEarliest: pickupEarliest,
       pickupLatest: pickupLatest,
       comment: comment,
-      rawComment: rawComment
+      rawComment: rawComment,
+      isTeam: (rawEquip.toUpperCase() === "POTM")
     };
 
     expandedRows.push(baseRow);
@@ -1006,6 +1007,8 @@ function detectCrossPosts(comment, mappedEquip, order, anomalies){
 
 /* ===================== DAT ROW BUILDER ===================== */
 
+var FLATBED_OPEN_DECK = {"FT":1,"F":1,"SD":1,"SP":1,"RGN":1,"RZ":1,"RM":1,"CN":1};
+
 function isStraightBox(equipment){
   var eq = equipment.toUpperCase();
   return eq === "SB" || eq === "BR" || eq === "BZ";
@@ -1018,7 +1021,8 @@ function computeLength(equipment, rawComment){
     var n = parseInt(m[1], 10);
     if (!isNaN(n) && n >= 20 && n <= 60) return n;
   }
-  return 48;
+  // Flatbed/open-deck family defaults to 48; van/reefer/everything else defaults to 53
+  return FLATBED_OPEN_DECK.hasOwnProperty(equipment.toUpperCase()) ? 48 : 53;
 }
 
 function buildDatRow(row){
@@ -1050,7 +1054,7 @@ function buildDatRow(row){
   o["Destination City*"] = row.destCity;
   o["Destination State*"] = row.destState;
   o["Destination Postal Code"] = "";
-  o["Comment"] = row.comment;
+  o["Comment"] = row.isTeam ? ("TEAM" + (row.comment ? " | " + row.comment : "")) : row.comment;
   o["Commodity"] = "";
   o["Reference ID"] = row.order;
   return o;
