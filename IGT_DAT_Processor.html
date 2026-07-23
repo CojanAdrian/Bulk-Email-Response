@@ -399,6 +399,8 @@
   .lookup-comment-label{font-size:10.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
   .lookup-comment-text{font-size:12.5px;line-height:1.65;color:#3a4560;white-space:pre-wrap;background:#f8f9fb;padding:10px 13px;border-radius:6px;border:1px solid #e2e8f0;}
   .multi-stop-warn{color:#c62828;font-weight:700;font-size:12.5px;margin-top:10px;padding:6px 10px;background:#fff3f3;border:1px solid #f5c6c6;border-radius:6px;display:flex;align-items:center;gap:6px;}
+  .blast-drop-zone{position:relative;}
+  .blast-drop-overlay{display:none;position:absolute;inset:0;background:rgba(20,43,102,.07);border:2px dashed var(--navy);border-radius:7px;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--navy);pointer-events:none;gap:8px;}
   @media(max-width:700px){#topRow.side-by-side{flex-direction:column;} #topRow.side-by-side #uploadCol,#lookupCol{flex:none;width:100%;position:static;}}
 </style>
 </head>
@@ -488,8 +490,11 @@
     </div>
 
     <div style="margin-bottom:18px;">
-      <label style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Carrier Emails &nbsp;<span id="blastEmailCount" style="font-weight:400;text-transform:none;letter-spacing:0;">(0 valid)</span></label>
-      <textarea id="blastEmailsInput" rows="5" placeholder="Paste carrier emails — one per line or comma-separated" style="width:100%;padding:9px 11px;border:1px solid #dde2ea;border-radius:7px;font-size:12.5px;font-family:inherit;resize:vertical;box-sizing:border-box;transition:border-color .15s;"></textarea>
+      <label style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Carrier Emails &nbsp;<span id="blastEmailCount" style="font-weight:400;text-transform:none;letter-spacing:0;">(0 valid)</span><span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;"> — or drop a CSV / TXT file</span></label>
+      <div class="blast-drop-zone" id="blastDropZone">
+        <textarea id="blastEmailsInput" rows="5" placeholder="Paste carrier emails — one per line or comma-separated" style="width:100%;padding:9px 11px;border:1px solid #dde2ea;border-radius:7px;font-size:12.5px;font-family:inherit;resize:vertical;box-sizing:border-box;transition:border-color .15s;display:block;"></textarea>
+        <div class="blast-drop-overlay" id="blastDropOverlay">&#8595;&nbsp;Drop file to import emails</div>
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -1159,7 +1164,7 @@ function renderRateTable(rows){
       '<td style="padding:8px 12px;">' + esc(row.destCity) + '</td>' +
       '<td style="padding:8px 12px;">' + esc(row.destState) + '</td>' +
       '<td style="padding:8px 12px;">' + esc(row.equipment) + '</td>' +
-      '<td style="padding:8px 12px;text-align:right;font-weight:600;color:' + (rate === "—" ? "#999" : "#0a1024") + ';">' + esc(rate) + '</td>' +
+      '<td style="padding:8px 12px;text-align:right;"><input type="number" class="rate-override-input" data-order="' + esc(row.order) + '" value="' + (row.targetPayNum !== null && row.targetPayNum > 0 ? row.targetPayNum : '') + '" min="0" step="1" placeholder="—" style="width:82px;text-align:right;border:1px solid #dde2ea;border-radius:5px;padding:4px 7px;font-size:12.5px;font-family:inherit;color:#0a1024;"></td>' +
       '<td style="padding:8px 12px;text-align:center;"><input type="checkbox" class="rate-row-check" data-order="' + esc(row.order) + '" ' + checked + '></td>';
     tbody.appendChild(tr);
   });
@@ -1211,11 +1216,16 @@ document.getElementById("rateTableHead").addEventListener("click", function(e){
     _rateSortCol = col;
     _rateSortDir = 1;
   }
-  // sync includeRate from checkboxes before re-render
+  // sync checkboxes and custom rates before re-render
   if (pendingFinalRows) {
     document.querySelectorAll(".rate-row-check").forEach(function(cb){
       var ord = cb.getAttribute("data-order");
       pendingFinalRows.forEach(function(r){ if (r.order === ord) r.includeRate = cb.checked; });
+    });
+    document.querySelectorAll(".rate-override-input").forEach(function(inp){
+      var ord = inp.getAttribute("data-order");
+      var val = parseFloat(inp.value);
+      pendingFinalRows.forEach(function(r){ if (r.order === ord && !isNaN(val) && val > 0) r.targetPayNum = val; });
     });
   }
   renderRateTable(pendingFinalRows || []);
@@ -1235,11 +1245,18 @@ document.getElementById("rateCancelBtn").addEventListener("click", function(){
 });
 
 document.getElementById("rateConfirmBtn").addEventListener("click", function(){
-  // sync final checkbox state before confirming
+  // sync final checkbox state and custom rates before confirming
   document.querySelectorAll(".rate-row-check").forEach(function(cb){
     var ord = cb.getAttribute("data-order");
     if (pendingFinalRows) {
       pendingFinalRows.forEach(function(r){ if (r.order === ord) r.includeRate = cb.checked; });
+    }
+  });
+  document.querySelectorAll(".rate-override-input").forEach(function(inp){
+    var ord = inp.getAttribute("data-order");
+    var val = parseFloat(inp.value);
+    if (pendingFinalRows) {
+      pendingFinalRows.forEach(function(r){ if (r.order === ord && !isNaN(val) && val > 0) r.targetPayNum = val; });
     }
   });
   rateModalOverlay.style.display = "none";
@@ -1823,6 +1840,40 @@ function parseLookupCommodity(comment){
   document.getElementById("blastCloseBtn").addEventListener("click", closeBlast);
   document.getElementById("blastCloseX").addEventListener("click", closeBlast);
   document.getElementById("blastModalOverlay").addEventListener("click", function(e){ if (e.target === this) closeBlast(); });
+
+  // Drag-and-drop carrier email file
+  function extractEmailsFromText(text){
+    var matches = text.match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g) || [];
+    var seen = {};
+    var out = [];
+    matches.forEach(function(m){ var l = m.toLowerCase(); if (!seen[l]){ seen[l]=true; out.push(m); } });
+    return out;
+  }
+
+  var _dropZone = document.getElementById("blastDropZone");
+  var _dropOverlay = document.getElementById("blastDropOverlay");
+
+  _dropZone.addEventListener("dragenter", function(e){ e.preventDefault(); _dropOverlay.style.display = "flex"; });
+  _dropZone.addEventListener("dragover",  function(e){ e.preventDefault(); });
+  _dropZone.addEventListener("dragleave", function(e){ if (!_dropZone.contains(e.relatedTarget)) _dropOverlay.style.display = "none"; });
+  _dropZone.addEventListener("drop", function(e){
+    e.preventDefault();
+    _dropOverlay.style.display = "none";
+    var file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (/\.(xlsx|xls)$/i.test(file.name)){
+      alert("Excel files aren't supported yet — export as CSV first and drop that.");
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      var emails = extractEmailsFromText(ev.target.result);
+      var ta = document.getElementById("blastEmailsInput");
+      ta.value = emails.join("\n");
+      ta.dispatchEvent(new Event("input"));
+    };
+    reader.readAsText(file);
+  });
 })();
 
 })();
