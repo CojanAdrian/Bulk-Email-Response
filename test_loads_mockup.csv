@@ -1,0 +1,12 @@
+Order,Origin City,Origin State,Destination City,Destination State,Equipment,Weight,Target Pay,Early P U Dt,Late P U Dt,Planning Comment
+0081001,Chicago,IL,Atlanta,GA,V,42000,1850,2026-07-25,2026-07-25,
+0081331,Chicago,IL,Memphis,TN,V,42000,1850,2026-07-25,2026-07-25,
+0081002,Dallas,TX,Memphis,TN,R,44000,1200,2026-07-25,2026-07-26,
+0081003,Los Angeles,CA,Phoenix,AZ,FT,38000,950,2026-07-26,2026-07-26,
+0081004,Nashville,TN,Charlotte,NC,SB26,26000,750,2026-07-25,2026-07-25,
+0081005,Houston,TX,Kansas City,MO,V,45000,1650,2026-07-26,2026-07-27,Drop trailer
+0081006,Miami,FL,Jacksonville,FL,R,40000,600,2026-07-26,2026-07-26,
+0081007,Columbus,OH,Indianapolis,IN,VR,39000,725,2026-07-27,2026-07-27,
+0081008,Denver,CO,Salt Lake City,UT,FGT,41000,1100,2026-07-27,2026-07-28,
+0081009,Seattle,WA,Portland,OR,POTM,43500,880,2026-07-25,2026-07-25,Team
+0081010,Philadelphia,PA,Boston,MA,V,44500,1400,2026-07-26,2026-07-26,

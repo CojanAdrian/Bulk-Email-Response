@@ -80,9 +80,9 @@
     color:#8497b8;
   }
   main{
-    max-width:980px;
+    max-width:1400px;
     margin:32px auto 0;
-    padding:0 20px 40px;
+    padding:0 32px 40px;
     flex:1 0 auto;
     width:100%;
   }
@@ -362,6 +362,40 @@
     margin-top:8px;
   }
   .modal-actions button{margin:0;}
+  /* ---- Top row + anomaly row layout ---- */
+  #topRow{display:block;}
+  #topRow.side-by-side{display:flex;gap:20px;align-items:flex-start;}
+  #uploadCol{width:100%;}
+  #topRow.side-by-side #uploadCol{flex:0 0 calc(50% - 10px);min-width:0;}
+  #lookupCol{flex:0 0 calc(50% - 10px);min-width:0;position:sticky;top:20px;}
+  #anomalyRow{margin-top:20px;}
+  /* ---- Load Lookup ---- */
+  .lookup-search-wrap{position:relative;margin-bottom:10px;}
+  .lookup-search-input{width:100%;padding:10px 12px 10px 36px;border:2px solid #dde2ea;border-radius:8px;font-size:13.5px;box-sizing:border-box;font-family:inherit;transition:border-color .15s;}
+  .lookup-search-input:focus{border-color:var(--navy);outline:none;}
+  .lookup-search-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);font-size:13px;pointer-events:none;color:var(--gray);}
+  .lookup-results-list{border:1px solid #dde2ea;border-radius:8px;overflow:hidden;max-height:220px;overflow-y:auto;margin-bottom:12px;}
+  .lookup-result-row{padding:8px 12px;cursor:pointer;border-bottom:1px solid #eef0f3;font-size:13px;line-height:1.4;transition:background .1s;}
+  .lookup-result-row:last-child{border-bottom:none;}
+  .lookup-result-row:hover,.lookup-result-row.active{background:var(--navy);color:var(--white);}
+  .lookup-result-order{font-weight:700;}
+  .lookup-result-route{font-size:11.5px;color:#8a9ab8;margin-top:1px;}
+  .lookup-result-row:hover .lookup-result-route,.lookup-result-row.active .lookup-result-route{color:#c9d5e8;}
+  .lookup-empty-hint{color:var(--gray);font-size:13px;padding:8px 0 0;}
+  .lookup-no-results{padding:10px 12px;text-align:center;color:var(--gray);font-size:13px;}
+  .lookup-detail{border-top:2px solid var(--navy);padding-top:14px;margin-top:4px;}
+  .lookup-detail-label{font-size:10.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
+  .lookup-email-pre{font-family:inherit;font-size:13px;line-height:1.75;white-space:pre-wrap;background:#f8f9fb;padding:12px 14px;border-radius:7px;border:1px solid #e2e8f0;margin:0 0 12px;color:#1a2540;}
+  .lookup-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .toggle-sw{position:relative;display:inline-block;width:42px;height:22px;vertical-align:middle;cursor:pointer;flex-shrink:0;}
+  .toggle-sw input{opacity:0;width:0;height:0;}
+  .toggle-track{position:absolute;top:0;left:0;right:0;bottom:0;background:#c8cdd8;border-radius:22px;transition:.22s;}
+  .toggle-track:before{content:"";position:absolute;width:16px;height:16px;background:#fff;border-radius:50%;top:3px;left:3px;transition:.22s;box-shadow:0 1px 3px rgba(0,0,0,.2);}
+  .toggle-sw input:checked + .toggle-track{background:var(--navy);}
+  .toggle-sw input:checked + .toggle-track:before{transform:translateX(20px);}
+  .toggle-label-text{font-size:13px;font-weight:600;color:var(--navy);user-select:none;}
+  .lookup-copy-btn{margin-left:auto;padding:7px 16px;font-size:12.5px;}
+  @media(max-width:700px){#topRow.side-by-side{flex-direction:column;} #topRow.side-by-side #uploadCol,#lookupCol{flex:none;width:100%;position:static;}}
 </style>
 </head>
 <body>
@@ -386,9 +420,45 @@
       <input type="text" id="commentContactInput" class="modal-input" style="display:none;" placeholder="Enter phone number or email">
     </div>
 
+    <div class="modal-section">
+      <div class="modal-label">Post with Rate?</div>
+      <p class="modal-hint">Controls whether the Target Pay value is included as the DAT Loadboard Rate.</p>
+      <label class="modal-radio"><input type="radio" name="rateChoice" value="none" checked> No rate (default)</label>
+      <label class="modal-radio"><input type="radio" name="rateChoice" value="all"> Post all loads with rate</label>
+      <label class="modal-radio"><input type="radio" name="rateChoice" value="some"> Post some loads with rate&hellip;</label>
+    </div>
+
     <div class="modal-actions">
       <button class="secondary" id="modalCancelBtn">Cancel</button>
       <button class="primary" id="modalContinueBtn">Continue &amp; Process</button>
+    </div>
+  </div>
+</div>
+
+<div id="rateModalOverlay" class="modal-overlay" style="display:none;">
+  <div class="modal-card" style="max-width:860px;width:95%;padding:28px 24px 20px;">
+    <h2 style="margin-bottom:12px;">Select Loads to Post with Rate</h2>
+    <p style="font-size:13px;color:var(--gray);margin:0 0 14px;">Check each load you want posted with its Target Pay rate. Uncheck to post without a rate.</p>
+    <div style="overflow:auto;max-height:420px;border:1px solid #dde2ea;border-radius:8px;">
+      <table id="rateTable" style="width:100%;border-collapse:collapse;font-size:13px;">
+        <thead id="rateTableHead">
+          <tr style="background:var(--navy);color:var(--white);position:sticky;top:0;z-index:1;">
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;cursor:pointer;" data-col="order">Order #</th>
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;cursor:pointer;" data-col="origCity">Origin City <span class="sort-arrow" data-col="origCity">&#8597;</span></th>
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;cursor:pointer;" data-col="origState">St <span class="sort-arrow" data-col="origState">&#8597;</span></th>
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;">Dest City</th>
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;">St</th>
+            <th style="padding:9px 12px;text-align:left;white-space:nowrap;">Equip</th>
+            <th style="padding:9px 12px;text-align:right;white-space:nowrap;">Target Pay</th>
+            <th style="padding:9px 12px;text-align:center;white-space:nowrap;"><input type="checkbox" id="rateSelectAll" checked title="Select / deselect all"></th>
+          </tr>
+        </thead>
+        <tbody id="rateTableBody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions" style="margin-top:16px;">
+      <button class="secondary" id="rateCancelBtn">Cancel</button>
+      <button class="primary" id="rateConfirmBtn">Confirm &amp; Download</button>
     </div>
   </div>
 </div>
@@ -406,46 +476,66 @@
 
 <main>
 
-  <div class="card">
-    <div id="dropZone">
-      <svg class="upload-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
-      <h2>Drop McLeod Export CSV here</h2>
-      <p>or click to browse for a file</p>
-      <input type="file" id="fileInput" accept=".csv">
+  <div id="topRow">
+    <div id="uploadCol">
+      <div class="card">
+        <div id="dropZone">
+          <svg class="upload-icon" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4"/><path d="M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>
+          <h2>Drop McLeod Export CSV here</h2>
+          <p>or click to browse for a file</p>
+          <input type="file" id="fileInput" accept=".csv">
+        </div>
+
+        <div id="errorBox"></div>
+        <div id="downloadBanner"></div>
+
+        <div class="status-grid" id="statusGrid" style="display:none;">
+          <div class="status-box">
+            <div class="label">File</div>
+            <div class="value" id="statFileName">&mdash;</div>
+          </div>
+          <div class="status-box">
+            <div class="label">Input Rows</div>
+            <div class="value" id="statInputRows">&mdash;</div>
+          </div>
+          <div class="status-box">
+            <div class="label">Output Rows</div>
+            <div class="value" id="statOutputRows">&mdash;</div>
+          </div>
+          <div class="status-box">
+            <div class="label">Anomalies Found</div>
+            <div class="value" id="statAnomalies">&mdash;</div>
+          </div>
+        </div>
+
+        <div id="processAnotherWrap">
+          <button class="primary" id="downloadBtn" style="display:none;">Download DAT CSV</button>
+          <button class="secondary" id="resetBtn">Process Another File</button>
+        </div>
+      </div>
     </div>
 
-    <div id="errorBox"></div>
-    <div id="downloadBanner"></div>
-
-    <div class="status-grid" id="statusGrid" style="display:none;">
-      <div class="status-box">
-        <div class="label">File</div>
-        <div class="value" id="statFileName">&mdash;</div>
+    <div id="lookupCol" style="display:none;">
+      <div class="card" id="lookupCard">
+        <h2 style="margin-top:0;color:var(--navy);">Load Detail Lookup</h2>
+        <div class="lookup-search-wrap">
+          <span class="lookup-search-icon">&#128269;</span>
+          <input type="text" id="lookupInput" class="lookup-search-input" placeholder="Order #, city, or state&hellip;" autocomplete="off">
+        </div>
+        <div id="lookupResultsList"></div>
+        <div id="lookupDetailWrap">
+          <div class="lookup-empty-hint">Select a load above.</div>
+        </div>
       </div>
-      <div class="status-box">
-        <div class="label">Input Rows</div>
-        <div class="value" id="statInputRows">&mdash;</div>
-      </div>
-      <div class="status-box">
-        <div class="label">Output Rows</div>
-        <div class="value" id="statOutputRows">&mdash;</div>
-      </div>
-      <div class="status-box">
-        <div class="label">Anomalies Found</div>
-        <div class="value" id="statAnomalies">&mdash;</div>
-      </div>
-    </div>
-
-    <div id="processAnotherWrap">
-      <button class="primary" id="downloadBtn" style="display:none;">Download DAT CSV</button>
-      <button class="secondary" id="resetBtn">Process Another File</button>
     </div>
   </div>
 
-  <div class="card" id="anomalyReport">
-    <h2 style="margin-top:0;color:var(--navy);">Anomaly Report</h2>
-    <div id="knownIssueBannerWrap"></div>
-    <div id="anomalySections"></div>
+  <div id="anomalyRow" style="display:none;">
+    <div class="card" id="anomalyReport">
+      <h2 style="margin-top:0;color:var(--navy);">Anomaly Report</h2>
+      <div id="knownIssueBannerWrap"></div>
+      <div id="anomalySections"></div>
+    </div>
   </div>
 
 </main>
@@ -485,7 +575,7 @@ var DAT_HEADERS = [
 var EQUIPMENT_MAP = {
   "FGT":"V","POTM":"PO","POZ":"PO","IGPO":"PO",
   "V":"V","R":"R","RV":"RV","VR":"VR","VM":"VM","RR":"RR","VZ":"VZ","CN":"CN","FT":"FT","F":"F",
-  "SD":"SD","SP":"SP","SB":"SB","SBR":"BR","BR":"BR","RZ":"RZ","RGN":"RGN","RM":"RM","PO":"PO"
+  "SD":"SD","SP":"SP","SB":"SB","SB26":"SB","SBR":"BR","BR":"BR","RZ":"RZ","RGN":"RGN","RM":"RM","PO":"PO"
 };
 
 var CANADIAN_PROVINCES = ["AB","BC","MB","NB","NL","NS","NT","NU","ON","PE","QC","SK","YT"];
@@ -583,6 +673,7 @@ function findColumn(fields, synonyms){
 var lastFileName = "";
 var lastCsvText = "";
 var lastCsvFilename = "";
+var lastFinalRows = [];
 
 /* ===================== UI WIRING ===================== */
 
@@ -618,14 +709,21 @@ document.getElementById("downloadBtn").addEventListener("click", function(){
 var pendingFile = null;
 var GLOBAL_CONTACT_METHOD = "phone";
 var GLOBAL_COMMENT_CONTACT = "";
+var GLOBAL_RATE_CHOICE = "none";
+var pendingFinalRows = null;
+var pendingAnomalies = null;
+var pendingKnownIssue = false;
+var pendingInputRowCount = 0;
 var contactModalOverlay = document.getElementById("contactModalOverlay");
 var commentContactInput = document.getElementById("commentContactInput");
+var rateModalOverlay = document.getElementById("rateModalOverlay");
 
 function showContactModal(file){
   pendingFile = file;
   document.querySelectorAll('input[name="commentContactChoice"]')[0].checked = true;
   commentContactInput.style.display = "none";
   commentContactInput.value = "";
+  document.querySelectorAll('input[name="rateChoice"]')[0].checked = true;
   contactModalOverlay.style.display = "flex";
 }
 
@@ -650,6 +748,9 @@ document.getElementById("modalContinueBtn").addEventListener("click", function()
   var typedValue = cleanText(commentContactInput.value);
   GLOBAL_COMMENT_CONTACT = (commentChoice === "none" || typedValue === "") ? "" : typedValue;
 
+  var rateChoiceRadio = document.querySelector('input[name="rateChoice"]:checked');
+  GLOBAL_RATE_CHOICE = rateChoiceRadio ? rateChoiceRadio.value : "none";
+
   contactModalOverlay.style.display = "none";
   if (pendingFile) {
     handleFile(pendingFile);
@@ -672,8 +773,16 @@ function resetUI(){
   lastCsvFilename = "";
   GLOBAL_CONTACT_METHOD = "phone";
   GLOBAL_COMMENT_CONTACT = "";
+  GLOBAL_RATE_CHOICE = "none";
   fileInput.value = "";
   dropZone.style.display = "block";
+  document.getElementById("lookupCol").style.display = "none";
+  document.getElementById("topRow").classList.remove("side-by-side");
+  document.getElementById("anomalyRow").style.display = "none";
+  document.getElementById("lookupInput").value = "";
+  document.getElementById("lookupResultsList").innerHTML = "";
+  document.getElementById("lookupDetailWrap").innerHTML = '<div class="lookup-empty-hint">Select a load above.</div>';
+  lastFinalRows = [];
 }
 
 function showError(msg){
@@ -850,7 +959,8 @@ function runPipeline(parsed){
       pickupLatest: pickupLatest,
       comment: comment,
       rawComment: rawComment,
-      isTeam: (rawEquip.toUpperCase() === "POTM")
+      isTeam: (rawEquip.toUpperCase() === "POTM"),
+      includeRate: false
     };
 
     expandedRows.push(baseRow);
@@ -907,10 +1017,25 @@ function runPipeline(parsed){
     return;
   }
 
-  // Build DAT output rows
-  var outputData = finalRows.map(buildDatRow);
+  // Apply rate flags and proceed
+  if (GLOBAL_RATE_CHOICE === "all") {
+    finalRows.forEach(function(r){ r.includeRate = true; });
+    finishOutput(finalRows, inputRowCount, anomalies, knownIssuePresent);
+  } else if (GLOBAL_RATE_CHOICE === "some") {
+    finalRows.forEach(function(r){ r.includeRate = true; }); // default all checked
+    pendingFinalRows = finalRows;
+    pendingAnomalies = anomalies;
+    pendingKnownIssue = knownIssuePresent;
+    pendingInputRowCount = inputRowCount;
+    showRateModal(finalRows);
+  } else {
+    finalRows.forEach(function(r){ r.includeRate = false; });
+    finishOutput(finalRows, inputRowCount, anomalies, knownIssuePresent);
+  }
+}
 
-  // Generate CSV & download
+function finishOutput(finalRows, inputRowCount, anomalies, knownIssuePresent){
+  var outputData = finalRows.map(buildDatRow);
   var csv = Papa.unparse({ fields: DAT_HEADERS, data: outputData.map(function(o){ return DAT_HEADERS.map(function(h){ return o[h]; }); }) });
   var today = new Date();
   var fname = "DAT_Bulk_Upload_" + today.getFullYear() + "-" + pad2(today.getMonth()+1) + "-" + pad2(today.getDate()) + ".csv";
@@ -918,7 +1043,6 @@ function runPipeline(parsed){
   lastCsvFilename = fname;
   downloadCsv(csv, fname);
 
-  // Update UI
   dropZone.style.display = "none";
   statusGrid.style.display = "grid";
   document.getElementById("statFileName").textContent = lastFileName;
@@ -933,7 +1057,141 @@ function runPipeline(parsed){
   processAnotherWrap.style.display = "block";
 
   renderAnomalyReport(anomalies, knownIssuePresent);
+
+  lastFinalRows = finalRows;
+  initLookup(finalRows);
+  document.getElementById("lookupCol").style.display = "block";
+  document.getElementById("topRow").classList.add("side-by-side");
+  document.getElementById("anomalyRow").style.display = "block";
 }
+
+/* ===================== RATE SELECTION MODAL ===================== */
+
+var _rateSortCol = null;
+var _rateSortDir = 1; // 1 = asc, -1 = desc
+
+function showRateModal(rows){
+  _rateSortCol = null;
+  _rateSortDir = 1;
+  renderRateTable(rows);
+  rateModalOverlay.style.display = "flex";
+}
+
+function renderRateTable(rows){
+  var tbody = document.getElementById("rateTableBody");
+  tbody.innerHTML = "";
+  var sorted = rows.slice();
+  if (_rateSortCol) {
+    sorted.sort(function(a, b){
+      var av = (a[_rateSortCol] || "").toString().toLowerCase();
+      var bv = (b[_rateSortCol] || "").toString().toLowerCase();
+      return av < bv ? -_rateSortDir : av > bv ? _rateSortDir : 0;
+    });
+  }
+  sorted.forEach(function(row, idx){
+    var rate = (row.targetPayNum !== null && row.targetPayNum > 0) ? "$" + row.targetPayNum.toLocaleString() : "—";
+    var checked = (row.includeRate !== false) ? "checked" : "";
+    var bg = idx % 2 === 0 ? "#ffffff" : "#f4f6f9";
+    var tr = document.createElement("tr");
+    tr.style.background = bg;
+    tr.setAttribute("data-order", row.order);
+    tr.innerHTML =
+      '<td style="padding:8px 12px;color:#152a52;font-weight:600;">' + esc(row.order) + '</td>' +
+      '<td style="padding:8px 12px;">' + esc(row.origCity) + '</td>' +
+      '<td style="padding:8px 12px;">' + esc(row.origState) + '</td>' +
+      '<td style="padding:8px 12px;">' + esc(row.destCity) + '</td>' +
+      '<td style="padding:8px 12px;">' + esc(row.destState) + '</td>' +
+      '<td style="padding:8px 12px;">' + esc(row.equipment) + '</td>' +
+      '<td style="padding:8px 12px;text-align:right;font-weight:600;color:' + (rate === "—" ? "#999" : "#0a1024") + ';">' + esc(rate) + '</td>' +
+      '<td style="padding:8px 12px;text-align:center;"><input type="checkbox" class="rate-row-check" data-order="' + esc(row.order) + '" ' + checked + '></td>';
+    tbody.appendChild(tr);
+  });
+  updateSelectAllState();
+}
+
+function updateSelectAllState(){
+  var all = document.querySelectorAll(".rate-row-check");
+  var checked = document.querySelectorAll(".rate-row-check:checked");
+  var master = document.getElementById("rateSelectAll");
+  if (!master) return;
+  if (checked.length === 0) {
+    master.checked = false;
+    master.indeterminate = false;
+  } else if (checked.length === all.length) {
+    master.checked = true;
+    master.indeterminate = false;
+  } else {
+    master.checked = false;
+    master.indeterminate = true;
+  }
+}
+
+document.getElementById("rateSelectAll").addEventListener("change", function(){
+  var val = this.checked;
+  document.querySelectorAll(".rate-row-check").forEach(function(cb){ cb.checked = val; });
+  if (pendingFinalRows) {
+    pendingFinalRows.forEach(function(r){ r.includeRate = val; });
+  }
+});
+
+document.getElementById("rateTableBody").addEventListener("change", function(e){
+  if (!e.target || !e.target.classList.contains("rate-row-check")) return;
+  var order = e.target.getAttribute("data-order");
+  if (pendingFinalRows) {
+    pendingFinalRows.forEach(function(r){ if (r.order === order) r.includeRate = e.target.checked; });
+  }
+  updateSelectAllState();
+});
+
+document.getElementById("rateTableHead").addEventListener("click", function(e){
+  var th = e.target.closest("th[data-col]");
+  if (!th) return;
+  var col = th.getAttribute("data-col");
+  if (!col) return;
+  if (_rateSortCol === col) {
+    _rateSortDir *= -1;
+  } else {
+    _rateSortCol = col;
+    _rateSortDir = 1;
+  }
+  // sync includeRate from checkboxes before re-render
+  if (pendingFinalRows) {
+    document.querySelectorAll(".rate-row-check").forEach(function(cb){
+      var ord = cb.getAttribute("data-order");
+      pendingFinalRows.forEach(function(r){ if (r.order === ord) r.includeRate = cb.checked; });
+    });
+  }
+  renderRateTable(pendingFinalRows || []);
+  // update sort arrows
+  document.querySelectorAll(".sort-arrow").forEach(function(el){
+    var c = el.getAttribute("data-col");
+    el.innerHTML = (c === _rateSortCol) ? (_rateSortDir === 1 ? "&#8595;" : "&#8593;") : "&#8597;";
+  });
+});
+
+document.getElementById("rateCancelBtn").addEventListener("click", function(){
+  rateModalOverlay.style.display = "none";
+  pendingFinalRows = null;
+  pendingAnomalies = null;
+  pendingFile = null;
+  fileInput.value = "";
+});
+
+document.getElementById("rateConfirmBtn").addEventListener("click", function(){
+  // sync final checkbox state before confirming
+  document.querySelectorAll(".rate-row-check").forEach(function(cb){
+    var ord = cb.getAttribute("data-order");
+    if (pendingFinalRows) {
+      pendingFinalRows.forEach(function(r){ if (r.order === ord) r.includeRate = cb.checked; });
+    }
+  });
+  rateModalOverlay.style.display = "none";
+  if (pendingFinalRows) {
+    finishOutput(pendingFinalRows, pendingInputRowCount, pendingAnomalies, pendingKnownIssue);
+    pendingFinalRows = null;
+    pendingAnomalies = null;
+  }
+});
 
 /* ===================== COMMENT / DROP TRAILER ===================== */
 
@@ -1044,7 +1302,7 @@ function buildDatRow(row){
   o["Allow Private Network Booking"] = "no";
   o["Allow Private Network Bidding"] = "no";
   o["Use DAT Loadboard*"] = "yes";
-  o["DAT Loadboard Rate"] = ""; // hard rule: never populate rate
+  o["DAT Loadboard Rate"] = (row.includeRate && row.targetPayNum !== null && row.targetPayNum > 0) ? row.targetPayNum : "";
   o["Allow DAT Loadboard Booking"] = "no";
   o["Use Extended Network"] = "no";
   o["Contact Method*"] = contactMethod;
@@ -1128,6 +1386,202 @@ function renderAnomalyReport(a, knownIssuePresent){
 
   document.getElementById("anomalySections").innerHTML = html;
   anomalyReport.style.display = "block";
+}
+
+/* ===================== LOAD LOOKUP ===================== */
+
+var _lookupShowRate = true;
+var _lookupActiveRow = null;
+
+function initLookup(rows){
+  var input = document.getElementById("lookupInput");
+  input.oninput = function(){ runLookupSearch(rows, this.value.trim()); };
+  document.getElementById("lookupResultsList").innerHTML = "";
+  document.getElementById("lookupDetailWrap").innerHTML = '<div class="lookup-empty-hint">Search for a load to see its email-ready detail here.</div>';
+  _lookupActiveRow = null;
+}
+
+function runLookupSearch(rows, q){
+  var listEl = document.getElementById("lookupResultsList");
+  if (q === "") { listEl.innerHTML = ""; return; }
+  var ql = q.toLowerCase();
+  var matches = rows.filter(function(r){
+    return r.order.toLowerCase().indexOf(ql) !== -1 ||
+           r.origCity.toLowerCase().indexOf(ql) !== -1 ||
+           r.origState.toLowerCase().indexOf(ql) !== -1 ||
+           r.destCity.toLowerCase().indexOf(ql) !== -1 ||
+           r.destState.toLowerCase().indexOf(ql) !== -1;
+  });
+  if (matches.length === 0){
+    listEl.innerHTML = '<div class="lookup-no-results">No loads match.</div>';
+    return;
+  }
+  var html = '<div class="lookup-results-list">';
+  matches.forEach(function(r, i){
+    html += '<div class="lookup-result-row" data-idx="' + i + '">' +
+      '<div class="lookup-result-order">' + esc(r.order) + ' &mdash; ' + esc(r.equipment) + '</div>' +
+      '<div class="lookup-result-route">' + esc(r.origCity) + ', ' + esc(r.origState) + ' &rarr; ' + esc(r.destCity) + ', ' + esc(r.destState) + '</div>' +
+      '</div>';
+  });
+  html += '</div>';
+  listEl.innerHTML = html;
+  listEl.querySelectorAll(".lookup-result-row").forEach(function(el, i){
+    el.addEventListener("click", function(){
+      listEl.querySelectorAll(".lookup-result-row").forEach(function(x){ x.classList.remove("active"); });
+      el.classList.add("active");
+      _lookupActiveRow = matches[i];
+      renderLookupDetail(matches[i]);
+    });
+  });
+}
+
+function renderLookupDetail(row){
+  _lookupActiveRow = row;
+  var detailWrap = document.getElementById("lookupDetailWrap");
+  var msgText = buildLookupMessage(row, _lookupShowRate);
+  detailWrap.innerHTML =
+    '<div class="lookup-detail">' +
+    '<div class="lookup-detail-label">Order ' + esc(row.order) + ' &mdash; ' + esc(row.origCity) + ', ' + esc(row.origState) + ' &rarr; ' + esc(row.destCity) + ', ' + esc(row.destState) + '</div>' +
+    '<pre class="lookup-email-pre" id="lookupEmailPre">' + esc(msgText) + '</pre>' +
+    '<div class="lookup-controls">' +
+    '<label class="toggle-sw" title="Toggle rate visibility"><input type="checkbox" id="lookupRateToggle"' + (_lookupShowRate ? ' checked' : '') + '><span class="toggle-track"></span></label>' +
+    '<span class="toggle-label-text" id="lookupToggleLabel">' + (_lookupShowRate ? 'Rate shown' : 'Rate hidden') + '</span>' +
+    '<button class="primary lookup-copy-btn" id="lookupCopyBtn">Copy to clipboard</button>' +
+    '</div>' +
+    '</div>';
+  document.getElementById("lookupRateToggle").addEventListener("change", function(){
+    _lookupShowRate = this.checked;
+    document.getElementById("lookupToggleLabel").textContent = _lookupShowRate ? "Rate shown" : "Rate hidden";
+    document.getElementById("lookupEmailPre").textContent = buildLookupMessage(_lookupActiveRow, _lookupShowRate);
+  });
+  document.getElementById("lookupCopyBtn").addEventListener("click", function(){
+    var text = document.getElementById("lookupEmailPre").textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){
+        var btn = document.getElementById("lookupCopyBtn");
+        btn.textContent = "Copied!";
+        setTimeout(function(){ btn.textContent = "Copy to clipboard"; }, 1800);
+      });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      var btn = document.getElementById("lookupCopyBtn");
+      btn.textContent = "Copied!";
+      setTimeout(function(){ btn.textContent = "Copy to clipboard"; }, 1800);
+    }
+  });
+}
+
+function buildLookupMessage(row, showRate){
+  var lines = [];
+  var comment = row.rawComment || "";
+
+  // PU line
+  var puDate = formatShortDateRange(row.pickupEarliest, row.pickupLatest);
+  var puSched = extractSched(comment, "pu");
+  var puLine = "PU: " + row.origCity + ", " + row.origState;
+  if (puDate) puLine += " – " + puDate;
+  if (puSched) puLine += " – " + puSched;
+  lines.push(puLine);
+
+  // DEL line
+  var delSched = extractSched(comment, "del");
+  var delLine = "DEL: " + row.destCity + ", " + row.destState;
+  if (delSched) delLine += " – " + delSched;
+  lines.push(delLine);
+
+  // Commodity
+  var commodity = parseLookupCommodity(comment);
+  if (commodity) lines.push("Commodity: " + commodity);
+
+  // Weight
+  if (row.weightNum !== null && row.weightNum > 0) {
+    lines.push("Weight: " + row.weightNum.toLocaleString() + " lbs");
+  }
+
+  // Rate
+  if (showRate && row.targetPayNum !== null && row.targetPayNum > 0) {
+    lines.push("Rate: $" + row.targetPayNum.toLocaleString());
+  } else {
+    lines.push("How much would you need for this?");
+  }
+
+  return lines.join("\n");
+}
+
+function extractSched(comment, side){
+  // Split on common separators to get segments
+  var segs = comment.split(/[|,;\n\/]/);
+  var sidePat = side === "pu"
+    ? /\b(pu|pickup|pick[\s-]?up)\b/i
+    : /\b(del|delivery|deliver)\b/i;
+  var otherPat = side === "pu"
+    ? /\b(del|delivery|deliver)\b/i
+    : /\b(pu|pickup|pick[\s-]?up)\b/i;
+
+  var specific = [], general = [];
+  segs.forEach(function(s){
+    s = s.trim();
+    if (sidePat.test(s)) specific.push(s);
+    else if (!otherPat.test(s)) general.push(s);
+  });
+  var pool = specific.length ? specific : (side === "pu" ? general : []);
+
+  var result = [];
+  var seen = {};
+  pool.forEach(function(seg){
+    // FCFS
+    if (/\bFCFS\b/i.test(seg) && !seen["fcfs"]) { result.push("FCFS"); seen["fcfs"] = true; }
+    // Appt time: "appt 0800" or "appt: 08:00"
+    var appt = seg.match(/\b(?:appt|appointment)\b[^\d]{0,8}(\d{1,2}:?\d{2}\s*(?:am|pm)?)/i);
+    if (appt && !seen["appt"]) { result.push("Appt " + appt[1].trim()); seen["appt"] = true; }
+    // Time range: 0700-1500 or 7:00-15:00 or 7am-3pm
+    if (!seen["range"]) {
+      var range = seg.match(/\b(\d{1,2}:?\d{2}\s*(?:am|pm)?)\s*[-–]\s*(\d{1,2}:?\d{2}\s*(?:am|pm)?)\b/i);
+      if (range && !appt) { result.push(range[1].trim() + "-" + range[2].trim()); seen["range"] = true; }
+    }
+    // "open 0700" or "hours 0700"
+    if (!seen["open"] && !seen["range"] && !seen["appt"]) {
+      var open = seg.match(/\b(?:open|hours?|dock)\b[^\d]{0,8}(\d{3,4}|\d{1,2}:\d{2})/i);
+      if (open) { result.push(open[1].trim()); seen["open"] = true; }
+    }
+  });
+  return result.join(", ");
+}
+
+function formatShortDateRange(earliest, latest){
+  var MO = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  function parse(s){ var m = (s||"").match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/); return m ? {mo:+m[1],dy:+m[2]} : null; }
+  var ep = parse(earliest);
+  if (!ep) return earliest || "";
+  var base = MO[ep.mo-1] + " " + ep.dy;
+  var lp = parse(latest);
+  if (!lp || (lp.mo === ep.mo && lp.dy === ep.dy)) return base;
+  if (lp.mo === ep.mo) return base + "-" + lp.dy;
+  return base + " – " + MO[lp.mo-1] + " " + lp.dy;
+}
+
+function parseLookupCommodity(comment){
+  // Empty returnables / beer empties — check first
+  if (/empty\s*(bottles?|cans?|containers?|returnables?)/i.test(comment) || /\bempties\b/i.test(comment) || /\breturnables?\b/i.test(comment)) {
+    return "Empty bottles / cans";
+  }
+  if (/\bbeer\b|\bale\b|\blager\b|\bipa\b|\bstout\b|\bporter\b|\bbrewery\b|\bbrewing\b|\bcanned\s+beer\b/i.test(comment)) return "Beer";
+  if (/\bwine\b|\bwinery\b|\bvineyard\b|\bmerlot\b|\bchardonnay\b|\bcabernet\b/i.test(comment)) return "Wine";
+  if (/\bwhiske?y\b|\bbourbon\b|\bvodka\b|\brum\b|\bgin\b|\btequila\b|\bspirits?\b|\bliquor\b/i.test(comment)) return "Spirits / liquor";
+  if (/\bbeverage\b|\bdrinks?\b|\bsoda\b|\bpop\b|\bjuice\b/i.test(comment)) return "Beverages";
+  if (/\bauto\s*parts?\b|\bautomotive\b|\bcar\s*parts?\b/i.test(comment)) return "Auto parts";
+  if (/\bgrocery\b|\bgroceries\b|\bfood\s*grade\b|\bproduce\b/i.test(comment)) return "Grocery / food";
+  if (/\bpaper\b|\bpaperboard\b|\bpackaging\b|\bcorrugated\b/i.test(comment)) return "Paper / packaging";
+  if (/\belectronics?\b|\bcomputers?\b|\bappliances?\b/i.test(comment)) return "Electronics";
+  if (/\bfurniture\b|\bhome\s*goods?\b/i.test(comment)) return "Furniture";
+  if (/\bsteel\b|\bmetal\b|\bcoils?\b|\bscrap\b/i.test(comment)) return "Steel / metal";
+  if (/\blumber\b|\bwood\b|\btimber\b/i.test(comment)) return "Lumber";
+  if (/\bplastic\b|\bresin\b|\bpolymers?\b/i.test(comment)) return "Plastics / resin";
+  return null;
 }
 
 })();
