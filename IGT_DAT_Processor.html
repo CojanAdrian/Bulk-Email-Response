@@ -1479,13 +1479,18 @@ function runLookupSearch(rows, q){
   var listEl = document.getElementById("lookupResultsList");
   if (q === "") { listEl.innerHTML = ""; return; }
   var ql = q.toLowerCase();
-  var matches = rows.filter(function(r){
-    return r.order.toLowerCase().indexOf(ql) !== -1 ||
-           r.origCity.toLowerCase().indexOf(ql) !== -1 ||
-           r.origState.toLowerCase().indexOf(ql) !== -1 ||
-           r.destCity.toLowerCase().indexOf(ql) !== -1 ||
-           r.destState.toLowerCase().indexOf(ql) !== -1;
-  });
+  function scoreRow(r){
+    var s = 0;
+    if (r.order.toLowerCase().indexOf(ql) !== -1)   s += 60; // order # match
+    if (r.origState.toLowerCase() === ql)            s += 50; // exact origin state  ← highest geo priority
+    if (r.origCity.toLowerCase().indexOf(ql) !== -1) s += 35; // origin city contains query
+    if (r.destState.toLowerCase() === ql)            s += 15; // exact dest state
+    if (r.destCity.toLowerCase().indexOf(ql) !== -1) s +=  8; // dest city contains query
+    return s;
+  }
+  var _scored = rows.map(function(r){ return { row: r, score: scoreRow(r) }; }).filter(function(x){ return x.score > 0; });
+  _scored.sort(function(a, b){ return b.score - a.score; });
+  var matches = _scored.map(function(x){ return x.row; });
   if (matches.length === 0){
     listEl.innerHTML = '<div class="lookup-no-results">No loads match.</div>';
     return;
