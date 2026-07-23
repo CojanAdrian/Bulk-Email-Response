@@ -385,7 +385,7 @@
   .lookup-no-results{padding:10px 12px;text-align:center;color:var(--gray);font-size:13px;}
   .lookup-detail{border-top:2px solid var(--navy);padding-top:14px;margin-top:4px;}
   .lookup-detail-label{font-size:10.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px;}
-  .lookup-email-pre{font-family:inherit;font-size:13px;line-height:1.75;white-space:pre-wrap;background:#f8f9fb;padding:12px 14px;border-radius:7px;border:1px solid #e2e8f0;margin:0 0 12px;color:#1a2540;}
+  .lookup-email-pre{font-family:inherit;font-size:13px;line-height:1.75;white-space:pre-wrap;background:#f8f9fb;padding:12px 14px;border-radius:7px;border:1px solid #e2e8f0;margin:0 0 12px;color:#1a2540;width:100%;box-sizing:border-box;resize:vertical;display:block;min-height:80px;}
   .lookup-controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
   .toggle-sw{position:relative;display:inline-block;width:42px;height:22px;vertical-align:middle;cursor:pointer;flex-shrink:0;}
   .toggle-sw input{opacity:0;width:0;height:0;}
@@ -482,7 +482,7 @@
 
     <div style="margin-bottom:12px;">
       <label style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:5px;">Email Body</label>
-      <pre id="blastEmailPre" style="font-family:inherit;font-size:13px;line-height:1.75;white-space:pre-wrap;background:#f8f9fb;padding:12px 14px;border-radius:7px;border:1px solid #e2e8f0;margin:0 0 8px;color:#1a2540;"></pre>
+      <textarea id="blastEmailPre" style="font-family:inherit;font-size:13px;line-height:1.75;white-space:pre-wrap;background:#f8f9fb;padding:12px 14px;border-radius:7px;border:1px solid #e2e8f0;margin:0 0 8px;color:#1a2540;width:100%;box-sizing:border-box;resize:vertical;display:block;min-height:80px;"></textarea>
       <div style="display:flex;align-items:center;gap:8px;">
         <label class="toggle-sw" title="Toggle rate visibility"><input type="checkbox" id="blastRateToggle"><span class="toggle-track"></span></label>
         <span class="toggle-label-text" id="blastRateLabel">Rate hidden</span>
@@ -1516,7 +1516,7 @@ function renderLookupDetail(row){
   detailWrap.innerHTML =
     '<div class="lookup-detail">' +
     '<div class="lookup-detail-label">Order ' + esc(row.order) + ' &mdash; ' + esc(row.origCity) + ', ' + esc(row.origState) + ' &rarr; ' + esc(row.destCity) + ', ' + esc(row.destState) + '</div>' +
-    '<pre class="lookup-email-pre" id="lookupEmailPre">' + esc(msgText) + '</pre>' +
+    '<textarea class="lookup-email-pre" id="lookupEmailPre"></textarea>' +
     '<div class="lookup-controls">' +
     '<label class="toggle-sw" title="Toggle rate visibility"><input type="checkbox" id="lookupRateToggle"' + (_lookupShowRate ? ' checked' : '') + '><span class="toggle-track"></span></label>' +
     '<span class="toggle-label-text" id="lookupToggleLabel">' + (_lookupShowRate ? 'Rate shown' : 'Rate hidden') + '</span>' +
@@ -1525,13 +1525,14 @@ function renderLookupDetail(row){
     (function(){ var w = detectMultiStop(row); return w ? '<div class="multi-stop-warn">&#9888; ' + esc(w) + ' &mdash; add additional stop info manually before sending</div>' : ''; })() +
     (row.rawComment ? '<div class="lookup-comment"><div class="lookup-comment-label">Planning Comment</div><div class="lookup-comment-text">' + esc(row.rawComment) + '</div></div>' : '') +
     '</div>';
+  document.getElementById("lookupEmailPre").value = msgText;
   document.getElementById("lookupRateToggle").addEventListener("change", function(){
     _lookupShowRate = this.checked;
     document.getElementById("lookupToggleLabel").textContent = _lookupShowRate ? "Rate shown" : "Rate hidden";
-    document.getElementById("lookupEmailPre").textContent = buildLookupMessage(_lookupActiveRow, _lookupShowRate);
+    document.getElementById("lookupEmailPre").value = buildLookupMessage(_lookupActiveRow, _lookupShowRate);
   });
   document.getElementById("lookupCopyBtn").addEventListener("click", function(){
-    var text = document.getElementById("lookupEmailPre").textContent;
+    var text = document.getElementById("lookupEmailPre").value;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(text).then(function(){
         var btn = document.getElementById("lookupCopyBtn");
@@ -1799,7 +1800,7 @@ function parseLookupCommodity(comment){
       "Load Available | " + row.origCity + " " + row.origState + " → " + row.destCity + " " + row.destState + " | " + row.equipment;
     document.getElementById("blastRateToggle").checked = _blastShowRate;
     document.getElementById("blastRateLabel").textContent = _blastShowRate ? "Rate shown" : "Rate hidden";
-    document.getElementById("blastEmailPre").textContent = buildLookupMessage(row, _blastShowRate);
+    document.getElementById("blastEmailPre").value = buildLookupMessage(row, _blastShowRate);
   }
 
   function parseBlastEmails(raw){
@@ -1814,7 +1815,7 @@ function parseLookupCommodity(comment){
   document.getElementById("blastRateToggle").addEventListener("change", function(){
     _blastShowRate = this.checked;
     document.getElementById("blastRateLabel").textContent = _blastShowRate ? "Rate shown" : "Rate hidden";
-    document.getElementById("blastEmailPre").textContent = buildLookupMessage(_blastRow, _blastShowRate);
+    document.getElementById("blastEmailPre").value = buildLookupMessage(_blastRow, _blastShowRate);
   });
 
   document.getElementById("blastEmailsInput").addEventListener("input", function(){
@@ -1831,7 +1832,7 @@ function parseLookupCommodity(comment){
       return;
     }
     var subject = document.getElementById("blastSubject").value;
-    var body = document.getElementById("blastEmailPre").textContent;
+    var body = document.getElementById("blastEmailPre").value;
     var url = "https://mail.google.com/mail/?view=cm&bcc=" + encodeURIComponent(emails.join(",")) +
               "&su=" + encodeURIComponent(subject) + "&body=" + encodeURIComponent(body);
     window.open(url, "_blank");
