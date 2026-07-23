@@ -395,6 +395,10 @@
   .toggle-sw input:checked + .toggle-track:before{transform:translateX(20px);}
   .toggle-label-text{font-size:13px;font-weight:600;color:var(--navy);user-select:none;}
   .lookup-copy-btn{margin-left:auto;padding:7px 16px;font-size:12.5px;}
+  .lookup-comment{margin-top:14px;padding-top:12px;border-top:1px solid #e2e8f0;}
+  .lookup-comment-label{font-size:10.5px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px;}
+  .lookup-comment-text{font-size:12.5px;line-height:1.65;color:#3a4560;white-space:pre-wrap;background:#f8f9fb;padding:10px 13px;border-radius:6px;border:1px solid #e2e8f0;}
+  .multi-stop-warn{color:#c62828;font-weight:700;font-size:12.5px;margin-top:10px;padding:6px 10px;background:#fff3f3;border:1px solid #f5c6c6;border-radius:6px;display:flex;align-items:center;gap:6px;}
   @media(max-width:700px){#topRow.side-by-side{flex-direction:column;} #topRow.side-by-side #uploadCol,#lookupCol{flex:none;width:100%;position:static;}}
 </style>
 </head>
@@ -593,6 +597,12 @@ var REQUIRED_COLS = {
   earlyPU: ["early p u dt","early pu dt","early pickup date","early p/u dt"],
   latePU: ["late p u dt","late pu dt","late pickup date","late p/u dt"],
   comment: ["planning comment"]
+};
+var OPTIONAL_COLS = {
+  lateDel: ["late del dt","late del","late delivery dt","delivery date","del dt"],
+  stops: ["stops","stop count","num stops","number of stops"],
+  origZip: ["origin zip","origin postal code","orig zip","orig zip code","pickup zip","pu zip","origin postal","origin zip code"],
+  destZip: ["dest zip","destination zip","dest postal code","dest zip code","delivery zip","del zip","drop zip","destination postal","destination postal code","destination zip code"]
 };
 
 /* ===================== UTIL ===================== */
@@ -841,6 +851,11 @@ function runPipeline(parsed){
     return;
   }
 
+  Object.keys(OPTIONAL_COLS).forEach(function(key){
+    var col = findColumn(fields, OPTIONAL_COLS[key]);
+    if (col !== null) colMap[key] = col;
+  });
+
   // drop fully-blank rows silently
   rows = rows.filter(function(r){
     return Object.keys(r).some(function(k){ return cleanText(r[k]) !== ""; });
@@ -881,6 +896,10 @@ function runPipeline(parsed){
     var rawEarlyPU = cleanText(r[colMap.earlyPU]);
     var rawLatePU = cleanText(r[colMap.latePU]);
     var rawComment = cleanText(r[colMap.comment]);
+    var rawLateDelDt = colMap.lateDel ? cleanText(r[colMap.lateDel]) : "";
+    var rawStops = colMap.stops ? cleanText(r[colMap.stops]) : "0";
+    var origZip = colMap.origZip ? cleanText(r[colMap.origZip]).replace(/\D/g, "").slice(0, 5) : "";
+    var destZip = colMap.destZip ? cleanText(r[colMap.destZip]).replace(/\D/g, "").slice(0, 5) : "";
 
     if (order === KNOWN_ISSUE_ORDER) knownIssuePresent = true;
 
@@ -957,6 +976,12 @@ function runPipeline(parsed){
       targetPayNum: targetPayNum,
       pickupEarliest: pickupEarliest,
       pickupLatest: pickupLatest,
+      rawEarlyPUDt: rawEarlyPU,
+      rawLatePUDt: rawLatePU,
+      rawLateDelDt: rawLateDelDt,
+      stops: parseInt(rawStops) || 0,
+      origZip: origZip,
+      destZip: destZip,
       comment: comment,
       rawComment: rawComment,
       isTeam: (rawEquip.toUpperCase() === "POTM"),
@@ -1448,6 +1473,8 @@ function renderLookupDetail(row){
     '<span class="toggle-label-text" id="lookupToggleLabel">' + (_lookupShowRate ? 'Rate shown' : 'Rate hidden') + '</span>' +
     '<button class="primary lookup-copy-btn" id="lookupCopyBtn">Copy to clipboard</button>' +
     '</div>' +
+    (function(){ var w = detectMultiStop(row); return w ? '<div class="multi-stop-warn">&#9888; ' + esc(w) + ' &mdash; add additional stop info manually before sending</div>' : ''; })() +
+    (row.rawComment ? '<div class="lookup-comment"><div class="lookup-comment-label">Planning Comment</div><div class="lookup-comment-text">' + esc(row.rawComment) + '</div></div>' : '') +
     '</div>';
   document.getElementById("lookupRateToggle").addEventListener("change", function(){
     _lookupShowRate = this.checked;
@@ -1475,22 +1502,71 @@ function renderLookupDetail(row){
   });
 }
 
+function parseMcLeodDt(s){
+  if (!s) return null;
+  s = s.trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{3,4})$/);
+  if (!m) return null;
+  var mo = m[1].length < 2 ? "0" + m[1] : m[1];
+  var dy = m[2].length < 2 ? "0" + m[2] : m[2];
+  var time = m[4].length < 4 ? "0" + m[4] : m[4];
+  return { date: mo + "/" + dy + "/" + m[3], time: time };
+}
+
+function fmtTime(t){
+  t = ("0000" + String(t)).slice(-4);
+  var h = parseInt(t.substring(0, 2), 10);
+  var min = t.substring(2, 4);
+  var p = h >= 12 ? "pm" : "am";
+  var h12 = h % 12 || 12;
+  return min === "00" ? h12 + p : h12 + ":" + min + p;
+}
+
+function buildPUSched(rawEarly, rawLate){
+  var e = parseMcLeodDt(rawEarly);
+  var l = parseMcLeodDt(rawLate);
+  if (!e && !l) return "";
+  if (!e) e = l;
+  if (!l) l = e;
+  if (e.date === l.date) {
+    if (e.time === l.time) return e.date + " " + fmtTime(e.time) + " appt";
+    return e.date + " " + fmtTime(e.time) + " - " + fmtTime(l.time) + " FCFS";
+  }
+  return e.date + " " + fmtTime(e.time) + " – " + l.date + " " + fmtTime(l.time) + " FCFS";
+}
+
+function buildDELSched(rawDel){
+  var d = parseMcLeodDt(rawDel);
+  if (!d) return "";
+  return d.date + " " + fmtTime(d.time);
+}
+
 function buildLookupMessage(row, showRate){
   var lines = [];
   var comment = row.rawComment || "";
 
-  // PU line
-  var puDate = formatShortDateRange(row.pickupEarliest, row.pickupLatest);
-  var puSched = extractSched(comment, "pu");
-  var puLine = "PU: " + row.origCity + ", " + row.origState;
-  if (puDate) puLine += " – " + puDate;
-  if (puSched) puLine += " – " + puSched;
+  // PU line — use raw datetime columns when available, fall back to date-only + comment
+  var puLine = "PU: " + row.origCity + ", " + row.origState + (row.origZip ? " " + row.origZip : "");
+  if (row.rawEarlyPUDt || row.rawLatePUDt) {
+    var puSched = buildPUSched(row.rawEarlyPUDt, row.rawLatePUDt);
+    if (puSched) puLine += " – " + puSched;
+  } else {
+    var puDate = formatShortDateRange(row.pickupEarliest, row.pickupLatest);
+    var puSchedAlt = extractSched(comment, "pu");
+    if (puDate) puLine += " – " + puDate;
+    if (puSchedAlt) puLine += " – " + puSchedAlt;
+  }
   lines.push(puLine);
 
-  // DEL line
-  var delSched = extractSched(comment, "del");
-  var delLine = "DEL: " + row.destCity + ", " + row.destState;
-  if (delSched) delLine += " – " + delSched;
+  // DEL line — use raw Late Del Dt when available
+  var delLine = "DEL: " + row.destCity + ", " + row.destState + (row.destZip ? " " + row.destZip : "");
+  if (row.rawLateDelDt) {
+    var delSched = buildDELSched(row.rawLateDelDt);
+    if (delSched) delLine += " – " + delSched;
+  } else {
+    var delSchedAlt = extractSched(comment, "del");
+    if (delSchedAlt) delLine += " – " + delSchedAlt;
+  }
   lines.push(delLine);
 
   // Commodity
@@ -1501,6 +1577,10 @@ function buildLookupMessage(row, showRate){
   if (row.weightNum !== null && row.weightNum > 0) {
     lines.push("Weight: " + row.weightNum.toLocaleString() + " lbs");
   }
+
+  // Temperature (reefer only)
+  var temp = parseTemp(comment, row.equipment);
+  if (temp) lines.push("Temp: " + temp);
 
   // Rate
   if (showRate && row.targetPayNum !== null && row.targetPayNum > 0) {
@@ -1564,17 +1644,65 @@ function formatShortDateRange(earliest, latest){
   return base + " – " + MO[lp.mo-1] + " " + lp.dy;
 }
 
+var _REEFER_EQUIPS = {"R":1,"RV":1,"VR":1,"RR":1,"RZ":1,"RM":1};
+
+function parseTemp(comment, equipment){
+  if (!_REEFER_EQUIPS[equipment]) return null;
+  if (/\b(keep\s+)?frozen\b/i.test(comment)) return "Frozen";
+  // Range: "TEMP 34-36" or "34-36 degrees" or "-10/0 F"
+  var m = comment.match(/\btemp(?:erature)?\s*:?\s*(-?\d+)\s*[-–\/to]+\s*(-?\d+)/i) ||
+           comment.match(/(-?\d+)\s*[-–\/]\s*(-?\d+)\s*(?:degrees?|°\s*[fc]?|\bf\b)/i);
+  if (m && m[1] && m[2]) return m[1] + "–" + m[2] + "°F";
+  // Single: "TEMP: 35" or "35 degrees" or "-10F"
+  m = comment.match(/\btemp(?:erature)?\s*:?\s*(-?\d+)/i) ||
+      comment.match(/(-?\d+)\s*(?:degrees?|°\s*[fc]?)/i);
+  if (m) return m[1] + "°F";
+  if (/\brefrigerat/i.test(comment)) return "Refrigerated";
+  return null;
+}
+
+function detectMultiStop(row){
+  var c = row.rawComment || "";
+  var stops = row.stops || 0;
+  var isMultiPick = /\b(2nd?\s*(pu|pick(?:up)?)|multi.?pick|multiple\s*pick|add(?:itional|'?l)\s*pick|2\s*pu\b|\bpu\s*#\s*2\b)/i.test(c);
+  var isMultiDrop = /\b(2nd?\s*(del(?:ivery)?|drop)|multi.?drop|multiple\s*del|add(?:itional|'?l)\s*del|2\s*del\b|\bdel\s*#\s*2\b)/i.test(c);
+  if (isMultiPick && isMultiDrop) return "MULTI-PICK & MULTI-DROP";
+  if (isMultiPick) return "MULTI-PICK";
+  if (isMultiDrop) return "MULTI-DROP";
+  if (stops > 0) return "MULTI-STOP";
+  return null;
+}
+
 function parseLookupCommodity(comment){
-  // Empty returnables / beer empties — check first
-  if (/empty\s*(bottles?|cans?|containers?|returnables?)/i.test(comment) || /\bempties\b/i.test(comment) || /\breturnables?\b/i.test(comment)) {
-    return "Empty bottles / cans";
+  // Empty beer containers specifically
+  var hasEmpty = /empty\s*(bottles?|cans?|containers?|returnables?)/i.test(comment) || /\bempties\b|\breturnables?\b/i.test(comment);
+  var hasBeerCtx = /\bbeer\b|\bbrewery\b|\bbrewing\b|\bale\b|\blager\b/i.test(comment);
+  if (hasEmpty && hasBeerCtx) return "Empty beer bottles/cans";
+  if (hasEmpty) return "Empty bottles/cans";
+
+  // Ice cream (before frozen so it's more specific)
+  if (/\bice\s*cream\b/i.test(comment)) return "Ice cream";
+
+  // Frozen specific meats/proteins
+  var frozenMatch = comment.match(/\bfrozen\s*(chicken|poultry|turkey|beef|pork|seafood|fish|meat)\b/i) ||
+                    ((/\b(chicken|poultry|turkey|beef|pork|seafood|fish)\b/i.test(comment) && /\bfrozen\b/i.test(comment)) ?
+                      comment.match(/\b(chicken|poultry|turkey|beef|pork|seafood|fish)\b/i) : null);
+  if (frozenMatch) {
+    var item = (frozenMatch[1] || frozenMatch[0]).toLowerCase();
+    return "Frozen " + item.charAt(0).toUpperCase() + item.slice(1);
   }
+
+  // Generic frozen food
+  if (/\bfrozen\b/i.test(comment)) return "Frozen food";
+
+  // Beer
   if (/\bbeer\b|\bale\b|\blager\b|\bipa\b|\bstout\b|\bporter\b|\bbrewery\b|\bbrewing\b|\bcanned\s+beer\b/i.test(comment)) return "Beer";
   if (/\bwine\b|\bwinery\b|\bvineyard\b|\bmerlot\b|\bchardonnay\b|\bcabernet\b/i.test(comment)) return "Wine";
   if (/\bwhiske?y\b|\bbourbon\b|\bvodka\b|\brum\b|\bgin\b|\btequila\b|\bspirits?\b|\bliquor\b/i.test(comment)) return "Spirits / liquor";
   if (/\bbeverage\b|\bdrinks?\b|\bsoda\b|\bpop\b|\bjuice\b/i.test(comment)) return "Beverages";
   if (/\bauto\s*parts?\b|\bautomotive\b|\bcar\s*parts?\b/i.test(comment)) return "Auto parts";
   if (/\bgrocery\b|\bgroceries\b|\bfood\s*grade\b|\bproduce\b/i.test(comment)) return "Grocery / food";
+  if (/palletized\s*paper|paper\s*products?|paper\s*goods?/i.test(comment)) return "Paper products (palletized)";
   if (/\bpaper\b|\bpaperboard\b|\bpackaging\b|\bcorrugated\b/i.test(comment)) return "Paper / packaging";
   if (/\belectronics?\b|\bcomputers?\b|\bappliances?\b/i.test(comment)) return "Electronics";
   if (/\bfurniture\b|\bhome\s*goods?\b/i.test(comment)) return "Furniture";
