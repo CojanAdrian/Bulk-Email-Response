@@ -56,4 +56,12 @@ describe('auth routes', () => {
     const res = await agent.get('/api/auth/me');
     expect(res.status).toBe(401);
   });
+
+  test('login returns 500 instead of crashing when the database is unavailable', async () => {
+    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
+    const brokenApp = createApp(brokenPool);
+    const res = await request(brokenApp).post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+  });
 });

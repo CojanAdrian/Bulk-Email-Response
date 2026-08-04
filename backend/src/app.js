@@ -21,6 +21,11 @@ function createApp(pool) {
 
   app.use('/api/auth', createAuthRouter(pool));
 
+  app.use((err, req, res, next) => {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  });
+
   return app;
 }
 

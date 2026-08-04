@@ -1,10 +1,12 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
+const asyncHandler = require('../lib/asyncHandler');
+const requireAuth = require('../middleware/requireAuth');
 
 function createAuthRouter(pool) {
   const router = express.Router();
 
-  router.post('/login', async (req, res) => {
+  router.post('/login', asyncHandler(async (req, res) => {
     const { username, password } = req.body;
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
@@ -18,7 +20,7 @@ function createAuthRouter(pool) {
     req.session.userId = user.id;
     req.session.username = user.username;
     res.json({ username: user.username });
-  });
+  }));
 
   router.post('/logout', (req, res) => {
     req.session.destroy(() => {
@@ -26,10 +28,7 @@ function createAuthRouter(pool) {
     });
   });
 
-  router.get('/me', (req, res) => {
-    if (!req.session.userId) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
+  router.get('/me', requireAuth, (req, res) => {
     res.json({ username: req.session.username });
   });
 
