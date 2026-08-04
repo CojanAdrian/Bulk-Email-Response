@@ -1,6 +1,7 @@
 const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
+const createAuthRouter = require('./routes/auth');
 
 function createApp(pool) {
   const app = express();
@@ -17,6 +18,8 @@ function createApp(pool) {
   app.get('/api/health', (req, res) => {
     res.json({ ok: true });
   });
+
+  app.use('/api/auth', createAuthRouter(pool));
 
   return app;
 }
