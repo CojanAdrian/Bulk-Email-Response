@@ -47,7 +47,16 @@ async function ensureAdminUser() {
   await conn.end();
 }
 
+function assertRequiredEnvVars() {
+  const required = ['DB_HOST', 'DB_USER', 'DB_NAME', 'DB_NAME_TEST', 'ADMIN_USERNAME', 'ADMIN_PASSWORD'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
+  }
+}
+
 async function main() {
+  assertRequiredEnvVars();
   await setupDatabase(process.env.DB_NAME);
   await setupDatabase(process.env.DB_NAME_TEST);
   await ensureAdminUser();
