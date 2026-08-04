@@ -1,4 +1,15 @@
 require('dotenv').config();
+
+function assertRequiredEnvVars() {
+  const required = ['SESSION_SECRET', 'DB_HOST', 'DB_USER', 'DB_NAME'];
+  const missing = required.filter((key) => !process.env[key]);
+  if (missing.length > 0) {
+    throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
+  }
+}
+
+assertRequiredEnvVars();
+
 const { createApp } = require('./app');
 const { createPool } = require('./db');
 
