@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 function assertRequiredEnvVars() {
-  const required = ['SESSION_SECRET', 'DB_HOST', 'DB_USER', 'DB_NAME'];
+  const required = ['SESSION_SECRET', 'DB_HOST', 'DB_USER', 'DB_NAME', 'FRONTEND_ORIGIN'];
   const missing = required.filter((key) => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required environment variable(s): ${missing.join(', ')}`);
