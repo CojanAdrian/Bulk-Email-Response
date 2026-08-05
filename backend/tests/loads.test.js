@@ -26,6 +26,11 @@ describe('loads routes', () => {
     await agent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
   });
 
+  test('LOAD_COLUMNS never includes status, so uploads can never change it', () => {
+    const { LOAD_COLUMNS } = require('../src/routes/loads');
+    expect(LOAD_COLUMNS).not.toContain('status');
+  });
+
   test('rejects unauthenticated requests', async () => {
     const res = await request(app).get('/api/loads');
     expect(res.status).toBe(401);
@@ -166,5 +171,28 @@ describe('loads routes', () => {
     });
     const list2 = await agent.get('/api/loads');
     expect(list2.body[0].status).toBe('booked');
+  });
+
+  test('upload with a non-array loads field returns 400', async () => {
+    const res = await agent.post('/api/loads/upload').send({ loads: 'not-an-array' });
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: 'loads must be an array' });
+  });
+
+  test('POST /api/loads/upload returns 500 instead of crashing when the database is unavailable', async () => {
+    const express = require('express');
+    const { createLoadsRouter } = require('../src/routes/loads');
+    const brokenPool = {
+      getConnection: () => Promise.reject(new Error('connection lost')),
+    };
+    const bareApp = express();
+    bareApp.use(express.json());
+    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
+    bareApp.use((err, req, res, next) => {
+      res.status(500).json({ error: 'Internal server error' });
+    });
+    const res = await request(bareApp).post('/api/loads/upload').send({ loads: [{ load_number: 'L1' }] });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
   });
 });

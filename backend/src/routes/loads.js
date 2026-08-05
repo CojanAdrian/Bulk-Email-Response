@@ -60,28 +60,39 @@ function createLoadsRouter(pool) {
     let inserted = 0;
     let updated = 0;
 
-    for (const load of loads) {
-      const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
-      const placeholders = columns.map(() => '?').join(', ');
-      const values = columns.map((col) => load[col]);
-      const updateClause = columns
-        .filter((col) => col !== 'load_number')
-        .map((col) => `${col} = VALUES(${col})`)
-        .join(', ');
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
 
-      const [result] = await pool.query(
-        `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})
-         ON DUPLICATE KEY UPDATE ${updateClause}`,
-        values
-      );
-      if (result.affectedRows === 1) {
-        inserted += 1;
-      } else {
-        updated += 1;
+      for (const load of loads) {
+        const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = columns.map((col) => load[col]);
+        const updateClause = columns
+          .filter((col) => col !== 'load_number')
+          .map((col) => `${col} = VALUES(${col})`)
+          .join(', ');
+
+        const [result] = await connection.query(
+          `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})
+           ON DUPLICATE KEY UPDATE ${updateClause}`,
+          values
+        );
+        if (result.affectedRows === 1) {
+          inserted += 1;
+        } else {
+          updated += 1;
+        }
       }
-    }
 
-    res.json({ inserted, updated });
+      await connection.commit();
+      res.json({ inserted, updated });
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
   }));
 
   return router;
