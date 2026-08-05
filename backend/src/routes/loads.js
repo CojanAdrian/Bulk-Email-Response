@@ -29,6 +29,28 @@ function createLoadsRouter(pool) {
     res.json(rows[0]);
   }));
 
+  router.patch('/:id', asyncHandler(async (req, res) => {
+    const allowedFields = ['target_pay', 'status'];
+    const updates = [];
+    const values = [];
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(req.body[field]);
+      }
+    }
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+    values.push(req.params.id);
+    await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
+    const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+    res.json(rows[0]);
+  }));
+
   return router;
 }
 

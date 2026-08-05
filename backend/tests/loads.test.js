@@ -68,4 +68,32 @@ describe('loads routes', () => {
     const res = await agent.get('/api/loads/99999');
     expect(res.status).toBe(404);
   });
+
+  test('PATCH updates target_pay and status', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay) VALUES (?, ?, ?)', ['L1001', 'Dallas', 1500]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ target_pay: 1700, status: 'booked' });
+    expect(res.status).toBe(200);
+    expect(Number(res.body.target_pay)).toBe(1700);
+    expect(res.body.status).toBe('booked');
+  });
+
+  test('PATCH with no valid fields returns 400', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city) VALUES (?, ?)', ['L1001', 'Dallas']);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston' });
+    expect(res.status).toBe(400);
+  });
+
+  test('GET /api/loads returns 500 instead of crashing when the database is unavailable', async () => {
+    const express = require('express');
+    const { createLoadsRouter } = require('../src/routes/loads');
+    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
+    const bareApp = express();
+    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
+    bareApp.use((err, req, res, next) => {
+      res.status(500).json({ error: 'Internal server error' });
+    });
+    const res = await request(bareApp).get('/api/loads');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+  });
 });
