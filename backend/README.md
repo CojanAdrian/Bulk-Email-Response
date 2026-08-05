@@ -15,9 +15,11 @@ root for the full design spec this backend implements.
 - Node.js (v18+ recommended)
 - A running MySQL 8.0+ server, reachable with a user that can create
   databases. Local development on this project has been using a MySQL 8.0
-  Docker container (e.g. `docker run --name bulkposting-mysql -e
-  MYSQL_ROOT_PASSWORD=<pw> -p 3306:3306 -d mysql:8.0`), but any local
-  MySQL 8.0+ install works the same way.
+  Docker container:
+  ```bash
+  docker run --name bulkposting-mysql -e MYSQL_ROOT_PASSWORD=<pw> -p 3306:3306 -d mysql:8.0
+  ```
+  but any local MySQL 8.0+ install works the same way.
 
 ## Setup
 
@@ -135,7 +137,7 @@ request to any of them returns `401 {"error":"Unauthorized"}`.
 
 A successful login sets an `httpOnly`, `sameSite=lax` session cookie. All
 `/api/loads/*` routes require this cookie (enforced by
-`middleware/requireAuth.js`).
+`src/middleware/requireAuth.js`).
 
 ### Loads (`/api/loads`) — all routes require an authenticated session
 
