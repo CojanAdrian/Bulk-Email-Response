@@ -195,7 +195,8 @@ no partial writes. The `{"inserted", "updated"}` counts in the response are
 only returned after a successful commit.
 
 **Required environment variables are validated at startup**, in both
-`src/server.js` (checks `SESSION_SECRET`, `DB_HOST`, `DB_USER`, `DB_NAME`)
+`src/server.js` (checks `SESSION_SECRET`, `DB_HOST`, `DB_USER`, `DB_NAME`,
+`FRONTEND_ORIGIN`)
 and `scripts/setup-db.js` (checks `DB_HOST`, `DB_USER`, `DB_NAME`,
 `DB_NAME_TEST`, `ADMIN_USERNAME`, `ADMIN_PASSWORD`). Both fail fast with a
 `Missing required environment variable(s): ...` error rather than
