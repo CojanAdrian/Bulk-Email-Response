@@ -3,7 +3,10 @@
     "allow": [
       "PowerShell(node --version)",
       "WebFetch(domain:www.igtfreight.com)",
-      "PowerShell(Get-Content \"$env:TEMP\\\\ss_err4.txt\" -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Content \"$env:TEMP\\\\ss_err4.txt\" -ErrorAction SilentlyContinue)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
