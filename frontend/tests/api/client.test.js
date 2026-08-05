@@ -58,4 +58,13 @@ describe('api client', () => {
     });
     await expect(get('/api/loads/999')).rejects.toMatchObject({ status: 404 });
   });
+
+  test('falls back to a generic message when the error response body is not JSON', async () => {
+    global.fetch.mockResolvedValue({
+      ok: false,
+      status: 502,
+      json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+    });
+    await expect(get('/api/loads')).rejects.toThrow('Request failed');
+  });
 });
