@@ -1,0 +1,101 @@
+const express = require('express');
+const asyncHandler = require('../lib/asyncHandler');
+
+const LOAD_COLUMNS = [
+  'load_number', 'origin_city', 'origin_state', 'origin_zip',
+  'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
+  'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
+  'commodity', 'temperature', 'comment',
+];
+
+function createLoadsRouter(pool) {
+  const router = express.Router();
+
+  router.get('/', asyncHandler(async (req, res) => {
+    const { status } = req.query;
+    const query = status
+      ? 'SELECT * FROM loads WHERE status = ? ORDER BY created_at DESC'
+      : 'SELECT * FROM loads ORDER BY created_at DESC';
+    const params = status ? [status] : [];
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  }));
+
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+    res.json(rows[0]);
+  }));
+
+  router.patch('/:id', asyncHandler(async (req, res) => {
+    const allowedFields = ['target_pay', 'status'];
+    const updates = [];
+    const values = [];
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) {
+        updates.push(`${field} = ?`);
+        values.push(req.body[field]);
+      }
+    }
+    if (updates.length === 0) {
+      return res.status(400).json({ error: 'No valid fields to update' });
+    }
+    values.push(req.params.id);
+    await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
+    const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
+    if (!rows[0]) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+    res.json(rows[0]);
+  }));
+
+  router.post('/upload', asyncHandler(async (req, res) => {
+    const { loads } = req.body;
+    if (!Array.isArray(loads)) {
+      return res.status(400).json({ error: 'loads must be an array' });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    const connection = await pool.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      for (const load of loads) {
+        const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
+        const placeholders = columns.map(() => '?').join(', ');
+        const values = columns.map((col) => load[col]);
+        const updateClause = columns
+          .filter((col) => col !== 'load_number')
+          .map((col) => `${col} = VALUES(${col})`)
+          .join(', ');
+
+        const [result] = await connection.query(
+          `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})
+           ON DUPLICATE KEY UPDATE ${updateClause}`,
+          values
+        );
+        if (result.affectedRows === 1) {
+          inserted += 1;
+        } else {
+          updated += 1;
+        }
+      }
+
+      await connection.commit();
+      res.json({ inserted, updated });
+    } catch (err) {
+      await connection.rollback();
+      throw err;
+    } finally {
+      connection.release();
+    }
+  }));
+
+  return router;
+}
+
+module.exports = { createLoadsRouter, LOAD_COLUMNS };
