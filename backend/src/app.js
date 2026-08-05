@@ -2,6 +2,8 @@ const express = require('express');
 const session = require('express-session');
 const cors = require('cors');
 const createAuthRouter = require('./routes/auth');
+const { createLoadsRouter } = require('./routes/loads');
+const requireAuth = require('./middleware/requireAuth');
 
 function createApp(pool) {
   const app = express();
@@ -20,6 +22,7 @@ function createApp(pool) {
   });
 
   app.use('/api/auth', createAuthRouter(pool));
+  app.use('/api/loads', requireAuth, createLoadsRouter(pool));
 
   app.use((err, req, res, next) => {
     console.error(err);
