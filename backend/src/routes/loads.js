@@ -51,6 +51,39 @@ function createLoadsRouter(pool) {
     res.json(rows[0]);
   }));
 
+  router.post('/upload', asyncHandler(async (req, res) => {
+    const { loads } = req.body;
+    if (!Array.isArray(loads)) {
+      return res.status(400).json({ error: 'loads must be an array' });
+    }
+
+    let inserted = 0;
+    let updated = 0;
+
+    for (const load of loads) {
+      const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
+      const placeholders = columns.map(() => '?').join(', ');
+      const values = columns.map((col) => load[col]);
+      const updateClause = columns
+        .filter((col) => col !== 'load_number')
+        .map((col) => `${col} = VALUES(${col})`)
+        .join(', ');
+
+      const [result] = await pool.query(
+        `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})
+         ON DUPLICATE KEY UPDATE ${updateClause}`,
+        values
+      );
+      if (result.affectedRows === 1) {
+        inserted += 1;
+      } else {
+        updated += 1;
+      }
+    }
+
+    res.json({ inserted, updated });
+  }));
+
   return router;
 }
 

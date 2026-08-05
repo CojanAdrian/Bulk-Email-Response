@@ -125,4 +125,46 @@ describe('loads routes', () => {
     expect(Number(res.body.target_pay)).toBe(2000);
     expect(res.body.origin_city).toBe('Dallas');
   });
+
+  test('uploads a batch of loads, inserting new ones', async () => {
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [
+        { load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', equipment: 'Reefer', target_pay: 1500 },
+        { load_number: 'L1002', origin_city: 'Atlanta', origin_state: 'GA', dest_city: 'Miami', dest_state: 'FL', equipment: 'Dry Van', target_pay: 900 },
+      ],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.inserted).toBe(2);
+
+    const list = await agent.get('/api/loads');
+    expect(list.body).toHaveLength(2);
+  });
+
+  test('re-uploading an existing load_number updates it instead of duplicating', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1800 }],
+    });
+    expect(res.status).toBe(200);
+
+    const list = await agent.get('/api/loads');
+    expect(list.body).toHaveLength(1);
+    expect(Number(list.body[0].target_pay)).toBe(1800);
+  });
+
+  test('re-uploading a load does not change its status', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+    const list1 = await agent.get('/api/loads');
+    await agent.patch(`/api/loads/${list1.body[0].id}`).send({ status: 'booked' });
+
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1800 }],
+    });
+    const list2 = await agent.get('/api/loads');
+    expect(list2.body[0].status).toBe('booked');
+  });
 });
