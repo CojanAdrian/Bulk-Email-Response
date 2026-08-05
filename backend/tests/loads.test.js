@@ -96,4 +96,33 @@ describe('loads routes', () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
+
+  test('PATCH /api/loads/:id returns 500 instead of crashing when the database is unavailable', async () => {
+    const express = require('express');
+    const { createLoadsRouter } = require('../src/routes/loads');
+    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
+    const bareApp = express();
+    bareApp.use(express.json());
+    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
+    bareApp.use((err, req, res, next) => {
+      res.status(500).json({ error: 'Internal server error' });
+    });
+    const res = await request(bareApp).patch('/api/loads/1').send({ target_pay: 1700 });
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+  });
+
+  test('PATCH returns 404 for an unknown load id', async () => {
+    const res = await agent.patch('/api/loads/99999').send({ target_pay: 1700 });
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({ error: 'Load not found' });
+  });
+
+  test('PATCH ignores disallowed fields but still applies allowed ones', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay) VALUES (?, ?, ?)', ['L1001', 'Dallas', 1500]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston', target_pay: 2000 });
+    expect(res.status).toBe(200);
+    expect(Number(res.body.target_pay)).toBe(2000);
+    expect(res.body.origin_city).toBe('Dallas');
+  });
 });
