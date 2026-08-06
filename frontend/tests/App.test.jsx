@@ -43,4 +43,20 @@ describe('App', () => {
       expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
     });
   });
+
+  test('still returns to the login page even if the logout request fails', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    authApi.me.mockResolvedValue({ username: 'admin' });
+    authApi.logout.mockRejectedValue(new Error('Network error'));
+    render(<App />);
+
+    await waitFor(() => screen.getByRole('button', { name: /log out/i }));
+    fireEvent.click(screen.getByRole('button', { name: /log out/i }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    });
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
 });

@@ -67,4 +67,15 @@ describe('api client', () => {
     });
     await expect(get('/api/loads')).rejects.toThrow('Request failed');
   });
+
+  test('produces a clear error when the network request itself fails', async () => {
+    global.fetch.mockRejectedValue(new TypeError('Failed to fetch'));
+    await expect(get('/api/health')).rejects.toThrow('Network error');
+  });
+
+  test('produces a clear timeout error when the request is aborted', async () => {
+    const abortError = new DOMException('The operation was aborted', 'TimeoutError');
+    global.fetch.mockRejectedValue(abortError);
+    await expect(get('/api/health')).rejects.toThrow('Request timed out');
+  });
 });

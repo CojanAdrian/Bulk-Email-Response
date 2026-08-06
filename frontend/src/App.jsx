@@ -24,10 +24,14 @@ function App() {
   }
 
   function handleLogout() {
-    logout().finally(() => {
-      setUsername(null);
-      setStatus('loggedOut');
-    });
+    logout()
+      .catch((err) => {
+        console.error('Logout request failed:', err);
+      })
+      .finally(() => {
+        setUsername(null);
+        setStatus('loggedOut');
+      });
   }
 
   if (status === 'checking') {

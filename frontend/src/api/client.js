@@ -1,14 +1,23 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+const REQUEST_TIMEOUT_MS = 10000;
 
 async function request(path, options = {}) {
-  const res = await fetch(`${API_URL}${path}`, {
-    ...options,
-    credentials: 'include',
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${API_URL}${path}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch (err) {
+    const error = new Error(err.name === 'TimeoutError' || err.name === 'AbortError' ? 'Request timed out' : 'Network error');
+    error.status = null;
+    throw error;
+  }
   const body = await res.json().catch(() => null);
   if (!res.ok) {
     const error = new Error((body && body.error) || 'Request failed');
