@@ -71,4 +71,30 @@ describe('LoadsTable', () => {
     rerender(<LoadsTable refreshKey={1} onSelectLoad={vi.fn()} />);
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(2));
   });
+
+  test('ignores a stale response that resolves after a newer filter change', async () => {
+    let resolveFirst;
+    loadsApi.listLoads.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveFirst = resolve;
+        })
+    );
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('active'));
+
+    const BOOKED_LOAD = { ...SAMPLE_LOAD, id: 2, load_number: 'L2002', status: 'booked' };
+    loadsApi.listLoads.mockResolvedValueOnce([BOOKED_LOAD]);
+    fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'booked' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('L2002')).toBeInTheDocument();
+    });
+
+    // The stale "active" request now resolves after the "booked" one already rendered.
+    resolveFirst([SAMPLE_LOAD]);
+
+    expect(screen.getByText('L2002')).toBeInTheDocument();
+    expect(screen.queryByText('L1001')).not.toBeInTheDocument();
+  });
 });

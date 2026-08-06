@@ -7,15 +7,23 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   const [statusFilter, setStatusFilter] = useState('active');
 
   useEffect(() => {
+    let ignore = false;
     setStatus('loading');
     listLoads(statusFilter)
       .then((data) => {
-        setLoads(data);
-        setStatus('ready');
+        if (!ignore) {
+          setLoads(data);
+          setStatus('ready');
+        }
       })
       .catch(() => {
-        setStatus('error');
+        if (!ignore) {
+          setStatus('error');
+        }
       });
+    return () => {
+      ignore = true;
+    };
   }, [refreshKey, statusFilter]);
 
   return (
