@@ -1,8 +1,10 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import Papa from 'papaparse';
 import MainToolPage from '../../src/pages/MainToolPage';
 import * as loadsApi from '../../src/api/loads';
 
+vi.mock('papaparse');
 vi.mock('../../src/api/loads');
 
 describe('MainToolPage', () => {
@@ -40,12 +42,39 @@ describe('MainToolPage', () => {
   });
 
   test('refreshes the table when an upload completes', async () => {
+    const validFields = [
+      'Order', 'Origin City', 'Origin State', 'Dest City', 'Dest State',
+      'Equip Type', 'Weight', 'Target Pay', 'Early P/U Dt', 'Late P/U Dt', 'Planning Comment',
+    ];
+    const validRow = {
+      Order: '0078033',
+      'Origin City': 'NEWPORT',
+      'Origin State': 'AR',
+      'Dest City': 'O FALLON',
+      'Dest State': 'MO',
+      'Equip Type': 'FGT',
+      Weight: '12845.0 LB',
+      'Target Pay': '$1,100.00',
+      'Early P/U Dt': '07/01/2026 1200',
+      'Late P/U Dt': '07/01/2026 1200',
+      'Planning Comment': '1p1d / $90 LUMP AT DEL',
+    };
+    Papa.parse.mockImplementation((file, options) => {
+      options.complete({ meta: { fields: validFields }, data: [validRow] });
+    });
+    loadsApi.uploadLoads.mockResolvedValue({ inserted: 1, updated: 0 });
+
     render(<MainToolPage username="admin" onLogout={vi.fn()} />);
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(1));
-    // Simulate UploadPanel's onUploadComplete by finding no direct hook here —
-    // this is covered indirectly since UploadPanel/LoadsTable are exercised in
-    // their own test files; this test just confirms the initial wiring renders
-    // without error and fetches once on mount.
-    expect(screen.getByLabelText(/upload loads csv/i)).toBeInTheDocument();
+
+    const file = new File(['irrelevant'], 'loads.csv', { type: 'text/csv' });
+    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [file] } });
+
+    await waitFor(() => {
+      expect(loadsApi.uploadLoads).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(2);
+    });
   });
 });
