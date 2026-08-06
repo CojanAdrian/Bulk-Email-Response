@@ -119,3 +119,9 @@ If any step fails, the most likely causes are:
   being blocked (e.g. browser privacy settings) and that both servers are
   on `localhost` (not `127.0.0.1` vs `localhost` mismatches, which count as
   different origins for cookie purposes).
+- **Request hangs for ~10 seconds, then shows "Request timed out"** — the
+  backend process is reachable but not responding (e.g. its MySQL
+  connection is stuck or the database container isn't running). Every
+  request from `frontend/src/api/client.js` aborts after 10 seconds
+  rather than hanging indefinitely; check the backend's own logs and that
+  `bulkposting-mysql` (or your local MySQL server) is actually up.
