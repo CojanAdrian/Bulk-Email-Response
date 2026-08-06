@@ -4,11 +4,12 @@ A React/Vite frontend for the BulkPosting backend — the tool freight brokers
 use to bulk-manage loads (CSV upload, a loads table, rate editing, DAT
 export, and a "blast" email/notification flow).
 
-**This is Phase 1: the auth shell only.** It implements session-based login,
-a logged-in/logged-out state machine, and a stub main page shown after
-login. CSV upload, the loads table, rate editing, DAT export, and the blast
-modal are **not implemented yet** — those land in follow-up phases that
-build on top of this shell. See
+**This is Phase 1/2: auth shell plus CSV upload, the loads table, and rate
+editing.** It implements session-based login, a logged-in/logged-out state
+machine, uploading a McLeod CSV export, viewing/filtering the resulting
+loads table, and editing a load's target pay and status. DAT export and the
+blast modal are **not implemented yet** — those land in Phase 3, which
+builds on top of this. See
 `docs/superpowers/specs/2026-08-04-backend-foundation-design.md` in the repo
 root for the full design.
 
@@ -66,6 +67,26 @@ Runs the Vitest suite (`vitest run`) — 20 tests across 4 suites
 `src/pages/LoginPage.jsx`). All API calls are mocked, so **no backend is
 required** to run tests.
 
+## Uploading loads
+
+On the main screen, use "Upload loads CSV" to upload a McLeod export.
+The file is parsed entirely in the browser (column names are matched
+flexibly, e.g. "Dest City" or "Destination City" both work) and the
+resulting loads are upserted into the database by load number — a
+re-upload with the same load numbers updates rates/details rather than
+creating duplicates, and never changes a load's `active`/`booked`/`expired`
+status (that's manual-only, via "Edit rate" on the loads table).
+
+Note: only the column-mapping logic is ported from the original
+`IGT_DAT_Processor.html` tool so far — anomaly detection, cross-posting,
+and DAT export are Phase 3 work and aren't available yet.
+
+Known limitation: if you have "Edit rate" open for a load and someone
+re-uploads a CSV that updates that same load in the background, saving
+your edit will overwrite the freshly-uploaded data with whatever you
+had open in the modal — there's no conflict detection yet. Close and
+reopen "Edit rate" if you know a re-upload just happened.
+
 ## Manual end-to-end verification walkthrough
 
 This proves the login flow works against the real backend (not mocks).
@@ -92,8 +113,8 @@ This proves the login flow works against the real backend (not mocks).
 4. **Log in** with the admin credentials from `backend/.env`
    (`ADMIN_USERNAME` / `ADMIN_PASSWORD`, e.g. `admin` / `changeme123` in a
    default local setup). You should land on the main shell: a header with
-   the username and a "Log out" button, and "Load management tools coming
-   soon." as the body.
+   the username and a "Log out" button, an "Upload loads CSV" panel, and
+   the loads table below it (see "Uploading loads" above).
 
 5. **Refresh the page.** You should stay logged in and land directly back
    on the shell (no flash back to the login form) — this confirms the
