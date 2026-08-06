@@ -69,7 +69,8 @@ export function toMysqlDatetime(raw) {
   const year = dateMatch[3];
   let hours = '00';
   let minutes = '00';
-  if (timePart && /^\d{3,4}$/.test(timePart)) {
+  if (timePart !== undefined) {
+    if (!/^\d{3,4}$/.test(timePart)) return null;
     const padded = timePart.padStart(4, '0');
     hours = padded.slice(0, 2);
     minutes = padded.slice(2, 4);
@@ -169,6 +170,7 @@ function mapRowToLoad(row, colMap) {
 export function parseMcleodRows(fields, rows) {
   const { colMap, missing } = resolveColumns(fields);
   if (missing.length) return { loads: [], missing };
+  if (!Array.isArray(rows)) return { loads: [], missing: [] };
 
   const cleanRows = rows.filter((r) => Object.keys(r).some((k) => cleanText(r[k]) !== ''));
   const loads = cleanRows
