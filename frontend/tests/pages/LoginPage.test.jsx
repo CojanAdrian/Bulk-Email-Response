@@ -41,4 +41,42 @@ describe('LoginPage', () => {
     });
     expect(onLoginSuccess).not.toHaveBeenCalled();
   });
+
+  test('shows a generic error message for non-401 failures', async () => {
+    const err = new Error('Internal server error');
+    err.status = 500;
+    authApi.login.mockRejectedValue(err);
+    render(<LoginPage onLoginSuccess={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'changeme123' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/something went wrong/i)).toBeInTheDocument();
+    });
+  });
+
+  test('disables the submit button and shows a signing-in state while the request is in flight', async () => {
+    let resolveLogin;
+    authApi.login.mockReturnValue(
+      new Promise((resolve) => {
+        resolveLogin = resolve;
+      })
+    );
+    render(<LoginPage onLoginSuccess={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/username/i), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByLabelText(/password/i), { target: { value: 'changeme123' } });
+    fireEvent.click(screen.getByRole('button', { name: /sign in/i }));
+
+    const submitButton = await screen.findByRole('button', { name: /signing in/i });
+    expect(submitButton).toBeDisabled();
+
+    resolveLogin({ username: 'admin' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /^sign in$/i })).not.toBeDisabled();
+    });
+  });
 });

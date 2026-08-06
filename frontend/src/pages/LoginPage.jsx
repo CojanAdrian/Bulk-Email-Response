@@ -32,23 +32,31 @@ function LoginPage({ onLoginSuccess }) {
         </label>
         <input
           id="username"
-          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-indigo-500"
+          name="username"
+          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50"
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           autoComplete="username"
+          aria-describedby={error ? 'login-error' : undefined}
         />
         <label className="mb-1 block text-sm text-slate-400" htmlFor="password">
           Password
         </label>
         <input
           id="password"
+          name="password"
           type="password"
-          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-indigo-500"
+          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/50"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           autoComplete="current-password"
+          aria-describedby={error ? 'login-error' : undefined}
         />
-        {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+        {error && (
+          <p id="login-error" role="alert" className="mb-4 text-sm text-red-400">
+            {error}
+          </p>
+        )}
         <button
           type="submit"
           disabled={submitting}
