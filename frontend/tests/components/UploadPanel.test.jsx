@@ -102,4 +102,43 @@ describe('UploadPanel', () => {
     });
     expect(loadsApi.uploadLoads).not.toHaveBeenCalled();
   });
+
+  test('shows an error when Papa.parse itself fails (e.g. an unreadable file)', async () => {
+    Papa.parse.mockImplementation((file, options) => {
+      options.error(new Error('Encoding error'));
+    });
+    render(<UploadPanel onUploadComplete={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [makeFile()] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/failed to read file/i)).toBeInTheDocument();
+    });
+    expect(loadsApi.uploadLoads).not.toHaveBeenCalled();
+  });
+
+  test('disables the file input while parsing/uploading is in flight', async () => {
+    Papa.parse.mockImplementation((file, options) => {
+      options.complete({ meta: { fields: VALID_FIELDS }, data: [validRow()] });
+    });
+    let resolveUpload;
+    loadsApi.uploadLoads.mockReturnValue(
+      new Promise((resolve) => {
+        resolveUpload = resolve;
+      })
+    );
+    render(<UploadPanel onUploadComplete={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [makeFile()] } });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/upload loads csv/i)).toBeDisabled();
+    });
+
+    resolveUpload({ inserted: 1, updated: 0 });
+
+    await waitFor(() => {
+      expect(screen.getByLabelText(/upload loads csv/i)).not.toBeDisabled();
+    });
+  });
 });

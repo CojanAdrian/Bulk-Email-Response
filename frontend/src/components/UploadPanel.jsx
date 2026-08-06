@@ -22,24 +22,29 @@ function UploadPanel({ onUploadComplete }) {
       skipEmptyLines: 'greedy',
       transformHeader: (h) => cleanText(h),
       complete: (results) => {
-        const fields = results.meta.fields || [];
-        if (fields.length === 0) {
-          setError('The file appears to be empty or not a valid CSV.');
+        try {
+          const fields = results.meta.fields || [];
+          if (fields.length === 0) {
+            setError('The file appears to be empty or not a valid CSV.');
+            setStatus('idle');
+            return;
+          }
+          const { loads, missing } = parseMcleodRows(fields, results.data);
+          if (missing.length) {
+            setError(`The file is missing required column(s): ${missing.join(', ')}`);
+            setStatus('idle');
+            return;
+          }
+          if (loads.length === 0) {
+            setError('The file contains headers but no usable data rows.');
+            setStatus('idle');
+            return;
+          }
+          submitLoads(loads);
+        } catch (err) {
+          setError('Failed to process the file. Please check its format and try again.');
           setStatus('idle');
-          return;
         }
-        const { loads, missing } = parseMcleodRows(fields, results.data);
-        if (missing.length) {
-          setError(`The file is missing required column(s): ${missing.join(', ')}`);
-          setStatus('idle');
-          return;
-        }
-        if (loads.length === 0) {
-          setError('The file contains headers but no usable data rows.');
-          setStatus('idle');
-          return;
-        }
-        submitLoads(loads);
       },
       error: (err) => {
         setError(`Failed to read file: ${err.message}`);
@@ -57,7 +62,8 @@ function UploadPanel({ onUploadComplete }) {
         onUploadComplete();
       })
       .catch((err) => {
-        setError(err.message || 'Upload failed.');
+        const detail = err.message || 'Upload failed.';
+        setError(`Upload failed — no loads were saved. ${detail}`);
         setStatus('idle');
       });
   }
