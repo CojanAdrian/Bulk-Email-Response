@@ -21,6 +21,34 @@ describe('App', () => {
     });
   });
 
+  test('logs a console error when the initial session check fails for a reason other than being unauthenticated', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('Network error');
+    err.status = null;
+    authApi.me.mockRejectedValue(err);
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    });
+    expect(consoleError).toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
+  test('does not log a console error for a normal 401 (not logged in)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    authApi.me.mockRejectedValue(err);
+    render(<App />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+    });
+    expect(consoleError).not.toHaveBeenCalled();
+    consoleError.mockRestore();
+  });
+
   test('shows the main tool page when a session is already active', async () => {
     authApi.me.mockResolvedValue({ username: 'admin' });
     render(<App />);

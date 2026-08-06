@@ -13,7 +13,10 @@ function App() {
         setUsername(data.username);
         setStatus('loggedIn');
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err.status !== 401) {
+          console.error('Session check failed:', err);
+        }
         setStatus('loggedOut');
       });
   }, []);
