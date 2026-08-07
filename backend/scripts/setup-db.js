@@ -99,6 +99,15 @@ async function migrateSchema(databaseName) {
   );
   await conn.query(`UPDATE users SET role = 'admin' WHERE username = ?`, [process.env.ADMIN_USERNAME]);
 
+  const [orphanedRows] = await conn.query('SELECT COUNT(*) AS count FROM loads WHERE user_id IS NULL');
+  if (orphanedRows[0].count > 0) {
+    console.warn(
+      `Warning: ${orphanedRows[0].count} load(s) in "${databaseName}" have no owner (user_id IS NULL) ` +
+        `after migration — they will be invisible to non-admin users. This usually means ADMIN_USERNAME ` +
+        `doesn't match any existing user; check your .env.`
+    );
+  }
+
   await conn.end();
 }
 
