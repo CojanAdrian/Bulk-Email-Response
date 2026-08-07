@@ -106,10 +106,13 @@ function createLoadsRouter(pool) {
         // user_id (must never change on a re-upload — ownership can't be
         // transferred by someone else uploading the same load_number, since
         // load_number is only unique per-user anyway).
-        const updateClause = columns
-          .filter((col) => col !== 'load_number' && col !== 'user_id')
-          .map((col) => `${col} = VALUES(${col})`)
-          .join(', ');
+        // If the load has no fields besides load_number, there's nothing to
+        // update on a re-upload -- fall back to a harmless no-op assignment
+        // instead of emitting an empty (invalid) UPDATE clause.
+        const updateColumns = columns.filter((col) => col !== 'load_number' && col !== 'user_id');
+        const updateClause = updateColumns.length
+          ? updateColumns.map((col) => `${col} = VALUES(${col})`).join(', ')
+          : 'load_number = VALUES(load_number)';
 
         await connection.query(
           `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})

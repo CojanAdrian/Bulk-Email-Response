@@ -133,6 +133,19 @@ describe('loads routes', () => {
     expect(res.status).toBe(404);
   });
 
+  test('an admin can PATCH any user\'s load', async () => {
+    const passwordHash = await bcrypt.hash('adminpw', 10);
+    await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+    const adminAgent = request.agent(app);
+    await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay, user_id) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', 1500, userId]);
+    const res = await adminAgent.patch(`/api/loads/${result.insertId}`).send({ target_pay: 1700, status: 'booked' });
+    expect(res.status).toBe(200);
+    expect(Number(res.body.target_pay)).toBe(1700);
+    expect(res.body.status).toBe('booked');
+  });
+
   test('PATCH with no valid fields returns 400', async () => {
     const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
     const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston' });
@@ -145,6 +158,43 @@ describe('loads routes', () => {
     expect(res.status).toBe(200);
     expect(Number(res.body.target_pay)).toBe(2000);
     expect(res.body.origin_city).toBe('Dallas');
+  });
+
+  test('an admin\'s own upload is tagged with the admin\'s own user_id, not shared/ownerless', async () => {
+    const passwordHash = await bcrypt.hash('adminpw', 10);
+    const [adminUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+    const adminAgent = request.agent(app);
+    await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+
+    await adminAgent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'ADMINLOAD', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+
+    const [rows] = await pool.query('SELECT user_id FROM loads WHERE load_number = ?', ['ADMINLOAD']);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].user_id).toBe(adminUser.insertId);
+
+    // A regular user must not see the admin's load in their own list.
+    const mine = await agent.get('/api/loads');
+    expect(mine.body).toHaveLength(0);
+  });
+
+  test('uploading a load with only load_number set succeeds instead of producing invalid SQL', async () => {
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'BARE1' }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inserted: 1, updated: 0 });
+
+    const reupload = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'BARE1' }],
+    });
+    expect(reupload.status).toBe(200);
+    expect(reupload.body).toEqual({ inserted: 0, updated: 1 });
+
+    const list = await agent.get('/api/loads');
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].load_number).toBe('BARE1');
   });
 
   test('uploads a batch of loads, inserting new ones owned by the uploader', async () => {
