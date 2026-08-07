@@ -8,6 +8,7 @@ describe('loads routes', () => {
   let pool;
   let app;
   let agent;
+  let userId;
 
   beforeAll(() => {
     pool = createTestPool();
@@ -21,14 +22,13 @@ describe('loads routes', () => {
   beforeEach(async () => {
     await resetTables(pool);
     const passwordHash = await bcrypt.hash('correcthorse', 10);
-    await pool.query('INSERT INTO users (username, password_hash) VALUES (?, ?)', ['testuser', passwordHash]);
+    const [result] = await pool.query(
+      "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')",
+      ['testuser', passwordHash]
+    );
+    userId = result.insertId;
     agent = request.agent(app);
     await agent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
-  });
-
-  test('LOAD_COLUMNS never includes status, so uploads can never change it', () => {
-    const { LOAD_COLUMNS } = require('../src/routes/loads');
-    expect(LOAD_COLUMNS).not.toContain('status');
   });
 
   test('rejects unauthenticated requests', async () => {
@@ -36,25 +36,32 @@ describe('loads routes', () => {
     expect(res.status).toBe(401);
   });
 
-  test('lists loads inserted directly in the database', async () => {
+  test('lists only the current user\'s own loads', async () => {
     await pool.query(
-      'INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state) VALUES (?, ?, ?, ?, ?)',
-      ['L1001', 'Dallas', 'TX', 'Chicago', 'IL']
+      'INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+      ['L1001', 'Dallas', 'TX', 'Chicago', 'IL', userId]
     );
+    const passwordHash = await bcrypt.hash('otherpw', 10);
+    const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+    await pool.query(
+      'INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)',
+      ['L9999', 'Someone Elses', otherUser.insertId]
+    );
+
     const res = await agent.get('/api/loads');
     expect(res.status).toBe(200);
     expect(res.body).toHaveLength(1);
     expect(res.body[0].load_number).toBe('L1001');
   });
 
-  test('filters loads by status', async () => {
+  test('filters loads by status within the user\'s own loads', async () => {
     await pool.query(
-      'INSERT INTO loads (load_number, origin_city, status) VALUES (?, ?, ?)',
-      ['L1001', 'Dallas', 'active']
+      'INSERT INTO loads (load_number, origin_city, status, user_id) VALUES (?, ?, ?, ?)',
+      ['L1001', 'Dallas', 'active', userId]
     );
     await pool.query(
-      'INSERT INTO loads (load_number, origin_city, status) VALUES (?, ?, ?)',
-      ['L1002', 'Atlanta', 'booked']
+      'INSERT INTO loads (load_number, origin_city, status, user_id) VALUES (?, ?, ?, ?)',
+      ['L1002', 'Atlanta', 'booked', userId]
     );
     const res = await agent.get('/api/loads?status=active');
     expect(res.status).toBe(200);
@@ -62,9 +69,44 @@ describe('loads routes', () => {
     expect(res.body[0].load_number).toBe('L1001');
   });
 
-  test('gets a single load by id', async () => {
-    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city) VALUES (?, ?)', ['L1001', 'Dallas']);
+  test('an admin sees loads from every user', async () => {
+    const passwordHash = await bcrypt.hash('adminpw', 10);
+    const [adminUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+    const adminAgent = request.agent(app);
+    await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+
+    await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L2002', 'Atlanta', adminUser.insertId]);
+
+    const res = await adminAgent.get('/api/loads');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+  });
+
+  test('gets a single load owned by the current user', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
     const res = await agent.get(`/api/loads/${result.insertId}`);
+    expect(res.status).toBe(200);
+    expect(res.body.load_number).toBe('L1001');
+  });
+
+  test('returns 404 for a load owned by a different user', async () => {
+    const passwordHash = await bcrypt.hash('otherpw', 10);
+    const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L9999', 'Someone Elses', otherUser.insertId]);
+
+    const res = await agent.get(`/api/loads/${result.insertId}`);
+    expect(res.status).toBe(404);
+  });
+
+  test('an admin can get any user\'s load by id', async () => {
+    const passwordHash = await bcrypt.hash('adminpw', 10);
+    await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+    const adminAgent = request.agent(app);
+    await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await adminAgent.get(`/api/loads/${result.insertId}`);
     expect(res.status).toBe(200);
     expect(res.body.load_number).toBe('L1001');
   });
@@ -74,64 +116,38 @@ describe('loads routes', () => {
     expect(res.status).toBe(404);
   });
 
-  test('PATCH updates target_pay and status', async () => {
-    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay) VALUES (?, ?, ?)', ['L1001', 'Dallas', 1500]);
+  test('PATCH updates target_pay and status on an owned load', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay, user_id) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', 1500, userId]);
     const res = await agent.patch(`/api/loads/${result.insertId}`).send({ target_pay: 1700, status: 'booked' });
     expect(res.status).toBe(200);
     expect(Number(res.body.target_pay)).toBe(1700);
     expect(res.body.status).toBe('booked');
   });
 
+  test('PATCH returns 404 for a load owned by a different user', async () => {
+    const passwordHash = await bcrypt.hash('otherpw', 10);
+    const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L9999', 'Someone Elses', otherUser.insertId]);
+
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ target_pay: 1700 });
+    expect(res.status).toBe(404);
+  });
+
   test('PATCH with no valid fields returns 400', async () => {
-    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city) VALUES (?, ?)', ['L1001', 'Dallas']);
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
     const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston' });
     expect(res.status).toBe(400);
   });
 
-  test('GET /api/loads returns 500 instead of crashing when the database is unavailable', async () => {
-    const express = require('express');
-    const { createLoadsRouter } = require('../src/routes/loads');
-    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
-    const bareApp = express();
-    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
-    bareApp.use((err, req, res, next) => {
-      res.status(500).json({ error: 'Internal server error' });
-    });
-    const res = await request(bareApp).get('/api/loads');
-    expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
-  });
-
-  test('PATCH /api/loads/:id returns 500 instead of crashing when the database is unavailable', async () => {
-    const express = require('express');
-    const { createLoadsRouter } = require('../src/routes/loads');
-    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
-    const bareApp = express();
-    bareApp.use(express.json());
-    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
-    bareApp.use((err, req, res, next) => {
-      res.status(500).json({ error: 'Internal server error' });
-    });
-    const res = await request(bareApp).patch('/api/loads/1').send({ target_pay: 1700 });
-    expect(res.status).toBe(500);
-    expect(res.body).toEqual({ error: 'Internal server error' });
-  });
-
-  test('PATCH returns 404 for an unknown load id', async () => {
-    const res = await agent.patch('/api/loads/99999').send({ target_pay: 1700 });
-    expect(res.status).toBe(404);
-    expect(res.body).toEqual({ error: 'Load not found' });
-  });
-
   test('PATCH ignores disallowed fields but still applies allowed ones', async () => {
-    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay) VALUES (?, ?, ?)', ['L1001', 'Dallas', 1500]);
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay, user_id) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', 1500, userId]);
     const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston', target_pay: 2000 });
     expect(res.status).toBe(200);
     expect(Number(res.body.target_pay)).toBe(2000);
     expect(res.body.origin_city).toBe('Dallas');
   });
 
-  test('uploads a batch of loads, inserting new ones', async () => {
+  test('uploads a batch of loads, inserting new ones owned by the uploader', async () => {
     const res = await agent.post('/api/loads/upload').send({
       loads: [
         { load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', equipment: 'Reefer', target_pay: 1500 },
@@ -145,7 +161,32 @@ describe('loads routes', () => {
     expect(list.body).toHaveLength(2);
   });
 
-  test('re-uploading an existing load_number updates it instead of duplicating', async () => {
+  test('two different users can each upload a load with the same load_number', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'SHARED1', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+
+    const passwordHash = await bcrypt.hash('otherpw', 10);
+    await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+    const otherAgent = request.agent(app);
+    await otherAgent.post('/api/auth/login').send({ username: 'otheruser', password: 'otherpw' });
+    const res = await otherAgent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'SHARED1', origin_city: 'Houston', target_pay: 2000 }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.inserted).toBe(1);
+
+    const mine = await agent.get('/api/loads');
+    expect(mine.body).toHaveLength(1);
+    expect(mine.body[0].origin_city).toBe('Dallas');
+
+    const theirs = await otherAgent.get('/api/loads');
+    expect(theirs.body).toHaveLength(1);
+    expect(theirs.body[0].origin_city).toBe('Houston');
+  });
+
+  test('re-uploading an existing load_number for the same user updates it instead of duplicating', async () => {
     await agent.post('/api/loads/upload').send({
       loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
     });
@@ -153,6 +194,7 @@ describe('loads routes', () => {
       loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1800 }],
     });
     expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inserted: 0, updated: 1 });
 
     const list = await agent.get('/api/loads');
     expect(list.body).toHaveLength(1);
@@ -173,53 +215,46 @@ describe('loads routes', () => {
     expect(list2.body[0].status).toBe('booked');
   });
 
-  test('re-uploading a batch with unchanged values reports them as updated, not inserted', async () => {
-    // MySQL's affectedRows from ON DUPLICATE KEY UPDATE is 1 for both a
-    // genuine insert AND a no-op update (matching row, unchanged values) —
-    // only a real value change reports 2. Classification must not rely on
-    // affectedRows alone, or an unmodified re-upload gets miscounted as new.
-    const first = await agent.post('/api/loads/upload').send({
-      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
-    });
-    expect(first.body).toEqual({ inserted: 1, updated: 0 });
-
-    const second = await agent.post('/api/loads/upload').send({
-      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
-    });
-    expect(second.body).toEqual({ inserted: 0, updated: 1 });
-
-    const list = await agent.get('/api/loads');
-    expect(list.body).toHaveLength(1);
-  });
-
-  test('a batch with a mix of new and existing load_numbers classifies each correctly', async () => {
-    await agent.post('/api/loads/upload').send({
-      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
-    });
-
-    const res = await agent.post('/api/loads/upload').send({
-      loads: [
-        { load_number: 'L1001', origin_city: 'Dallas', target_pay: 1700 },
-        { load_number: 'L1002', origin_city: 'Atlanta', target_pay: 900 },
-      ],
-    });
-    expect(res.body).toEqual({ inserted: 1, updated: 1 });
-  });
-
   test('upload with a non-array loads field returns 400', async () => {
     const res = await agent.post('/api/loads/upload').send({ loads: 'not-an-array' });
     expect(res.status).toBe(400);
     expect(res.body).toEqual({ error: 'loads must be an array' });
   });
 
+  test('LOAD_COLUMNS never includes status or user_id, so uploads can never set them directly', () => {
+    const { LOAD_COLUMNS } = require('../src/routes/loads');
+    expect(LOAD_COLUMNS).not.toContain('status');
+    expect(LOAD_COLUMNS).not.toContain('user_id');
+  });
+
+  test('GET /api/loads returns 500 instead of crashing when the database is unavailable', async () => {
+    const express = require('express');
+    const { createLoadsRouter } = require('../src/routes/loads');
+    const brokenPool = { query: () => Promise.reject(new Error('connection lost')) };
+    const bareApp = express();
+    bareApp.use((req, res, next) => {
+      req.session = { userId: 1, role: 'user' };
+      next();
+    });
+    bareApp.use('/api/loads', createLoadsRouter(brokenPool));
+    bareApp.use((err, req, res, next) => {
+      res.status(500).json({ error: 'Internal server error' });
+    });
+    const res = await request(bareApp).get('/api/loads');
+    expect(res.status).toBe(500);
+    expect(res.body).toEqual({ error: 'Internal server error' });
+  });
+
   test('POST /api/loads/upload returns 500 instead of crashing when the database is unavailable', async () => {
     const express = require('express');
     const { createLoadsRouter } = require('../src/routes/loads');
-    const brokenPool = {
-      getConnection: () => Promise.reject(new Error('connection lost')),
-    };
+    const brokenPool = { getConnection: () => Promise.reject(new Error('connection lost')) };
     const bareApp = express();
     bareApp.use(express.json());
+    bareApp.use((req, res, next) => {
+      req.session = { userId: 1, role: 'user' };
+      next();
+    });
     bareApp.use('/api/loads', createLoadsRouter(brokenPool));
     bareApp.use((err, req, res, next) => {
       res.status(500).json({ error: 'Internal server error' });

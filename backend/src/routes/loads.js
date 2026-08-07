@@ -13,23 +13,40 @@ function createLoadsRouter(pool) {
 
   router.get('/', asyncHandler(async (req, res) => {
     const { status } = req.query;
-    const query = status
-      ? 'SELECT * FROM loads WHERE status = ? ORDER BY created_at DESC'
-      : 'SELECT * FROM loads ORDER BY created_at DESC';
-    const params = status ? [status] : [];
-    const [rows] = await pool.query(query, params);
+    const isAdmin = req.session.role === 'admin';
+    const conditions = [];
+    const params = [];
+    if (!isAdmin) {
+      conditions.push('user_id = ?');
+      params.push(req.session.userId);
+    }
+    if (status) {
+      conditions.push('status = ?');
+      params.push(status);
+    }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const [rows] = await pool.query(`SELECT * FROM loads ${whereClause} ORDER BY created_at DESC`, params);
     res.json(rows);
   }));
 
   router.get('/:id', asyncHandler(async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
-    if (!rows[0]) {
+    const load = rows[0];
+    const isAdmin = req.session.role === 'admin';
+    if (!load || (!isAdmin && load.user_id !== req.session.userId)) {
       return res.status(404).json({ error: 'Load not found' });
     }
-    res.json(rows[0]);
+    res.json(load);
   }));
 
   router.patch('/:id', asyncHandler(async (req, res) => {
+    const [existingRows] = await pool.query('SELECT id, user_id FROM loads WHERE id = ?', [req.params.id]);
+    const existing = existingRows[0];
+    const isAdmin = req.session.role === 'admin';
+    if (!existing || (!isAdmin && existing.user_id !== req.session.userId)) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+
     const allowedFields = ['target_pay', 'status'];
     const updates = [];
     const values = [];
@@ -45,9 +62,6 @@ function createLoadsRouter(pool) {
     values.push(req.params.id);
     await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
-    if (!rows[0]) {
-      return res.status(404).json({ error: 'Load not found' });
-    }
     res.json(rows[0]);
   }));
 
@@ -57,6 +71,7 @@ function createLoadsRouter(pool) {
       return res.status(400).json({ error: 'loads must be an array' });
     }
 
+    const userId = req.session.userId;
     let inserted = 0;
     let updated = 0;
 
@@ -70,24 +85,29 @@ function createLoadsRouter(pool) {
       // ON DUPLICATE KEY UPDATE that matches an existing row but changes no
       // column values (a no-op re-upload of unchanged data) — only an
       // actual value change reports 2. Relying on affectedRows alone would
-      // misclassify unchanged re-uploads as "inserted".
+      // misclassify unchanged re-uploads as "inserted". Scoped to the
+      // current user, since load_number is only unique per-user.
       const loadNumbers = loads.map((load) => load.load_number).filter((n) => n !== undefined && n !== null);
       const existing = new Set();
       if (loadNumbers.length) {
         const placeholders = loadNumbers.map(() => '?').join(', ');
         const [existingRows] = await connection.query(
-          `SELECT load_number FROM loads WHERE load_number IN (${placeholders})`,
-          loadNumbers
+          `SELECT load_number FROM loads WHERE user_id = ? AND load_number IN (${placeholders})`,
+          [userId, ...loadNumbers]
         );
         existingRows.forEach((row) => existing.add(row.load_number));
       }
 
       for (const load of loads) {
-        const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
+        const columns = [...LOAD_COLUMNS.filter((col) => load[col] !== undefined), 'user_id'];
         const placeholders = columns.map(() => '?').join(', ');
-        const values = columns.map((col) => load[col]);
+        const values = [...LOAD_COLUMNS.filter((col) => load[col] !== undefined).map((col) => load[col]), userId];
+        // Deliberately excludes both load_number (identifies the row) and
+        // user_id (must never change on a re-upload — ownership can't be
+        // transferred by someone else uploading the same load_number, since
+        // load_number is only unique per-user anyway).
         const updateClause = columns
-          .filter((col) => col !== 'load_number')
+          .filter((col) => col !== 'load_number' && col !== 'user_id')
           .map((col) => `${col} = VALUES(${col})`)
           .join(', ');
 
