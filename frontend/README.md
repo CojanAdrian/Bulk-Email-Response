@@ -62,12 +62,13 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 80 tests across 10 suites
+Runs the Vitest suite (`vitest run`) — 90 tests across 11 suites
 (`src/App.jsx`, `src/api/client.js`, `src/api/auth.js`, `src/api/loads.js`,
 `src/lib/mcleodParser.js`, `src/pages/LoginPage.jsx`,
-`src/pages/MainToolPage.jsx`, `src/components/UploadPanel.jsx`,
-`src/components/LoadsTable.jsx`, `src/components/RateModal.jsx`). All API
-calls are mocked, so **no backend is required** to run tests.
+`src/pages/RegisterPage.jsx`, `src/pages/MainToolPage.jsx`,
+`src/components/UploadPanel.jsx`, `src/components/LoadsTable.jsx`,
+`src/components/RateModal.jsx`). All API calls are mocked, so **no backend
+is required** to run tests.
 
 ## Uploading loads
 
@@ -89,10 +90,26 @@ your edit will overwrite the freshly-uploaded data with whatever you
 had open in the modal — there's no conflict detection yet. Close and
 reopen "Edit rate" if you know a re-upload just happened.
 
+## Registration
+
+The login screen has a "Don't have an account? Sign up" link that switches
+to a registration form (username, password, confirm password). On success,
+the new account is created and you're **auto-logged-in** immediately —
+landing directly on the main tool shell, same as after a login. The
+registration form also has an "Already have an account? Log in" link back
+to the login screen.
+
+A self-registered account always gets `role: 'user'`, which — per the
+backend's own per-user load isolation — starts with an empty loads table
+and can only see/edit loads it uploads itself. There's no way to
+self-register as `role: 'admin'`; see the backend README's "Accounts and
+roles" section for how the one admin account is seeded and what admins can
+see that regular users can't.
+
 ## Manual end-to-end verification walkthrough
 
-This proves the login flow, CSV upload, loads table, and rate editing all
-work against the real backend (not mocks).
+This proves the login/registration flow, CSV upload, loads table, and rate
+editing all work against the real backend (not mocks).
 
 1. **Start the backend** (from `backend/`, with MySQL reachable and `.env`
    filled in — see its README):
@@ -111,34 +128,51 @@ work against the real backend (not mocks).
 3. **Open `http://localhost:5173`** in a browser. You should briefly see
    "Loading..." (the app calling `GET /api/auth/me` to check for an
    existing session) and then land on the login form, since you're not
-   logged in yet.
+   logged in yet. It has a "Don't have an account? Sign up" link.
 
-4. **Log in** with the admin credentials from `backend/.env`
-   (`ADMIN_USERNAME` / `ADMIN_PASSWORD`, e.g. `admin` / `changeme123` in a
-   default local setup). You should land on the main shell: a header with
-   the username and a "Log out" button, an "Upload loads CSV" panel, and
-   the loads table below it (see "Uploading loads" above).
+4. **Click "Sign up."** You should see the registration form (username,
+   password, confirm password) with an "Already have an account? Log in"
+   link back to the login form.
 
-5. **Refresh the page.** You should stay logged in and land directly back
+5. **Register a brand-new account** — a username you haven't used before, a
+   password at least 8 characters, and a matching confirm-password. You
+   should land directly on the main shell, logged in as the new user (no
+   separate login step needed). The loads table should be empty — a fresh
+   account has no loads of its own yet, which is expected given per-user
+   load isolation (see the backend README's "Accounts and roles" section).
+
+6. **Log out**, click "Sign up" again, and try registering that **same
+   username** a second time. You should see a "Username already taken"
+   error and stay on the registration form (the account is not
+   re-created or logged into).
+
+7. **Log in** as the account you just registered, to confirm the
+   credentials actually persisted server-side. You should land back on the
+   main shell. (You can also log in with the seeded admin credentials from
+   `backend/.env` — `ADMIN_USERNAME` / `ADMIN_PASSWORD`, e.g.
+   `admin` / `changeme123` in a default local setup — to exercise the
+   `role: 'admin'` account instead.)
+
+8. **Refresh the page.** You should stay logged in and land directly back
    on the shell (no flash back to the login form) — this confirms the
    session cookie is being sent and honored on the `GET /api/auth/me`
    check that runs on mount.
 
-6. **Upload a McLeod CSV** (e.g. `test_loads_mockup.csv` in the repo root)
+9. **Upload a McLeod CSV** (e.g. `test_loads_mockup.csv` in the repo root)
    via the "Upload loads CSV" control. You should see a success message
    with a nonzero "inserted" count, and the loads table below should
    populate.
 
-7. **Click "Edit rate"** on a row, change the target pay or status, and
-   save. The table should reflect the change immediately.
+10. **Click "Edit rate"** on a row, change the target pay or status, and
+    save. The table should reflect the change immediately.
 
-8. **Re-upload the same CSV.** The success message should now show
-   "updated" loads instead of "inserted", and the table's row count
-   should not change.
+11. **Re-upload the same CSV.** The success message should now show
+    "updated" loads instead of "inserted", and the table's row count
+    should not change.
 
-9. **Click "Log out."** You should return to the login form. Refreshing
-   again should keep you on the login form (the session was destroyed
-   server-side).
+12. **Click "Log out."** You should return to the login form. Refreshing
+    again should keep you on the login form (the session was destroyed
+    server-side).
 
 If any step fails, the most likely causes are:
 
