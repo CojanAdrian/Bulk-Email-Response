@@ -21,10 +21,18 @@ function createAuthRouter(pool) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const [result] = await pool.query(
-      'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
-      [username, passwordHash, 'user']
-    );
+    let result;
+    try {
+      [result] = await pool.query(
+        'INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)',
+        [username, passwordHash, 'user']
+      );
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(400).json({ error: 'Username already taken' });
+      }
+      throw err;
+    }
 
     req.session.userId = result.insertId;
     req.session.username = username;

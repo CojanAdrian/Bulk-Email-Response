@@ -92,6 +92,20 @@ describe('auth routes', () => {
     expect(res.body).toEqual({ error: 'Username already taken' });
   });
 
+  test('two concurrent registrations for the same username never both succeed, and the loser gets a clean 400 (not a 500)', async () => {
+    const [resA, resB] = await Promise.all([
+      request(app).post('/api/auth/register').send({ username: 'racer', password: 'longenough' }),
+      request(app).post('/api/auth/register').send({ username: 'racer', password: 'longenough' }),
+    ]);
+    const statuses = [resA.status, resB.status].sort();
+    expect(statuses).toEqual([200, 400]);
+    const loser = resA.status === 400 ? resA : resB;
+    expect(loser.body).toEqual({ error: 'Username already taken' });
+
+    const [rows] = await pool.query('SELECT id FROM users WHERE username = ?', ['racer']);
+    expect(rows).toHaveLength(1);
+  });
+
   test('login response and session include the user role', async () => {
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     await pool.query('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)', ['adminlike', passwordHash, 'admin']);
