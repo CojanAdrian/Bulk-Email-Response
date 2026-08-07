@@ -2,12 +2,15 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import App from '../src/App';
 import * as authApi from '../src/api/auth';
+import * as loadsApi from '../src/api/loads';
 
 vi.mock('../src/api/auth');
+vi.mock('../src/api/loads');
 
 describe('App', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    loadsApi.listLoads.mockResolvedValue([]);
   });
 
   test('shows the login page when there is no active session', async () => {

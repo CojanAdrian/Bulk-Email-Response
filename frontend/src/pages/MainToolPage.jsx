@@ -1,4 +1,20 @@
+import { useState } from 'react';
+import UploadPanel from '../components/UploadPanel';
+import LoadsTable from '../components/LoadsTable';
+import RateModal from '../components/RateModal';
+
 function MainToolPage({ username, onLogout }) {
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [selectedLoad, setSelectedLoad] = useState(null);
+
+  function handleUploadComplete() {
+    setRefreshKey((k) => k + 1);
+  }
+
+  function handleSaved() {
+    setRefreshKey((k) => k + 1);
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <header className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
@@ -13,7 +29,13 @@ function MainToolPage({ username, onLogout }) {
           </button>
         </div>
       </header>
-      <main className="p-6 text-slate-400">Load management tools coming soon.</main>
+      <main className="space-y-6 p-6">
+        <UploadPanel onUploadComplete={handleUploadComplete} />
+        <LoadsTable refreshKey={refreshKey} onSelectLoad={setSelectedLoad} />
+      </main>
+      {selectedLoad && (
+        <RateModal load={selectedLoad} onClose={() => setSelectedLoad(null)} onSaved={handleSaved} />
+      )}
     </div>
   );
 }
