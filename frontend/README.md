@@ -5,11 +5,11 @@ use to bulk-manage loads (CSV upload, a loads table, rate editing, DAT
 export, and a "blast" email/notification flow).
 
 **This is Phase 1/2: auth shell plus CSV upload, the loads table, and rate
-editing.** It implements session-based login, a logged-in/logged-out state
-machine, uploading a McLeod CSV export, viewing/filtering the resulting
-loads table, and editing a load's target pay and status. DAT export and the
-blast modal are **not implemented yet** — those land in Phase 3, which
-builds on top of this. See
+editing.** It implements session-based login and self-service registration,
+a logged-in/logged-out state machine, uploading a McLeod CSV export,
+viewing/filtering the resulting loads table, and editing a load's target
+pay and status. DAT export and the blast modal are **not implemented yet**
+— those land in Phase 3, which builds on top of this. See
 `docs/superpowers/specs/2026-08-04-backend-foundation-design.md` in the repo
 root for the full design.
 
