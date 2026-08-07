@@ -79,4 +79,12 @@ describe('LoginPage', () => {
       expect(screen.getByRole('button', { name: /^sign in$/i })).not.toBeDisabled();
     });
   });
+
+  test('calls onSwitchToRegister when "Sign up" is clicked', () => {
+    const onSwitchToRegister = vi.fn();
+    render(<LoginPage onLoginSuccess={vi.fn()} onSwitchToRegister={onSwitchToRegister} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    expect(onSwitchToRegister).toHaveBeenCalled();
+  });
 });

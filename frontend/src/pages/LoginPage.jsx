@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { login } from '../api/auth';
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -63,6 +63,13 @@ function LoginPage({ onLoginSuccess }) {
           className="w-full rounded-lg bg-indigo-600 px-4 py-2 font-medium text-white transition hover:bg-indigo-500 disabled:opacity-60"
         >
           {submitting ? 'Signing in...' : 'Sign in'}
+        </button>
+        <button
+          type="button"
+          onClick={onSwitchToRegister}
+          className="mt-4 w-full text-center text-sm text-slate-400 hover:text-slate-200"
+        >
+          Don't have an account? Sign up
         </button>
       </form>
     </div>
