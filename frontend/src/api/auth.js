@@ -11,3 +11,7 @@ export function logout() {
 export function me() {
   return get('/api/auth/me');
 }
+
+export function register(username, password) {
+  return post('/api/auth/register', { username, password });
+}

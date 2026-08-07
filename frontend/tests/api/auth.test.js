@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { login, logout, me } from '../../src/api/auth';
+import { login, logout, me, register } from '../../src/api/auth';
 
 describe('auth api', () => {
   beforeEach(() => {
@@ -34,5 +34,19 @@ describe('auth api', () => {
   test('me rejects when not logged in', async () => {
     global.fetch.mockResolvedValue({ ok: false, status: 401, json: () => Promise.resolve({ error: 'Unauthorized' }) });
     await expect(me()).rejects.toMatchObject({ status: 401 });
+  });
+
+  test('register posts username and password to /api/auth/register', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ username: 'newuser', role: 'user' }) });
+    const result = await register('newuser', 'longenough');
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/auth/register');
+    expect(JSON.parse(options.body)).toEqual({ username: 'newuser', password: 'longenough' });
+    expect(result).toEqual({ username: 'newuser', role: 'user' });
+  });
+
+  test('register rejects with the server error message and status on failure', async () => {
+    global.fetch.mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ error: 'Username already taken' }) });
+    await expect(register('taken', 'longenough')).rejects.toMatchObject({ status: 400, message: 'Username already taken' });
   });
 });
