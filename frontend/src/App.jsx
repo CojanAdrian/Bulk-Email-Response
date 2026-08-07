@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { me, logout } from './api/auth';
 import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
 import MainToolPage from './pages/MainToolPage';
 
 function App() {
   const [status, setStatus] = useState('checking'); // 'checking' | 'loggedOut' | 'loggedIn'
+  const [authView, setAuthView] = useState('login'); // 'login' | 'register'
   const [username, setUsername] = useState(null);
 
   useEffect(() => {
@@ -21,7 +23,7 @@ function App() {
       });
   }, []);
 
-  function handleLoginSuccess(data) {
+  function handleAuthSuccess(data) {
     setUsername(data.username);
     setStatus('loggedIn');
   }
@@ -33,6 +35,7 @@ function App() {
       })
       .finally(() => {
         setUsername(null);
+        setAuthView('login');
         setStatus('loggedOut');
       });
   }
@@ -46,7 +49,10 @@ function App() {
   }
 
   if (status === 'loggedOut') {
-    return <LoginPage onLoginSuccess={handleLoginSuccess} />;
+    if (authView === 'register') {
+      return <RegisterPage onRegisterSuccess={handleAuthSuccess} onSwitchToLogin={() => setAuthView('login')} />;
+    }
+    return <LoginPage onLoginSuccess={handleAuthSuccess} onSwitchToRegister={() => setAuthView('register')} />;
   }
 
   return <MainToolPage username={username} onLogout={handleLogout} />;

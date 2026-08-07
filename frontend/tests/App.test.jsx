@@ -90,4 +90,38 @@ describe('App', () => {
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
   });
+
+  test('switches from the login page to the register page and back', async () => {
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    authApi.me.mockRejectedValue(err);
+    render(<App />);
+    await waitFor(() => screen.getByRole('button', { name: /sign in/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    expect(screen.getByRole('button', { name: /create account/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /already have an account/i }));
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
+  });
+
+  test('registering successfully logs the user in', async () => {
+    const err = new Error('Unauthorized');
+    err.status = 401;
+    authApi.me.mockRejectedValue(err);
+    authApi.register.mockResolvedValue({ username: 'newuser', role: 'user' });
+    render(<App />);
+    await waitFor(() => screen.getByRole('button', { name: /sign in/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
+    fireEvent.change(screen.getByLabelText(/^username$/i), { target: { value: 'newuser' } });
+    fireEvent.change(screen.getByLabelText(/^password$/i), { target: { value: 'longenough' } });
+    fireEvent.change(screen.getByLabelText(/confirm password/i), { target: { value: 'longenough' } });
+    fireEvent.click(screen.getByRole('button', { name: /create account/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('newuser')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /log out/i })).toBeInTheDocument();
+    });
+  });
 });
