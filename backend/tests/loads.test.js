@@ -173,6 +173,39 @@ describe('loads routes', () => {
     expect(list2.body[0].status).toBe('booked');
   });
 
+  test('re-uploading a batch with unchanged values reports them as updated, not inserted', async () => {
+    // MySQL's affectedRows from ON DUPLICATE KEY UPDATE is 1 for both a
+    // genuine insert AND a no-op update (matching row, unchanged values) —
+    // only a real value change reports 2. Classification must not rely on
+    // affectedRows alone, or an unmodified re-upload gets miscounted as new.
+    const first = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+    expect(first.body).toEqual({ inserted: 1, updated: 0 });
+
+    const second = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+    expect(second.body).toEqual({ inserted: 0, updated: 1 });
+
+    const list = await agent.get('/api/loads');
+    expect(list.body).toHaveLength(1);
+  });
+
+  test('a batch with a mix of new and existing load_numbers classifies each correctly', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [
+        { load_number: 'L1001', origin_city: 'Dallas', target_pay: 1700 },
+        { load_number: 'L1002', origin_city: 'Atlanta', target_pay: 900 },
+      ],
+    });
+    expect(res.body).toEqual({ inserted: 1, updated: 1 });
+  });
+
   test('upload with a non-array loads field returns 400', async () => {
     const res = await agent.post('/api/loads/upload').send({ loads: 'not-an-array' });
     expect(res.status).toBe(400);

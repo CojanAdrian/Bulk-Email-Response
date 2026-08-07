@@ -64,6 +64,24 @@ function createLoadsRouter(pool) {
     try {
       await connection.beginTransaction();
 
+      // Determine which load_numbers already exist up front, rather than
+      // inferring insert-vs-update from MySQL's affectedRows. MySQL reports
+      // affectedRows === 1 both for a genuine new-row insert AND for an
+      // ON DUPLICATE KEY UPDATE that matches an existing row but changes no
+      // column values (a no-op re-upload of unchanged data) — only an
+      // actual value change reports 2. Relying on affectedRows alone would
+      // misclassify unchanged re-uploads as "inserted".
+      const loadNumbers = loads.map((load) => load.load_number).filter((n) => n !== undefined && n !== null);
+      const existing = new Set();
+      if (loadNumbers.length) {
+        const placeholders = loadNumbers.map(() => '?').join(', ');
+        const [existingRows] = await connection.query(
+          `SELECT load_number FROM loads WHERE load_number IN (${placeholders})`,
+          loadNumbers
+        );
+        existingRows.forEach((row) => existing.add(row.load_number));
+      }
+
       for (const load of loads) {
         const columns = LOAD_COLUMNS.filter((col) => load[col] !== undefined);
         const placeholders = columns.map(() => '?').join(', ');
@@ -73,15 +91,16 @@ function createLoadsRouter(pool) {
           .map((col) => `${col} = VALUES(${col})`)
           .join(', ');
 
-        const [result] = await connection.query(
+        await connection.query(
           `INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})
            ON DUPLICATE KEY UPDATE ${updateClause}`,
           values
         );
-        if (result.affectedRows === 1) {
-          inserted += 1;
-        } else {
+        if (existing.has(load.load_number)) {
           updated += 1;
+        } else {
+          inserted += 1;
+          existing.add(load.load_number);
         }
       }
 
