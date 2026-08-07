@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { updateLoad } from '../api/loads';
 
 function RateModal({ load, onClose, onSaved }) {
@@ -6,6 +6,13 @@ function RateModal({ load, onClose, onSaved }) {
   const [status, setStatus] = useState(load.status);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     function handleKeyDown(e) {
@@ -36,14 +43,20 @@ function RateModal({ load, onClose, onSaved }) {
     setSaving(true);
     updateLoad(load.id, { target_pay: normalizedTargetPay, status })
       .then((updated) => {
-        onSaved(updated);
-        onClose();
+        if (isMountedRef.current) {
+          onSaved(updated);
+          onClose();
+        }
       })
       .catch((err) => {
-        setError(err.message || 'Failed to save.');
+        if (isMountedRef.current) {
+          setError(err.message || 'Failed to save.');
+        }
       })
       .finally(() => {
-        setSaving(false);
+        if (isMountedRef.current) {
+          setSaving(false);
+        }
       });
   }
 

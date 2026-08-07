@@ -78,4 +78,10 @@ describe('api client', () => {
     global.fetch.mockRejectedValue(abortError);
     await expect(get('/api/health')).rejects.toThrow('Request timed out');
   });
+
+  test('post() accepts a custom timeoutMs without breaking the request', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) });
+    await post('/api/loads/upload', { loads: [] }, { timeoutMs: 60000 });
+    expect(global.fetch).toHaveBeenCalled();
+  });
 });

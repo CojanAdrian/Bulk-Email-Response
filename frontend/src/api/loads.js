@@ -14,5 +14,5 @@ export function updateLoad(id, data) {
 }
 
 export function uploadLoads(loads) {
-  return post('/api/loads/upload', { loads });
+  return post('/api/loads/upload', { loads }, { timeoutMs: 60000 });
 }

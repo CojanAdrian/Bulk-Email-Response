@@ -111,4 +111,22 @@ describe('RateModal', () => {
     expect(onClose).toHaveBeenCalled();
     expect(loadsApi.updateLoad).not.toHaveBeenCalled();
   });
+
+  test('does not update state after unmounting while a save is in flight', async () => {
+    let resolveSave;
+    loadsApi.updateLoad.mockReturnValue(
+      new Promise((resolve) => {
+        resolveSave = resolve;
+      })
+    );
+    const onSaved = vi.fn();
+    const { unmount } = render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={onSaved} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    unmount();
+    resolveSave({ ...LOAD, status: 'active' });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(onSaved).not.toHaveBeenCalled();
+  });
 });

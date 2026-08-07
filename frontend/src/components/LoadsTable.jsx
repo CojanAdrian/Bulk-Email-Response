@@ -5,10 +5,12 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   const [loads, setLoads] = useState([]);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     let ignore = false;
     setStatus('loading');
+    setError(null);
     listLoads(statusFilter)
       .then((data) => {
         if (!ignore) {
@@ -16,8 +18,9 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
           setStatus('ready');
         }
       })
-      .catch(() => {
+      .catch((err) => {
         if (!ignore) {
+          setError(err.message || 'Failed to load loads.');
           setStatus('error');
         }
       });
@@ -44,7 +47,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
       {status === 'loading' && <p className="text-sm text-slate-400">Loading loads...</p>}
       {status === 'error' && (
         <p role="alert" className="text-sm text-red-400">
-          Failed to load loads.
+          {error}
         </p>
       )}
       {status === 'ready' && loads.length === 0 && <p className="text-sm text-slate-400">No loads found.</p>}

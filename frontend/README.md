@@ -62,10 +62,12 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 20 tests across 4 suites
-(`src/App.jsx`, `src/api/client.js`, `src/api/auth.js`,
-`src/pages/LoginPage.jsx`). All API calls are mocked, so **no backend is
-required** to run tests.
+Runs the Vitest suite (`vitest run`) — 80 tests across 10 suites
+(`src/App.jsx`, `src/api/client.js`, `src/api/auth.js`, `src/api/loads.js`,
+`src/lib/mcleodParser.js`, `src/pages/LoginPage.jsx`,
+`src/pages/MainToolPage.jsx`, `src/components/UploadPanel.jsx`,
+`src/components/LoadsTable.jsx`, `src/components/RateModal.jsx`). All API
+calls are mocked, so **no backend is required** to run tests.
 
 ## Uploading loads
 
@@ -89,7 +91,8 @@ reopen "Edit rate" if you know a re-upload just happened.
 
 ## Manual end-to-end verification walkthrough
 
-This proves the login flow works against the real backend (not mocks).
+This proves the login flow, CSV upload, loads table, and rate editing all
+work against the real backend (not mocks).
 
 1. **Start the backend** (from `backend/`, with MySQL reachable and `.env`
    filled in — see its README):
@@ -121,7 +124,19 @@ This proves the login flow works against the real backend (not mocks).
    session cookie is being sent and honored on the `GET /api/auth/me`
    check that runs on mount.
 
-6. **Click "Log out."** You should return to the login form. Refreshing
+6. **Upload a McLeod CSV** (e.g. `test_loads_mockup.csv` in the repo root)
+   via the "Upload loads CSV" control. You should see a success message
+   with a nonzero "inserted" count, and the loads table below should
+   populate.
+
+7. **Click "Edit rate"** on a row, change the target pay or status, and
+   save. The table should reflect the change immediately.
+
+8. **Re-upload the same CSV.** The success message should now show
+   "updated" loads instead of "inserted", and the table's row count
+   should not change.
+
+9. **Click "Log out."** You should return to the login form. Refreshing
    again should keep you on the login form (the session was destroyed
    server-side).
 

@@ -39,7 +39,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/failed to load loads/i)).toBeInTheDocument();
+      expect(screen.getByText('Network error')).toBeInTheDocument();
     });
   });
 
