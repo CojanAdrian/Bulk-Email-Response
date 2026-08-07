@@ -263,6 +263,13 @@ UPDATE users SET role = 'admin' WHERE username = 'someuser';
 This is a known, deliberate limitation for now — there's no
 admin-management UI or API endpoint yet.
 
+Role changes made this way are not instantaneous for a user who's already
+logged in: `role` is read from the session (set at login/registration),
+not re-checked against the database on every request. Demoting an admin
+via direct SQL doesn't revoke their access until they log out, their
+session expires, or the session store is cleared — there's currently no
+way to forcibly terminate a specific user's active session.
+
 ## Behavior notes
 
 **`status` can only change via `PATCH /api/loads/:id`.** The upload
