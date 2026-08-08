@@ -1,0 +1,77 @@
+const { matchInquiry, extractDate } = require('../../src/lib/matchingEngine');
+
+const LOADS = [
+  { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', early_pu: '2026-08-10 08:00:00' },
+  { id: 2, load_number: '4522', origin_city: 'Atlanta', origin_state: 'GA', dest_city: 'Miami', dest_state: 'FL', early_pu: '2026-08-11 08:00:00' },
+  { id: 3, load_number: '4523', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO', early_pu: '2026-08-12 08:00:00' },
+];
+
+describe('matchInquiry', () => {
+  test('matches on an exact load number mentioned anywhere in the email', () => {
+    const result = matchInquiry('Hi, is load #4521 still available?', LOADS);
+    expect(result.tier).toBe('load_number');
+    expect(result.matchedLoad.id).toBe(1);
+  });
+
+  test('matches on a city+state pair when no load number is mentioned', () => {
+    const result = matchInquiry('Do you have anything from Dallas, TX this week?', LOADS);
+    expect(result.tier).toBe('city_state');
+    expect(result.matchedLoad.id).toBe(1); // two Dallas,TX loads (1 and 3) -- tie-break picks earliest pickup
+  });
+
+  test('narrows a city+state tie using a date mentioned in the email', () => {
+    const result = matchInquiry('Looking for a Dallas, TX load picking up 8/12', LOADS);
+    expect(result.tier).toBe('city_state');
+    expect(result.matchedLoad.id).toBe(3);
+  });
+
+  test('matches on city alone when state is not mentioned', () => {
+    const result = matchInquiry('Anything out of Atlanta?', LOADS);
+    expect(result.tier).toBe('city');
+    expect(result.matchedLoad.id).toBe(2);
+  });
+
+  test('matches on state alone as the broadest tier', () => {
+    const result = matchInquiry('Got anything in Texas this week?', LOADS);
+    expect(result.tier).toBe('state');
+    expect(result.matchedLoad.id).toBe(1); // two loads touch TX (1 and 3) -- tie-break picks earliest pickup
+  });
+
+  test('recognizes a full state name as well as its abbreviation', () => {
+    const result = matchInquiry('Anything in Georgia?', LOADS);
+    expect(result.tier).toBe('state');
+    expect(result.matchedLoad.id).toBe(2);
+  });
+
+  test('returns no match when nothing in the email corresponds to any load', () => {
+    const result = matchInquiry('Do you have any loads from Seattle to Portland?', LOADS);
+    expect(result.tier).toBe('none');
+    expect(result.matchedLoad).toBeNull();
+  });
+
+  test('returns no match when there are no loads to match against', () => {
+    const result = matchInquiry('Is load #4521 available?', []);
+    expect(result.tier).toBe('none');
+    expect(result.matchedLoad).toBeNull();
+  });
+
+  test('load number match takes priority even when city/state text is also present', () => {
+    const result = matchInquiry('Following up on load 4522 from Dallas, TX', LOADS);
+    expect(result.tier).toBe('load_number');
+    expect(result.matchedLoad.id).toBe(2);
+  });
+});
+
+describe('extractDate', () => {
+  test('extracts an MM/DD date with no year', () => {
+    expect(extractDate('picking up 8/12')).toEqual({ month: 8, day: 12, year: null });
+  });
+
+  test('extracts an MM/DD/YYYY date', () => {
+    expect(extractDate('pickup on 8/12/2026')).toEqual({ month: 8, day: 12, year: 2026 });
+  });
+
+  test('returns null when no date is present', () => {
+    expect(extractDate('no date mentioned here')).toBeNull();
+  });
+});
