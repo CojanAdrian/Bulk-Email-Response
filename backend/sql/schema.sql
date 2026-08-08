@@ -28,3 +28,28 @@ CREATE TABLE IF NOT EXISTS loads (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS email_accounts (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  gmail_address VARCHAR(255) NOT NULL,
+  refresh_token TEXT NOT NULL,
+  connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_polled_at TIMESTAMP NULL
+);
+
+CREATE TABLE IF NOT EXISTS email_inquiries (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  email_account_id INT NOT NULL,
+  gmail_message_id VARCHAR(255) NOT NULL,
+  from_address VARCHAR(255),
+  subject VARCHAR(500),
+  body_snippet TEXT,
+  received_at DATETIME,
+  matched_load_id INT NULL,
+  match_tier ENUM('load_number','city_state','city','state','none') NOT NULL DEFAULT 'none',
+  status ENUM('matched','needs_review') NOT NULL DEFAULT 'needs_review',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uniq_account_message (email_account_id, gmail_message_id)
+);
