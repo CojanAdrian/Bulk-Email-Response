@@ -50,6 +50,26 @@ describe('listNewMessageIds', () => {
     const ids = await listNewMessageIds('token', null);
     expect(ids).toEqual([]);
   });
+
+  test('warns when Gmail signals more results were available than fetched', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    googleapis.__mockGmailClient.users.messages.list.mockResolvedValue({
+      data: { messages: [{ id: 'm1' }], nextPageToken: 'abc123' },
+    });
+    await listNewMessageIds('token', null);
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    warnSpy.mockRestore();
+  });
+
+  test('does not warn when there is no next page token', async () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    googleapis.__mockGmailClient.users.messages.list.mockResolvedValue({
+      data: { messages: [{ id: 'm1' }] },
+    });
+    await listNewMessageIds('token', null);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
 });
 
 describe('extractPlainTextBody', () => {
@@ -104,5 +124,56 @@ describe('getMessage', () => {
       body: 'Is load 4521 still available?',
       receivedAt: new Date(1735689600000),
     });
+  });
+
+  test('returns an empty string for a header that is missing entirely', async () => {
+    googleapis.__mockGmailClient.users.messages.get.mockResolvedValue({
+      data: {
+        id: 'm1',
+        internalDate: '1735689600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [{ name: 'From', value: 'carrier@example.com' }],
+          body: { data: Buffer.from('No subject here').toString('base64url') },
+        },
+      },
+    });
+
+    const message = await getMessage('token', 'm1');
+    expect(message.subject).toBe('');
+  });
+
+  test('matches header names case-insensitively', async () => {
+    googleapis.__mockGmailClient.users.messages.get.mockResolvedValue({
+      data: {
+        id: 'm1',
+        internalDate: '1735689600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [{ name: 'from', value: 'carrier@example.com' }],
+          body: { data: Buffer.from('Case insensitive header').toString('base64url') },
+        },
+      },
+    });
+
+    const message = await getMessage('token', 'm1');
+    expect(message.from).toBe('carrier@example.com');
+  });
+
+  test('does not crash when a header object is missing a name property', async () => {
+    googleapis.__mockGmailClient.users.messages.get.mockResolvedValue({
+      data: {
+        id: 'm1',
+        internalDate: '1735689600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [{ value: 'malformed-header-with-no-name' }, { name: 'From', value: 'carrier@example.com' }],
+          body: { data: Buffer.from('Malformed header present').toString('base64url') },
+        },
+      },
+    });
+
+    const message = await getMessage('token', 'm1');
+    expect(message.from).toBe('carrier@example.com');
   });
 });

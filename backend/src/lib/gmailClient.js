@@ -11,6 +11,9 @@ async function listNewMessageIds(accessToken, sinceDate) {
   const gmail = buildGmailClient(accessToken);
   const query = sinceDate ? `after:${Math.floor(sinceDate.getTime() / 1000)}` : '';
   const res = await gmail.users.messages.list({ userId: 'me', q: query, labelIds: ['INBOX'], maxResults: 50 });
+  if (res.data.nextPageToken) {
+    console.warn('Gmail listNewMessageIds: more than 50 messages matched in one poll window; some may be missed until the next poll.');
+  }
   return (res.data.messages || []).map((m) => m.id);
 }
 
@@ -35,7 +38,7 @@ async function getMessage(accessToken, messageId) {
   const gmail = buildGmailClient(accessToken);
   const res = await gmail.users.messages.get({ userId: 'me', id: messageId, format: 'full' });
   const headers = res.data.payload.headers || [];
-  const getHeader = (name) => (headers.find((h) => h.name.toLowerCase() === name.toLowerCase()) || {}).value || '';
+  const getHeader = (name) => (headers.find((h) => h.name && h.name.toLowerCase() === name.toLowerCase()) || {}).value || '';
   return {
     id: res.data.id,
     from: getHeader('From'),
