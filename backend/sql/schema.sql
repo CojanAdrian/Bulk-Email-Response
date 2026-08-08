@@ -51,5 +51,6 @@ CREATE TABLE IF NOT EXISTS email_inquiries (
   match_tier ENUM('load_number','city_state','city','state','none') NOT NULL DEFAULT 'none',
   status ENUM('matched','needs_review') NOT NULL DEFAULT 'needs_review',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY uniq_account_message (email_account_id, gmail_message_id)
+  UNIQUE KEY uniq_account_message (email_account_id, gmail_message_id),
+  KEY idx_user_id (user_id)
 );
