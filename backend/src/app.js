@@ -4,6 +4,7 @@ const cors = require('cors');
 const createAuthRouter = require('./routes/auth');
 const { createLoadsRouter } = require('./routes/loads');
 const createGmailRouter = require('./routes/gmail');
+const createInquiriesRouter = require('./routes/inquiries');
 const requireAuth = require('./middleware/requireAuth');
 
 function createApp(pool) {
@@ -25,6 +26,7 @@ function createApp(pool) {
   app.use('/api/auth', createAuthRouter(pool));
   app.use('/api/loads', requireAuth, createLoadsRouter(pool));
   app.use('/api/gmail', requireAuth, createGmailRouter(pool));
+  app.use('/api/inquiries', requireAuth, createInquiriesRouter(pool));
 
   app.use((err, req, res, next) => {
     console.error(err);
