@@ -215,9 +215,9 @@ two separate rows, each owned by its uploader. A re-upload of the same
 `load_number` by the *same* user updates that user's existing row; it has
 no effect on any other user's load with the same number.
 
-A load row has this shape (the `role`/`user_id` columns and the per-user
-unique key come from `npm run setup-db`'s migration step, not from
-`sql/schema.sql` alone — see "Setup" above):
+A load row has this shape (the `role`/`user_id`/`raw_equipment` columns and
+the per-user unique key come from `npm run setup-db`'s migration step, not
+from `sql/schema.sql` alone — see "Setup" above):
 
 ```json
 {
@@ -226,7 +226,7 @@ unique key come from `npm run setup-db`'s migration step, not from
   "load_number": "TEST-001",
   "origin_city": "Chicago", "origin_state": "IL", "origin_zip": null,
   "dest_city": "Dallas", "dest_state": "TX", "dest_zip": null,
-  "equipment": null, "weight": null,
+  "equipment": null, "raw_equipment": null, "weight": null,
   "target_pay": "1500.00",
   "early_pu": null, "late_pu": null, "late_del": null,
   "stops": null,
@@ -239,6 +239,14 @@ unique key come from `npm run setup-db`'s migration step, not from
 
 (`target_pay` is returned as a string because it's a MySQL `DECIMAL`
 column serialized via `mysql2`.)
+
+`raw_equipment` holds the *pre-mapping* equipment code exactly as it
+appeared in the uploaded CSV (e.g. `"POTM"`), while `equipment` holds the
+value after `EQUIPMENT_MAP` normalization (e.g. `"PO"`) that the rest of
+the app uses for matching/filtering. They're the same value for codes that
+map to themselves. The frontend's DAT export pipeline needs the raw code
+to detect team loads (`POTM` specifically) since that distinction is lost
+once mapping collapses several raw codes onto the same normalized value.
 
 Any unhandled error in a route (e.g. a dropped DB connection) is caught by
 a shared error handler and returned as `500 {"error": "Internal server error"}`
