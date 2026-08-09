@@ -4,6 +4,7 @@ import { connect as connectLiveSocket, disconnect as disconnectLiveSocket } from
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MainToolPage from './pages/MainToolPage';
+import { ToastProvider } from './components/Toast';
 
 function App() {
   const [status, setStatus] = useState('checking'); // 'checking' | 'loggedOut' | 'loggedIn'
@@ -62,7 +63,11 @@ function App() {
     return <LoginPage onLoginSuccess={handleAuthSuccess} onSwitchToRegister={() => setAuthView('register')} />;
   }
 
-  return <MainToolPage username={username} onLogout={handleLogout} />;
+  return (
+    <ToastProvider>
+      <MainToolPage username={username} onLogout={handleLogout} />
+    </ToastProvider>
+  );
 }
 
 export default App;

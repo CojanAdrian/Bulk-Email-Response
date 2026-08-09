@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 
+const MotionCard = motion(Card);
+
 function ContactMethodModal({ onCancel, onConfirm }) {
+  const preset = useMotionPreset();
   const [contactMethod, setContactMethod] = useState('phone');
   const [includeContactLine, setIncludeContactLine] = useState(false);
   const [commentContact, setCommentContact] = useState('');
@@ -18,13 +23,14 @@ function ContactMethodModal({ onCancel, onConfirm }) {
   }
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="contact-modal-title"
       className="fixed inset-0 flex items-center justify-center bg-black/60 px-4"
+      {...preset.modal.backdrop}
     >
-      <Card className="w-full max-w-md">
+      <MotionCard className="w-full max-w-md" {...preset.modal.card}>
         <h2 id="contact-modal-title" className="mb-4 text-lg font-semibold text-text">
           DAT Contact Method
         </h2>
@@ -81,8 +87,8 @@ function ContactMethodModal({ onCancel, onConfirm }) {
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
           <PrimaryButton onClick={handleConfirm}>Continue</PrimaryButton>
         </div>
-      </Card>
-    </div>
+      </MotionCard>
+    </motion.div>
   );
 }
 

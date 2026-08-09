@@ -1,7 +1,11 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { buildLookupMessage } from '../lib/lookupMessage';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import SecondaryButton from './SecondaryButton';
+
+const MotionCard = motion(Card);
 
 function parseBlastEmails(raw) {
   return raw
@@ -25,6 +29,7 @@ function extractEmailsFromText(text) {
 }
 
 function BlastModal({ load, initialShowRate, onClose }) {
+  const preset = useMotionPreset();
   const [showRate, setShowRate] = useState(Boolean(initialShowRate));
   const [subject, setSubject] = useState(
     `Load Available | ${load.origin_city} ${load.origin_state} → ${load.dest_city} ${load.dest_state} | ${load.equipment}`
@@ -77,7 +82,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
   }
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="blast-modal-title"
@@ -85,8 +90,9 @@ function BlastModal({ load, initialShowRate, onClose }) {
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
+      {...preset.modal.backdrop}
     >
-      <Card className="w-full max-w-lg">
+      <MotionCard className="w-full max-w-lg" {...preset.modal.card}>
         <div className="mb-1 flex items-start justify-between">
           <h2 id="blast-modal-title" className="text-lg font-semibold text-text">
             Blast Email
@@ -170,8 +176,8 @@ function BlastModal({ load, initialShowRate, onClose }) {
             Open in Gmail →
           </button>
         </div>
-      </Card>
-    </div>
+      </MotionCard>
+    </motion.div>
   );
 }
 

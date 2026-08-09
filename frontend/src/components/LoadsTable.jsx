@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { listLoads } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
+import Skeleton from './Skeleton';
 
 function LoadsTable({ refreshKey, onSelectLoad }) {
   const [loads, setLoads] = useState([]);
@@ -51,7 +52,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
           <option value="expired">Expired</option>
         </select>
       </div>
-      {status === 'loading' && <p className="text-sm text-text-muted">Loading loads...</p>}
+      {status === 'loading' && <Skeleton count={4} height="1.75rem" />}
       {status === 'error' && (
         <p role="alert" className="text-sm text-error">
           {error}

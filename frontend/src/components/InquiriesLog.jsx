@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { listInquiries } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import Badge from './Badge';
+import Skeleton from './Skeleton';
 
 const REPLY_STATUS_LABELS = {
   none: 'No match',
@@ -21,6 +24,7 @@ const REPLY_STATUS_VARIANTS = {
 };
 
 function InquiriesLog({ refreshKey }) {
+  const preset = useMotionPreset();
   const [inquiries, setInquiries] = useState([]);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [error, setError] = useState(null);
@@ -63,7 +67,7 @@ function InquiriesLog({ refreshKey }) {
   return (
     <Card>
       <h2 className="mb-3 text-sm font-semibold text-text">Inquiry log</h2>
-      {status === 'loading' && <p className="text-sm text-text-muted">Loading inquiries...</p>}
+      {status === 'loading' && <Skeleton count={4} height="1.75rem" />}
       {status === 'error' && (
         <p role="alert" className="text-sm text-error">
           {error}
@@ -82,19 +86,29 @@ function InquiriesLog({ refreshKey }) {
             </tr>
           </thead>
           <tbody>
-            {inquiries.map((inquiry) => (
-              <tr key={inquiry.id} className="border-b border-border/60">
-                <td className="py-2 pr-4">{new Date(inquiry.received_at).toLocaleString()}</td>
-                <td className="py-2 pr-4">{inquiry.from_address}</td>
-                <td className="py-2 pr-4">{inquiry.subject}</td>
-                <td className="py-2 pr-4">{inquiry.match_tier}</td>
-                <td className="py-2">
-                  <Badge variant={REPLY_STATUS_VARIANTS[inquiry.reply_status] || 'default'}>
-                    {REPLY_STATUS_LABELS[inquiry.reply_status] || inquiry.reply_status}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
+            <AnimatePresence initial={false}>
+              {inquiries.map((inquiry) => (
+                <motion.tr
+                  key={inquiry.id}
+                  layout
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={preset.reduced ? { duration: 0.05 } : { duration: 0.25 }}
+                  className="border-b border-border/60"
+                >
+                  <td className="py-2 pr-4">{new Date(inquiry.received_at).toLocaleString()}</td>
+                  <td className="py-2 pr-4">{inquiry.from_address}</td>
+                  <td className="py-2 pr-4">{inquiry.subject}</td>
+                  <td className="py-2 pr-4">{inquiry.match_tier}</td>
+                  <td className="py-2">
+                    <Badge variant={REPLY_STATUS_VARIANTS[inquiry.reply_status] || 'default'}>
+                      {REPLY_STATUS_LABELS[inquiry.reply_status] || inquiry.reply_status}
+                    </Badge>
+                  </td>
+                </motion.tr>
+              ))}
+            </AnimatePresence>
           </tbody>
         </table>
       )}

@@ -79,7 +79,10 @@ describe('DatExportSection', () => {
     expect(global.URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(screen.getByText(/downloaded a dat csv with 1 row/i)).toBeInTheDocument();
     expect(screen.getByText(/anomaly report/i)).toBeInTheDocument();
-    expect(screen.queryByText(/dat contact method/i)).not.toBeInTheDocument();
+    // the modal may still be mid-exit-animation briefly
+    await waitFor(() => {
+      expect(screen.queryByText(/dat contact method/i)).not.toBeInTheDocument();
+    });
   });
 
   test('confirming with rate choice "some" opens the per-load rate selection modal instead of exporting immediately', async () => {

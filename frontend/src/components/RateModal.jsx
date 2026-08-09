@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { updateLoad } from '../api/loads';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 
+const MotionCard = motion(Card);
+
 function RateModal({ load, onClose, onSaved }) {
+  const preset = useMotionPreset();
   const [targetPay, setTargetPay] = useState(load.target_pay ?? '');
   const [status, setStatus] = useState(load.status);
   const [error, setError] = useState(null);
@@ -64,13 +69,14 @@ function RateModal({ load, onClose, onSaved }) {
   }
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="rate-modal-title"
       className="fixed inset-0 flex items-center justify-center bg-black/60 px-4"
+      {...preset.modal.backdrop}
     >
-      <Card className="w-full max-w-sm">
+      <MotionCard className="w-full max-w-sm" {...preset.modal.card}>
         <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-text">
           Edit load {load.load_number}
         </h2>
@@ -109,8 +115,8 @@ function RateModal({ load, onClose, onSaved }) {
             {saving ? 'Saving...' : 'Save'}
           </PrimaryButton>
         </div>
-      </Card>
-    </div>
+      </MotionCard>
+    </motion.div>
   );
 }
 

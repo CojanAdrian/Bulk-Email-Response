@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { listInquiries, sendInquiryReply, rejectInquiry } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
+import Skeleton from './Skeleton';
 
 function ReviewQueue() {
+  const preset = useMotionPreset();
   const [inquiries, setInquiries] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
@@ -107,7 +111,7 @@ function ReviewQueue() {
   return (
     <Card>
       <h2 className="mb-3 text-sm font-semibold text-text">Review queue</h2>
-      {status === 'loading' && <p className="text-sm text-text-muted">Loading review queue...</p>}
+      {status === 'loading' && <Skeleton count={2} height="6rem" />}
       {error && (
         <p role="alert" className="mb-3 text-sm text-error">
           {error}
@@ -118,31 +122,39 @@ function ReviewQueue() {
       )}
       {status === 'ready' && inquiries.length > 0 && (
         <ul className="space-y-4">
-          {inquiries.map((inquiry) => (
-            <li key={inquiry.id} className="rounded-xl border border-border bg-surface-alt p-4">
-              <div className="mb-2 text-sm text-text">
-                <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
-              </div>
-              <label className="mb-1 block text-xs text-text-muted" htmlFor={`reply-${inquiry.id}`}>
-                Reply
-              </label>
-              <textarea
-                id={`reply-${inquiry.id}`}
-                value={drafts[inquiry.id] ?? ''}
-                onChange={(e) => handleDraftChange(inquiry.id, e.target.value)}
-                rows={5}
-                className="mb-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
-              />
-              <div className="flex justify-end gap-2">
-                <SecondaryButton onClick={() => handleReject(inquiry.id)} disabled={actioningId === inquiry.id}>
-                  Reject
-                </SecondaryButton>
-                <PrimaryButton onClick={() => handleSend(inquiry.id)} disabled={actioningId === inquiry.id}>
-                  {actioningId === inquiry.id ? 'Sending...' : 'Send'}
-                </PrimaryButton>
-              </div>
-            </li>
-          ))}
+          <AnimatePresence initial={false}>
+            {inquiries.map((inquiry, index) => (
+              <motion.li
+                key={inquiry.id}
+                layout
+                {...preset.popIn}
+                transition={{ ...preset.popIn.transition, delay: index * preset.stagger }}
+                className="rounded-xl border border-border bg-surface-alt p-4"
+              >
+                <div className="mb-2 text-sm text-text">
+                  <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
+                </div>
+                <label className="mb-1 block text-xs text-text-muted" htmlFor={`reply-${inquiry.id}`}>
+                  Reply
+                </label>
+                <textarea
+                  id={`reply-${inquiry.id}`}
+                  value={drafts[inquiry.id] ?? ''}
+                  onChange={(e) => handleDraftChange(inquiry.id, e.target.value)}
+                  rows={5}
+                  className="mb-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
+                />
+                <div className="flex justify-end gap-2">
+                  <SecondaryButton onClick={() => handleReject(inquiry.id)} disabled={actioningId === inquiry.id}>
+                    Reject
+                  </SecondaryButton>
+                  <PrimaryButton onClick={() => handleSend(inquiry.id)} disabled={actioningId === inquiry.id}>
+                    {actioningId === inquiry.id ? 'Sending...' : 'Send'}
+                  </PrimaryButton>
+                </div>
+              </motion.li>
+            ))}
+          </AnimatePresence>
         </ul>
       )}
     </Card>

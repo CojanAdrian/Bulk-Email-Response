@@ -1,9 +1,14 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 
+const MotionCard = motion(Card);
+
 function RateSelectionModal({ loads, onCancel, onConfirm }) {
+  const preset = useMotionPreset();
   const [overrides, setOverrides] = useState(() =>
     Object.fromEntries(loads.map((l) => [l.id, { include: true, value: l.target_pay ?? '' }]))
   );
@@ -29,13 +34,14 @@ function RateSelectionModal({ loads, onCancel, onConfirm }) {
   }
 
   return (
-    <div
+    <motion.div
       role="dialog"
       aria-modal="true"
       aria-labelledby="rate-selection-title"
       className="fixed inset-0 flex items-center justify-center bg-black/60 px-4"
+      {...preset.modal.backdrop}
     >
-      <Card className="max-h-[80vh] w-full max-w-2xl overflow-y-auto">
+      <MotionCard className="max-h-[80vh] w-full max-w-2xl overflow-y-auto" {...preset.modal.card}>
         <h2 id="rate-selection-title" className="mb-4 text-lg font-semibold text-text">
           Choose loads to include a rate on
         </h2>
@@ -82,8 +88,8 @@ function RateSelectionModal({ loads, onCancel, onConfirm }) {
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
           <PrimaryButton onClick={() => onConfirm(overrides)}>Generate export</PrimaryButton>
         </div>
-      </Card>
-    </div>
+      </MotionCard>
+    </motion.div>
   );
 }
 

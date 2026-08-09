@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { listLoads } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
 import { processLoadsForExport, buildDatCsv, buildDatExportFilename, countAnomalies } from '../lib/datExport';
@@ -9,6 +10,7 @@ import LoadLookupPanel from './LoadLookupPanel';
 import BlastModal from './BlastModal';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
+import Skeleton from './Skeleton';
 
 function downloadCsv(csv, filename) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -85,7 +87,7 @@ function DatExportSection({ refreshKey }) {
       <Card className="flex items-center justify-between">
         <div>
           <h2 className="text-sm font-semibold text-text">DAT Export</h2>
-          {fetchStatus === 'loading' && <p className="text-sm text-text-muted">Loading active loads...</p>}
+          {fetchStatus === 'loading' && <Skeleton height="1rem" width="12rem" />}
           {fetchStatus === 'error' && (
             <p role="alert" className="text-sm text-error">
               {fetchError}
@@ -111,13 +113,17 @@ function DatExportSection({ refreshKey }) {
         <LoadLookupPanel loads={loads} onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })} />
       )}
 
-      {step === 'contactMethod' && <ContactMethodModal onCancel={() => setStep('idle')} onConfirm={handleContactConfirm} />}
-      {step === 'rateSelection' && (
-        <RateSelectionModal loads={loads} onCancel={() => setStep('idle')} onConfirm={handleRateConfirm} />
-      )}
-      {blastTarget && (
-        <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
-      )}
+      <AnimatePresence>
+        {step === 'contactMethod' && <ContactMethodModal onCancel={() => setStep('idle')} onConfirm={handleContactConfirm} />}
+        {step === 'rateSelection' && (
+          <RateSelectionModal loads={loads} onCancel={() => setStep('idle')} onConfirm={handleRateConfirm} />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {blastTarget && (
+          <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
