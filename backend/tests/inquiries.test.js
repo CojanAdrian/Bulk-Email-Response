@@ -4,6 +4,11 @@ const bcrypt = require('bcrypt');
 const { createApp } = require('../src/app');
 const { createTestPool, resetTables } = require('./setupTestDb');
 
+jest.mock('../src/lib/googleOAuth');
+jest.mock('../src/lib/gmailClient');
+const googleOAuth = require('../src/lib/googleOAuth');
+const gmailClient = require('../src/lib/gmailClient');
+
 describe('inquiries routes', () => {
   let pool;
   let app;
@@ -21,6 +26,7 @@ describe('inquiries routes', () => {
   });
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     await resetTables(pool);
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     const [userResult] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')", ['testuser', passwordHash]);
@@ -68,5 +74,148 @@ describe('inquiries routes', () => {
     expect(res.body).toHaveLength(2);
     expect(res.body[0].subject).toBe('Newer inquiry');
     expect(res.body[1].subject).toBe('Older inquiry');
+  });
+
+  test('filters by reply_status when the query param is given', async () => {
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status, reply_status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Auto-sent one', '2026-08-01 08:00:00', 'load_number', 'matched', 'auto_sent')`,
+      [userId, accountId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status, reply_status)
+       VALUES (?, ?, 'm2', 'carrier2@example.com', 'Needs review one', '2026-08-02 08:00:00', 'city_state', 'matched', 'pending_review')`,
+      [userId, accountId]
+    );
+
+    const res = await agent.get('/api/inquiries?reply_status=pending_review');
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(1);
+    expect(res.body[0].subject).toBe('Needs review one');
+  });
+
+  describe('POST /:id/send', () => {
+    let inquiryId;
+
+    beforeEach(async () => {
+      const [result] = await pool.query(
+        `INSERT INTO email_inquiries
+         (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body, gmail_thread_id, gmail_in_reply_to)
+         VALUES (?, ?, 'm1', 'carrier@example.com', 'Dallas load?', '2026-08-01 08:00:00', 1, 'city_state', 'matched', 'pending_review', 'Yes, load #4521 is still available.', 't1', '<abc@mail.gmail.com>')`,
+        [userId, accountId]
+      );
+      inquiryId = result.insertId;
+    });
+
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(401);
+    });
+
+    test('sends the stored reply_body via Gmail and marks the inquiry sent', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(200);
+      expect(res.body.reply_status).toBe('sent');
+      expect(res.body.reply_sent_at).not.toBeNull();
+
+      expect(gmailClient.sendReply).toHaveBeenCalledTimes(1);
+      const sendArgs = gmailClient.sendReply.mock.calls[0][1];
+      expect(sendArgs.to).toBe('carrier@example.com');
+      expect(sendArgs.subject).toBe('Re: Dallas load?');
+      expect(sendArgs.body).toBe('Yes, load #4521 is still available.');
+      expect(sendArgs.threadId).toBe('t1');
+      expect(sendArgs.inReplyToMessageId).toBe('<abc@mail.gmail.com>');
+    });
+
+    test('sends a caller-edited body instead of the stored draft when provided', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`).send({ body: 'An edited reply body.' });
+      expect(res.status).toBe(200);
+      expect(res.body.reply_body).toBe('An edited reply body.');
+
+      const sendArgs = gmailClient.sendReply.mock.calls[0][1];
+      expect(sendArgs.body).toBe('An edited reply body.');
+    });
+
+    test('returns 404 for an inquiry belonging to a different user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [otherAccount] = await pool.query(
+        'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+        [otherUser.insertId, 'other@example.com', 'other-refresh']
+      );
+      const [otherInquiry] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, received_at, match_tier, status, reply_status, reply_body)
+         VALUES (?, ?, 'm-other', NOW(), 'city_state', 'matched', 'pending_review', 'draft')`,
+        [otherUser.insertId, otherAccount.insertId]
+      );
+
+      const res = await agent.post(`/api/inquiries/${otherInquiry.insertId}/send`);
+      expect(res.status).toBe(404);
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+    });
+
+    test('returns 400 when the inquiry is not pending_review', async () => {
+      await pool.query("UPDATE email_inquiries SET reply_status = 'auto_sent' WHERE id = ?", [inquiryId]);
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(400);
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /:id/reject', () => {
+    let inquiryId;
+
+    beforeEach(async () => {
+      const [result] = await pool.query(
+        `INSERT INTO email_inquiries
+         (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body)
+         VALUES (?, ?, 'm1', 'carrier@example.com', 'Dallas load?', '2026-08-01 08:00:00', 1, 'city_state', 'matched', 'pending_review', 'draft reply')`,
+        [userId, accountId]
+      );
+      inquiryId = result.insertId;
+    });
+
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post(`/api/inquiries/${inquiryId}/reject`);
+      expect(res.status).toBe(401);
+    });
+
+    test('marks the inquiry rejected without sending anything', async () => {
+      const res = await agent.post(`/api/inquiries/${inquiryId}/reject`);
+      expect(res.status).toBe(200);
+      expect(res.body.reply_status).toBe('rejected');
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+    });
+
+    test('returns 404 for an inquiry belonging to a different user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [otherAccount] = await pool.query(
+        'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+        [otherUser.insertId, 'other@example.com', 'other-refresh']
+      );
+      const [otherInquiry] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, received_at, match_tier, status, reply_status)
+         VALUES (?, ?, 'm-other', NOW(), 'city_state', 'matched', 'pending_review')`,
+        [otherUser.insertId, otherAccount.insertId]
+      );
+
+      const res = await agent.post(`/api/inquiries/${otherInquiry.insertId}/reject`);
+      expect(res.status).toBe(404);
+    });
+
+    test('returns 400 when the inquiry is not pending_review', async () => {
+      await pool.query("UPDATE email_inquiries SET reply_status = 'rejected' WHERE id = ?", [inquiryId]);
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/reject`);
+      expect(res.status).toBe(400);
+    });
   });
 });
