@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { listInquiries } from '../api/inquiries';
+import Card from './Card';
+import Badge from './Badge';
 
 const REPLY_STATUS_LABELS = {
   none: 'No match',
@@ -9,12 +11,12 @@ const REPLY_STATUS_LABELS = {
   rejected: 'Rejected',
 };
 
-const REPLY_STATUS_COLORS = {
-  none: 'bg-slate-700 text-slate-300',
-  pending_review: 'bg-amber-900/50 text-amber-300',
-  auto_sent: 'bg-emerald-900/50 text-emerald-300',
-  sent: 'bg-emerald-900/50 text-emerald-300',
-  rejected: 'bg-red-900/50 text-red-300',
+const REPLY_STATUS_VARIANTS = {
+  none: 'default',
+  pending_review: 'warning',
+  auto_sent: 'success',
+  sent: 'success',
+  rejected: 'error',
 };
 
 function InquiriesLog({ refreshKey }) {
@@ -45,19 +47,19 @@ function InquiriesLog({ refreshKey }) {
   }, [refreshKey]);
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-      <h2 className="mb-3 text-sm font-semibold text-slate-100">Inquiry log</h2>
-      {status === 'loading' && <p className="text-sm text-slate-400">Loading inquiries...</p>}
+    <Card>
+      <h2 className="mb-3 text-sm font-semibold text-text">Inquiry log</h2>
+      {status === 'loading' && <p className="text-sm text-text-muted">Loading inquiries...</p>}
       {status === 'error' && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}
-      {status === 'ready' && inquiries.length === 0 && <p className="text-sm text-slate-400">No inquiries yet.</p>}
+      {status === 'ready' && inquiries.length === 0 && <p className="text-sm text-text-muted">No inquiries yet.</p>}
       {status === 'ready' && inquiries.length > 0 && (
-        <table className="w-full text-left text-sm text-slate-300">
+        <table className="w-full text-left text-sm text-text">
           <thead>
-            <tr className="border-b border-slate-800 text-slate-500">
+            <tr className="border-b border-border text-text-muted">
               <th className="py-2 pr-4">Received</th>
               <th className="py-2 pr-4">From</th>
               <th className="py-2 pr-4">Subject</th>
@@ -67,26 +69,22 @@ function InquiriesLog({ refreshKey }) {
           </thead>
           <tbody>
             {inquiries.map((inquiry) => (
-              <tr key={inquiry.id} className="border-b border-slate-800/60">
+              <tr key={inquiry.id} className="border-b border-border/60">
                 <td className="py-2 pr-4">{new Date(inquiry.received_at).toLocaleString()}</td>
                 <td className="py-2 pr-4">{inquiry.from_address}</td>
                 <td className="py-2 pr-4">{inquiry.subject}</td>
                 <td className="py-2 pr-4">{inquiry.match_tier}</td>
                 <td className="py-2">
-                  <span
-                    className={`rounded-full px-2 py-1 text-xs ${
-                      REPLY_STATUS_COLORS[inquiry.reply_status] || REPLY_STATUS_COLORS.none
-                    }`}
-                  >
+                  <Badge variant={REPLY_STATUS_VARIANTS[inquiry.reply_status] || 'default'}>
                     {REPLY_STATUS_LABELS[inquiry.reply_status] || inquiry.reply_status}
-                  </span>
+                  </Badge>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       )}
-    </div>
+    </Card>
   );
 }
 
