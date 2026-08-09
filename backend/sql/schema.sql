@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS email_inquiries (
   match_tier ENUM('load_number','city_state','city','state','none') NOT NULL DEFAULT 'none',
   status ENUM('matched','needs_review') NOT NULL DEFAULT 'needs_review',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  reply_status ENUM('none','pending_review','auto_sent','sent','rejected') NOT NULL DEFAULT 'none',
+  reply_body TEXT NULL,
+  reply_sent_at DATETIME NULL,
+  gmail_thread_id VARCHAR(255) NULL,
+  gmail_in_reply_to VARCHAR(255) NULL,
   UNIQUE KEY uniq_account_message (email_account_id, gmail_message_id),
   KEY idx_user_id (user_id)
 );

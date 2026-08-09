@@ -108,6 +108,23 @@ async function migrateSchema(databaseName) {
     );
   }
 
+  const replyColumns = [
+    ['reply_status', `ALTER TABLE email_inquiries ADD COLUMN reply_status ENUM('none','pending_review','auto_sent','sent','rejected') NOT NULL DEFAULT 'none'`],
+    ['reply_body', `ALTER TABLE email_inquiries ADD COLUMN reply_body TEXT NULL`],
+    ['reply_sent_at', `ALTER TABLE email_inquiries ADD COLUMN reply_sent_at DATETIME NULL`],
+    ['gmail_thread_id', `ALTER TABLE email_inquiries ADD COLUMN gmail_thread_id VARCHAR(255) NULL`],
+    ['gmail_in_reply_to', `ALTER TABLE email_inquiries ADD COLUMN gmail_in_reply_to VARCHAR(255) NULL`],
+  ];
+  for (const [columnName, alterSql] of replyColumns) {
+    const [col] = await conn.query(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_inquiries' AND COLUMN_NAME = ?`,
+      [databaseName, columnName]
+    );
+    if (col[0].count === 0) {
+      await conn.query(alterSql);
+    }
+  }
+
   await conn.end();
 }
 
