@@ -10,9 +10,10 @@ describe('PrimaryButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  test('applies the gold-gradient primary styling', () => {
+  test('applies the lime pill primary styling', () => {
     render(<PrimaryButton>Save</PrimaryButton>);
-    expect(screen.getByRole('button').className).toContain('from-gold-light');
+    expect(screen.getByRole('button').className).toContain('bg-accent');
+    expect(screen.getByRole('button').className).toContain('rounded-full');
   });
 
   test('respects the disabled prop', () => {

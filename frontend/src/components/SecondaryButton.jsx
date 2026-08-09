@@ -1,7 +1,7 @@
 function SecondaryButton({ children, className = '', ...rest }) {
   return (
     <button
-      className={`rounded-lg border-2 border-accent px-4 py-2 text-sm font-semibold text-accent transition hover:bg-accent hover:text-surface disabled:cursor-not-allowed disabled:opacity-60 ${className}`}
+      className={`rounded-full border border-border bg-surface-alt px-5 py-2.5 text-sm font-semibold text-text transition hover:bg-border active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 ${className}`}
       {...rest}
     >
       {children}

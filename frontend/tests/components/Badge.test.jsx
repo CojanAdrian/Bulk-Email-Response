@@ -8,9 +8,9 @@ describe('Badge', () => {
     expect(screen.getByText('Active')).toBeInTheDocument();
   });
 
-  test('defaults to the navy/gold variant', () => {
+  test('defaults to the lavender tag variant', () => {
     render(<Badge>Active</Badge>);
-    expect(screen.getByText('Active').className).toContain('bg-accent');
+    expect(screen.getByText('Active').className).toContain('bg-tag-bg');
   });
 
   test.each([
@@ -24,6 +24,6 @@ describe('Badge', () => {
 
   test('falls back to the default variant for an unrecognized value', () => {
     render(<Badge variant="not-a-real-variant">Status</Badge>);
-    expect(screen.getByText('Status').className).toContain('bg-accent');
+    expect(screen.getByText('Status').className).toContain('bg-tag-bg');
   });
 });

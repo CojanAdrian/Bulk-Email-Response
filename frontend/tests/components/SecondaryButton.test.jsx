@@ -10,9 +10,10 @@ describe('SecondaryButton', () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  test('applies the navy-outline secondary styling', () => {
+  test('applies the outlined pill secondary styling', () => {
     render(<SecondaryButton>Cancel</SecondaryButton>);
-    expect(screen.getByRole('button').className).toContain('border-accent');
+    expect(screen.getByRole('button').className).toContain('rounded-full');
+    expect(screen.getByRole('button').className).toContain('border-border');
   });
 
   test('respects the disabled prop', () => {

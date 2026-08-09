@@ -8,10 +8,10 @@ describe('Card', () => {
     expect(screen.getByText('Hello world')).toBeInTheDocument();
   });
 
-  test('applies the surface/gold-accent card styling', () => {
+  test('applies the floating rounded-card styling', () => {
     render(<Card data-testid="card">content</Card>);
     expect(screen.getByTestId('card').className).toContain('bg-surface');
-    expect(screen.getByTestId('card').className).toContain('border-t-gold');
+    expect(screen.getByTestId('card').className).toContain('rounded-3xl');
   });
 
   test('merges an additional className with the base styling', () => {

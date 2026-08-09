@@ -1,39 +1,41 @@
 :root {
-  --color-bg: #eef1f6;
+  /* App shell (outer background + sidebar) -- this is the one thing that
+     actually flips between light/dark. Content cards are white in both
+     themes (a floating-card-on-shell look), so card-related tokens below
+     don't need per-theme overrides. */
+  --color-shell-bg: #eef6f1;
+  --color-shell-surface: #e4f0e8;
+  --color-shell-text: #12141c;
+  --color-shell-text-muted: #5b6472;
+  --color-shell-border: #d7e6dc;
+
+  /* Content cards -- always white/light, in both themes */
   --color-surface: #ffffff;
-  --color-surface-alt: #f4f6f9;
-  --color-text: #1c2733;
-  --color-text-muted: #64748b;
-  --color-border: #e4e8ef;
-  --color-accent: #152a52;
-  --color-accent-strong: #0a1024;
-  --color-gold: #c9a227;
-  --color-gold-light: #e6c869;
-  --color-gold-dark: #a3801e;
-  --color-success: #1f9d4d;
-  --color-success-bg: #e8f6ec;
+  --color-surface-alt: #f5f6f8;
+  --color-text: #12141c;
+  --color-text-muted: #6b7280;
+  --color-border: #e7e9ee;
+
+  /* Brand accent -- vibrant lime, constant across themes */
+  --color-accent: #d7ff3d;
+  --color-accent-strong: #b9e619;
+  --color-accent-ink: #1a2e05;
+
+  /* Status colors -- calibrated for white card backgrounds, constant across themes */
+  --color-success: #15803d;
+  --color-success-bg: #dcfce7;
   --color-error: #b91c1c;
-  --color-error-bg: #fdecea;
+  --color-error-bg: #fde2e2;
   --color-warning: #92600c;
-  --color-warning-bg: #fff6e5;
+  --color-warning-bg: #fff3d6;
+  --color-tag: #5b21b6;
+  --color-tag-bg: #ede9fe;
 }
 
 .dark {
-  --color-bg: #0a1024;
-  --color-surface: #0f1c3d;
-  --color-surface-alt: #152a52;
-  --color-text: #e8ecf5;
-  --color-text-muted: #9fb0cc;
-  --color-border: #22345c;
-  --color-accent: #e6c869;
-  --color-accent-strong: #c9a227;
-  --color-gold: #c9a227;
-  --color-gold-light: #e6c869;
-  --color-gold-dark: #a3801e;
-  --color-success: #4ade80;
-  --color-success-bg: #0f2e1a;
-  --color-error: #f87171;
-  --color-error-bg: #3f1414;
-  --color-warning: #fbbf24;
-  --color-warning-bg: #3f2f0a;
+  --color-shell-bg: #0a0b10;
+  --color-shell-surface: #14161f;
+  --color-shell-text: #f5f6fa;
+  --color-shell-text-muted: #8b93a7;
+  --color-shell-border: rgba(255, 255, 255, 0.08);
 }

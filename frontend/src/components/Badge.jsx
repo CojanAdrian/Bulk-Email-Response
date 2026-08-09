@@ -1,5 +1,5 @@
 const VARIANT_CLASSES = {
-  default: 'bg-accent text-gold-light',
+  default: 'bg-tag-bg text-tag',
   success: 'bg-success-bg text-success',
   error: 'bg-error-bg text-error',
   warning: 'bg-warning-bg text-warning',
