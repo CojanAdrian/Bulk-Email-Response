@@ -102,12 +102,13 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 78 tests across 9 suites: `tests/health.test.js`,
+There are 104 tests across 10 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/lib/googleOAuth.test.js`,
 `tests/lib/gmailClient.test.js`, `tests/lib/matchingEngine.test.js`,
-`tests/lib/emailPoller.test.js`. All Gmail API calls are mocked — no real
-Google credentials are needed to run the suite.
+`tests/lib/replyComposer.test.js`, `tests/lib/emailPoller.test.js`. All
+Gmail API calls are mocked — no real Google credentials are needed to run
+the suite.
 
 ## Manual smoke test (curl)
 
@@ -260,13 +261,16 @@ credentials). Each user can connect at most one Gmail account.
 ### Inquiries (`/api/inquiries`)
 
 Lists the caller's own processed email inquiries — the output of the
-background poller described below. Not yet surfaced in any UI; this
-endpoint exists so the poller's work is inspectable/testable now, ahead of
-a future dashboard.
+background poller described below — and lets the caller act on the ones
+waiting in the review queue. Not yet surfaced in any UI; these endpoints
+exist so the poller's work is inspectable/actionable now, ahead of a future
+dashboard (sub-project 4).
 
-| Method | Path | Response |
-|---|---|---|
-| GET | `/api/inquiries` | `200` array of the caller's own `email_inquiries` rows, newest (`received_at`) first |
+| Method | Path | Request body | Response |
+|---|---|---|---|
+| GET | `/api/inquiries` | — (optional query `?reply_status=none\|pending_review\|auto_sent\|sent\|rejected`) | `200` array of the caller's own `email_inquiries` rows, newest (`received_at`) first |
+| POST | `/api/inquiries/:id/send` | `{"body"?: string}` (optional — overrides the stored draft) | `200` updated inquiry row, reply sent via Gmail as a threaded reply; `404` if not found/not the caller's; `400 {"error": "Inquiry is not pending review"}` unless `reply_status` is currently `pending_review`; `400 {"error": "Gmail account is no longer connected"}` if the connected account was disconnected since the inquiry was logged |
+| POST | `/api/inquiries/:id/reject` | — | `200` updated inquiry row (`reply_status: "rejected"`), no email sent; same `404`/`400` conditions as `/send` |
 
 An inquiry row has this shape:
 
@@ -283,14 +287,24 @@ An inquiry row has this shape:
   "matched_load_id": 1,
   "match_tier": "load_number",
   "status": "matched",
+  "gmail_thread_id": "18abc...",
+  "gmail_in_reply_to": "<CAF...@mail.gmail.com>",
+  "reply_status": "auto_sent",
+  "reply_body": "Hi,\n\nYes, load #TEST-001 is still available:\n...",
+  "reply_sent_at": "2026-08-08T14:04:02.000Z",
   "created_at": "2026-08-08T14:04:00.000Z"
 }
 ```
 
-`match_tier` is one of `load_number`, `city_state`, `city`, `state`, `none`
-(see "Gmail integration" below for what each tier means). `status` is
-`matched` or `needs_review`; `matched_load_id` is `null` when `status` is
-`needs_review`.
+`match_tier` is one of `load_number`, `city_state`, `city`, `state`, `none`;
+`status` is `matched` or `needs_review`; `matched_load_id` is `null` when
+`status` is `needs_review`. `reply_status` is one of `none` (no load
+matched, nothing to reply with), `pending_review` (a reply was composed but
+is waiting for a human, via `/send` or `/reject`), `auto_sent` (sent
+automatically at poll time), `sent` (a human approved it via `/send`), or
+`rejected` (a human dismissed it via `/reject`, no email sent). See "Gmail
+integration" below for the full policy on which tier gets auto-sent versus
+queued.
 
 ## Accounts and roles
 
@@ -334,9 +348,27 @@ per-user data isolation enforced everywhere else in this backend. Every
 processed message is logged to `email_inquiries` (see "Inquiries" above)
 whether or not it matched anything, so nothing is silently dropped.
 
-**This phase does not send any replies.** Detecting and matching inquiries
-is as far as this goes right now — auto-sending a response, and a review
-queue for low-confidence matches, are separate, not-yet-built features.
+**Auto-send and review queue.** Only an exact **load number** match
+(`match_tier: 'load_number'`) is confident enough to reply without a human
+looking at it — the carrier gave a unique, unambiguous identifier, so
+there's no risk of answering about the wrong load. When that happens, the
+poller composes a reply from the matched load's fields (see
+`src/lib/replyComposer.js`) and sends it immediately via Gmail, as a proper
+threaded reply (`In-Reply-To`/`References` headers, same `threadId`, `Re:`
+subject) — `reply_status` becomes `auto_sent`. Every other matched tier
+(`city_state`, `city`, `state` — ambiguous enough that multiple candidate
+loads existed and were tie-broken by heuristics) still gets a reply
+composed and ready, but waits as `reply_status: 'pending_review'` for a
+human to approve (`POST /api/inquiries/:id/send`, optionally editing the
+body first) or dismiss (`POST /api/inquiries/:id/reject`) — see
+"Inquiries" above. Unmatched inquiries (`match_tier: 'none'`) get no
+composed reply at all (`reply_status` stays `none`); nothing to send until
+a human works out what to do the old-fashioned way. If an auto-send
+attempt itself fails (e.g. a transient Gmail API error), the inquiry
+degrades gracefully to `pending_review` rather than being lost or crashing
+the poller — the same per-item resilience pattern used everywhere else in
+the poller. Reply content is a fixed template, not AI-generated — see the
+design spec for why (`docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`).
 
 **Matching pipeline** (`src/lib/matchingEngine.js`), tried in this order,
 first match wins:
