@@ -1,0 +1,78 @@
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import GmailConnectionPanel from '../../src/components/GmailConnectionPanel';
+import * as gmailApi from '../../src/api/gmail';
+
+vi.mock('../../src/api/gmail');
+
+describe('GmailConnectionPanel', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    delete window.location;
+    window.location = { href: '' };
+  });
+
+  test('shows a Connect button when no account is connected', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    render(<GmailConnectionPanel />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect gmail/i })).toBeInTheDocument();
+    });
+  });
+
+  test('navigates the browser to the connect URL when Connect is clicked', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    gmailApi.getGmailConnectUrl.mockReturnValue('http://localhost:4000/api/gmail/connect');
+    render(<GmailConnectionPanel />);
+    await waitFor(() => screen.getByRole('button', { name: /connect gmail/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /connect gmail/i }));
+    expect(window.location.href).toBe('http://localhost:4000/api/gmail/connect');
+  });
+
+  test('shows the connected address when an account is connected', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com' });
+    render(<GmailConnectionPanel />);
+    await waitFor(() => {
+      expect(screen.getByText('kenny@igtfreight.com')).toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /^disconnect$/i })).toBeInTheDocument();
+  });
+
+  test('requires a confirm step before actually disconnecting', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com' });
+    render(<GmailConnectionPanel />);
+    await waitFor(() => screen.getByRole('button', { name: /^disconnect$/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^disconnect$/i }));
+    expect(screen.getByText(/disconnect this gmail account/i)).toBeInTheDocument();
+    expect(gmailApi.disconnectGmail).not.toHaveBeenCalled();
+  });
+
+  test('disconnects and refreshes status after confirming', async () => {
+    gmailApi.getGmailStatus
+      .mockResolvedValueOnce({ connected: true, gmailAddress: 'kenny@igtfreight.com' })
+      .mockResolvedValueOnce({ connected: false });
+    gmailApi.disconnectGmail.mockResolvedValue({ ok: true });
+    render(<GmailConnectionPanel />);
+    await waitFor(() => screen.getByRole('button', { name: /^disconnect$/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /^disconnect$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /confirm disconnect/i }));
+
+    await waitFor(() => {
+      expect(gmailApi.disconnectGmail).toHaveBeenCalledTimes(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect gmail/i })).toBeInTheDocument();
+    });
+  });
+
+  test('shows an error message when the status fetch fails', async () => {
+    gmailApi.getGmailStatus.mockRejectedValue(new Error('Network error'));
+    render(<GmailConnectionPanel />);
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toHaveTextContent('Network error');
+    });
+  });
+});
