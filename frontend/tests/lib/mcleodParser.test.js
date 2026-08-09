@@ -48,6 +48,12 @@ describe('parseMcleodRows', () => {
     });
   });
 
+  test('preserves the raw (pre-mapping) equipment code alongside the mapped one', () => {
+    const { loads } = parseMcleodRows(FIELDS, [row({ 'Equip Type': 'potm' })]);
+    expect(loads[0].equipment).toBe('PO');
+    expect(loads[0].raw_equipment).toBe('POTM');
+  });
+
   test('reports missing required columns instead of throwing', () => {
     const { loads, missing } = parseMcleodRows(['Order'], [{ Order: '123' }]);
     expect(loads).toEqual([]);

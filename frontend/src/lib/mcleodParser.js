@@ -155,6 +155,7 @@ function mapRowToLoad(row, colMap) {
     dest_state: cleanText(row[colMap.destState]),
     dest_zip: colMap.destZip ? cleanText(row[colMap.destZip]).replace(/\D/g, '').slice(0, 5) : '',
     equipment,
+    raw_equipment: equipKey,
     weight: cleanText(row[colMap.weight]),
     target_pay: parseMoney(row[colMap.targetPay]),
     early_pu: toMysqlDatetime(row[colMap.earlyPU]),
