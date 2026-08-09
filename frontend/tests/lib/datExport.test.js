@@ -16,6 +16,10 @@ import {
   buildDatExportFilename,
 } from '../../src/lib/datExport';
 
+function iso(y, mo, d, h = 0, min = 0) {
+  return new Date(y, mo - 1, d, h, min, 0).toISOString();
+}
+
 function load(overrides = {}) {
   return {
     id: 1,
@@ -30,8 +34,8 @@ function load(overrides = {}) {
     raw_equipment: 'V',
     weight: '42000',
     target_pay: 1500,
-    early_pu: '2026-08-10T08:00:00.000Z',
-    late_pu: '2026-08-10T08:00:00.000Z',
+    early_pu: iso(2026, 8, 10, 8, 0),
+    late_pu: iso(2026, 8, 10, 8, 0),
     late_del: null,
     stops: 0,
     comment: '',
@@ -411,8 +415,8 @@ describe('processLoadsForExport', () => {
   test('does not dedup the same lane/equipment on a different pickup date', () => {
     const { finalRows } = processLoadsForExport(
       [
-        load({ id: 1, load_number: 'A', early_pu: '2026-08-10T08:00:00.000Z' }),
-        load({ id: 2, load_number: 'B', early_pu: '2026-08-11T08:00:00.000Z' }),
+        load({ id: 1, load_number: 'A', early_pu: iso(2026, 8, 10, 8, 0) }),
+        load({ id: 2, load_number: 'B', early_pu: iso(2026, 8, 11, 8, 0) }),
       ],
       {}
     );
