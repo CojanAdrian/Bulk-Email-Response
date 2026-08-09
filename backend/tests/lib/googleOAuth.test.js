@@ -8,18 +8,30 @@ jest.mock('googleapis', () => {
   const mockGmailClient = {
     users: { getProfile: jest.fn() },
   };
+  const mockOAuth2ApiClient = {
+    userinfo: { get: jest.fn() },
+  };
   return {
     google: {
       auth: { OAuth2: jest.fn(() => mockOAuth2Instance) },
       gmail: jest.fn(() => mockGmailClient),
+      oauth2: jest.fn(() => mockOAuth2ApiClient),
     },
     __mockOAuth2Instance: mockOAuth2Instance,
     __mockGmailClient: mockGmailClient,
+    __mockOAuth2ApiClient: mockOAuth2ApiClient,
   };
 });
 
 const googleapis = require('googleapis');
-const { getAuthUrl, exchangeCodeForTokens, getAccessToken, getUserEmailAddress } = require('../../src/lib/googleOAuth');
+const {
+  getAuthUrl,
+  getSignInAuthUrl,
+  exchangeCodeForTokens,
+  getAccessToken,
+  getUserEmailAddress,
+  getGoogleIdentity,
+} = require('../../src/lib/googleOAuth');
 
 describe('googleOAuth', () => {
   beforeEach(() => {
@@ -56,6 +68,32 @@ describe('googleOAuth', () => {
     googleapis.__mockGmailClient.users.getProfile.mockResolvedValue({ data: { emailAddress: 'kenny@igtfreight.com' } });
     const email = await getUserEmailAddress('some-access-token');
     expect(email).toBe('kenny@igtfreight.com');
+    expect(googleapis.__mockOAuth2Instance.setCredentials).toHaveBeenCalledWith({ access_token: 'some-access-token' });
+  });
+
+  test('getSignInAuthUrl requests identity scopes plus the Gmail scopes, offline with forced consent', () => {
+    googleapis.__mockOAuth2Instance.generateAuthUrl.mockReturnValue('https://accounts.google.com/o/oauth2/mock-signin-url');
+    const url = getSignInAuthUrl();
+    expect(url).toBe('https://accounts.google.com/o/oauth2/mock-signin-url');
+    expect(googleapis.__mockOAuth2Instance.generateAuthUrl).toHaveBeenCalledWith({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: [
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+        'https://www.googleapis.com/auth/gmail.readonly',
+        'https://www.googleapis.com/auth/gmail.send',
+      ],
+    });
+  });
+
+  test('getGoogleIdentity returns the stable Google id and verified email', async () => {
+    googleapis.__mockOAuth2ApiClient.userinfo.get.mockResolvedValue({
+      data: { id: 'google-sub-123', email: 'kenny@igtfreight.com', verified_email: true, name: 'Kenny' },
+    });
+    const identity = await getGoogleIdentity('some-access-token');
+    expect(identity).toEqual({ googleId: 'google-sub-123', email: 'kenny@igtfreight.com', emailVerified: true, name: 'Kenny' });
     expect(googleapis.__mockOAuth2Instance.setCredentials).toHaveBeenCalledWith({ access_token: 'some-access-token' });
   });
 });
