@@ -64,6 +64,31 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE users ADD COLUMN role ENUM('admin','user') NOT NULL DEFAULT 'user'`);
   }
 
+  const [googleIdCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME = 'google_id'`,
+    [databaseName]
+  );
+  if (googleIdCol[0].count === 0) {
+    await conn.query(`ALTER TABLE users ADD COLUMN google_id VARCHAR(255) NULL UNIQUE`);
+  }
+
+  // Google accounts have no password (password_hash must be nullable) and
+  // sign-up defaults username to the full Gmail address, which the original
+  // VARCHAR(50) is too short to reliably hold.
+  const [usersColInfo] = await conn.query(
+    `SELECT COLUMN_NAME, IS_NULLABLE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'users' AND COLUMN_NAME IN ('password_hash', 'username')`,
+    [databaseName]
+  );
+  const passwordHashCol = usersColInfo.find((c) => c.COLUMN_NAME === 'password_hash');
+  if (passwordHashCol && passwordHashCol.IS_NULLABLE === 'NO') {
+    await conn.query(`ALTER TABLE users MODIFY COLUMN password_hash VARCHAR(255) NULL`);
+  }
+  const usernameCol = usersColInfo.find((c) => c.COLUMN_NAME === 'username');
+  if (usernameCol && usernameCol.CHARACTER_MAXIMUM_LENGTH < 255) {
+    await conn.query(`ALTER TABLE users MODIFY COLUMN username VARCHAR(255) NOT NULL`);
+  }
+
   const [userIdCol] = await conn.query(
     `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'user_id'`,
     [databaseName]

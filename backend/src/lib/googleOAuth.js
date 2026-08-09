@@ -15,12 +15,17 @@ const SIGN_IN_SCOPES = [
   ...SCOPES,
 ];
 
-function createOAuthClient() {
-  return new google.auth.OAuth2(
-    process.env.GOOGLE_CLIENT_ID,
-    process.env.GOOGLE_CLIENT_SECRET,
-    process.env.GOOGLE_REDIRECT_URI || 'http://localhost:4000/api/gmail/oauth/callback'
-  );
+// Two separate callback routes, two separate redirect URIs -- an OAuth2
+// client's redirect_uri is fixed at construction and must exactly match
+// whichever endpoint the authorization request was sent to, or the later
+// token exchange fails a redirect_uri_mismatch check. Reusing one redirect
+// URI for both flows would send the sign-in flow's consent screen back to
+// the Gmail-connect callback route instead of the sign-in one.
+const GMAIL_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:4000/api/gmail/oauth/callback';
+const SIGN_IN_REDIRECT_URI = process.env.GOOGLE_SIGN_IN_REDIRECT_URI || 'http://localhost:4000/api/auth/google/callback';
+
+function createOAuthClient(redirectUri = GMAIL_REDIRECT_URI) {
+  return new google.auth.OAuth2(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, redirectUri);
 }
 
 function getAuthUrl() {
@@ -33,7 +38,7 @@ function getAuthUrl() {
 }
 
 function getSignInAuthUrl() {
-  const oauth2Client = createOAuthClient();
+  const oauth2Client = createOAuthClient(SIGN_IN_REDIRECT_URI);
   return oauth2Client.generateAuthUrl({
     access_type: 'offline',
     prompt: 'consent',
@@ -41,10 +46,14 @@ function getSignInAuthUrl() {
   });
 }
 
-async function exchangeCodeForTokens(code) {
-  const oauth2Client = createOAuthClient();
+async function exchangeCodeForTokens(code, redirectUri = GMAIL_REDIRECT_URI) {
+  const oauth2Client = createOAuthClient(redirectUri);
   const { tokens } = await oauth2Client.getToken(code);
   return tokens;
+}
+
+async function exchangeSignInCodeForTokens(code) {
+  return exchangeCodeForTokens(code, SIGN_IN_REDIRECT_URI);
 }
 
 async function getAccessToken(refreshToken) {
@@ -74,6 +83,7 @@ module.exports = {
   getAuthUrl,
   getSignInAuthUrl,
   exchangeCodeForTokens,
+  exchangeSignInCodeForTokens,
   getAccessToken,
   getUserEmailAddress,
   getGoogleIdentity,

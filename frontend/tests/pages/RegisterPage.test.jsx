@@ -64,6 +64,28 @@ describe('RegisterPage', () => {
     expect(onSwitchToLogin).toHaveBeenCalled();
   });
 
+  test('renders a "Sign up with Google" button that navigates to the Google sign-in URL', () => {
+    // See the equivalent LoginPage.test.jsx test for why window.location is restored.
+    const originalLocation = window.location;
+    authApi.getGoogleSignInUrl.mockReturnValue('http://localhost:4000/api/auth/google');
+    delete window.location;
+    window.location = { href: '' };
+    render(<RegisterPage onRegisterSuccess={vi.fn()} onSwitchToLogin={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /sign up with google/i }));
+    expect(window.location.href).toBe('http://localhost:4000/api/auth/google');
+
+    window.location = originalLocation;
+  });
+
+  test('shows a message when redirected back with a ?authError= from a failed Google sign-in', () => {
+    window.history.replaceState(null, '', '/?authError=email_not_verified');
+    render(<RegisterPage onRegisterSuccess={vi.fn()} onSwitchToLogin={vi.fn()} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/isn't verified/i);
+    window.history.replaceState(null, '', '/');
+  });
+
   test('disables the submit button while the request is in flight', async () => {
     let resolveRegister;
     authApi.register.mockReturnValue(

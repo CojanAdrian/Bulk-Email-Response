@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 133 tests across 13 suites: `tests/health.test.js`,
+There are 142 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -221,11 +221,43 @@ the full design.
 | POST | `/api/auth/login` | none | `{"username": string, "password": string}` | `200 {"username": string, "role": "admin"\|"user"}` on success; `401 {"error": "Invalid credentials"}` if the username doesn't exist or the password is wrong |
 | POST | `/api/auth/logout` | none | — | `200 {"ok": true}` (destroys the session) |
 | GET | `/api/auth/me` | session | — | `200 {"username": string, "role": "admin"\|"user"}`; `401 {"error": "Unauthorized"}` if not logged in |
+| GET | `/api/auth/google` | none | — | `302` redirect to Google's OAuth consent screen (identity + Gmail scopes together) |
+| GET | `/api/auth/google/callback` | none (Google redirects here with a `code`) | — | `302` redirect to `FRONTEND_ORIGIN/` on success (session cookie set); `302` redirect to `FRONTEND_ORIGIN/?authError=<code>` on failure — see below |
 
 A successful login or registration sets an `httpOnly`, `sameSite=lax`
 session cookie. All `/api/loads/*` routes require this cookie (enforced by
 `src/middleware/requireAuth.js`). See "Accounts and roles" below for what
 `role` means and how it's assigned.
+
+**Sign in / sign up with Google** (`GET /api/auth/google` → Google consent →
+`GET /api/auth/google/callback`) is a single OAuth flow that requests
+identity scopes (`openid`, `email`, `profile`) *and* the same Gmail scopes
+as the standalone "Connect Gmail" flow, together in one consent screen.
+The callback:
+1. Exchanges the code for tokens and resolves the identity via Google's
+   userinfo endpoint (`src/lib/googleOAuth.js`'s `getGoogleIdentity`).
+2. Rejects (redirects with `?authError=email_not_verified`) if Google
+   reports the email as unverified.
+3. Looks up a user by `google_id`. If none exists, creates one —
+   `username` defaults to the full Gmail address (the `users.username`
+   column is `VARCHAR(255)` specifically to hold this), `password_hash`
+   is `NULL` (a Google-only account has no password — the `/login` route
+   rejects password attempts against a `NULL` hash with a clean `401`
+   instead of crashing), `role` is `'user'`.
+4. **Auto-connects Gmail** — the same token pair that authenticated the
+   sign-in is upserted into `email_accounts` for that user (the same
+   `ON DUPLICATE KEY UPDATE` upsert the standalone Gmail-connect flow
+   uses), so a brand-new Google sign-up never needs a separate "Connect
+   Gmail" step.
+5. Sets the session and redirects to the frontend.
+
+Existing manual (username/password) accounts are **not** auto-linked to a
+Google identity that happens to share a username — a collision (e.g.
+someone already registered with a username identical to their own Gmail
+address) redirects with `?authError=account_exists` rather than silently
+merging accounts. The frontend's `LoginPage`/`RegisterPage` read that
+`authError` query param once on mount, show a human-readable message, and
+strip it from the URL (`frontend/src/lib/useGoogleAuthError.js`).
 
 ### Loads (`/api/loads`) — all routes require an authenticated session
 
@@ -458,26 +490,46 @@ suite. Connecting a *real* Gmail inbox, however, requires OAuth credentials
 from a Google Cloud project, which only the app owner can create (it's
 tied to a Google account):
 
+The same credentials also power **Sign in / sign up with Google**
+(`GET /api/auth/google`), since both flows share `createOAuthClient()` in
+`src/lib/googleOAuth.js` — there's only one Google Cloud project and one
+OAuth client to set up, not two.
+
 1. Create a project at [console.cloud.google.com](https://console.cloud.google.com).
 2. Enable the **Gmail API** for that project.
 3. Configure the **OAuth consent screen** (app name, and scopes
-   `gmail.readonly` and `gmail.send`).
+   `openid`, `userinfo.email`, `userinfo.profile`, `gmail.readonly`, and
+   `gmail.send` — the sign-in flow requests all five together; the
+   standalone Gmail-connect flow requests just the last two). While the
+   consent screen is in **Testing** publishing status (the default),
+   every Google account that needs to sign in or connect Gmail —
+   including your own — must be added under **Test users**, or the OAuth
+   flow will fail for them.
 4. Create an **OAuth 2.0 Client ID** (application type: **Web
-   application**), with `http://localhost:4000/api/gmail/oauth/callback`
-   (or your production callback URL) as an authorized redirect URI.
+   application**), with **both** callback URLs as authorized redirect
+   URIs: `http://localhost:4000/api/gmail/oauth/callback` and
+   `http://localhost:4000/api/auth/google/callback` (or your production
+   equivalents).
 5. Put the resulting values into `.env`:
    ```
    GOOGLE_CLIENT_ID=...
    GOOGLE_CLIENT_SECRET=...
    GOOGLE_REDIRECT_URI=http://localhost:4000/api/gmail/oauth/callback
+   GOOGLE_SIGN_IN_REDIRECT_URI=http://localhost:4000/api/auth/google/callback
    ```
+   Both default to the `localhost:4000` values shown above if unset, so
+   only override them for a production deployment. They're deliberately
+   two separate variables — an OAuth2 client's redirect URI is fixed at
+   construction and must exactly match whichever endpoint the
+   authorization request was actually sent to, so the Gmail-connect flow
+   and the sign-in flow each need their own.
 
-Without these three variables set, `GET /api/gmail/connect` will redirect
-to an invalid Google URL (Google will show its own error page) — everything
-else in the app, including `GET /api/gmail/status` for a never-connected
-user, works fine either way. The server does not fail to start if these
-are unset; they're only read lazily when a Gmail route or the poller
-actually needs them.
+Without these three variables set, `GET /api/gmail/connect` and
+`GET /api/auth/google` will redirect to an invalid Google URL (Google will
+show its own error page) — everything else in the app, including
+`GET /api/gmail/status` for a never-connected user, works fine either way.
+The server does not fail to start if these are unset; they're only read
+lazily when a Google/Gmail route or the poller actually needs them.
 
 ## Behavior notes
 

@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { login, logout, me, register } from '../../src/api/auth';
+import { login, logout, me, register, getGoogleSignInUrl } from '../../src/api/auth';
+import { API_URL } from '../../src/api/client';
 
 describe('auth api', () => {
   beforeEach(() => {
@@ -48,5 +49,9 @@ describe('auth api', () => {
   test('register rejects with the server error message and status on failure', async () => {
     global.fetch.mockResolvedValue({ ok: false, status: 400, json: () => Promise.resolve({ error: 'Username already taken' }) });
     await expect(register('taken', 'longenough')).rejects.toMatchObject({ status: 400, message: 'Username already taken' });
+  });
+
+  test('getGoogleSignInUrl points at the backend\'s /api/auth/google redirect endpoint', () => {
+    expect(getGoogleSignInUrl()).toBe(`${API_URL}/api/auth/google`);
   });
 });

@@ -1,4 +1,4 @@
-import { get, post } from './client';
+import { get, post, API_URL } from './client';
 
 export function login(username, password) {
   return post('/api/auth/login', { username, password });
@@ -14,4 +14,8 @@ export function me() {
 
 export function register(username, password) {
   return post('/api/auth/register', { username, password });
+}
+
+export function getGoogleSignInUrl() {
+  return `${API_URL}/api/auth/google`;
 }

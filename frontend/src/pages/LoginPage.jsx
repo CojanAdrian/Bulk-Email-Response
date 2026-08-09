@@ -1,16 +1,20 @@
 import { useState } from 'react';
 import { login } from '../api/auth';
+import { useGoogleAuthError } from '../lib/useGoogleAuthError';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import ThemeToggle from '../components/ThemeToggle';
 import AuroraBackground from '../components/AuroraBackground';
 import logoIcon from '../assets/logo-icon.png';
 
 function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
+  const googleAuthError = useGoogleAuthError();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const displayedError = error || googleAuthError;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -40,6 +44,21 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
             <img src={logoIcon} alt="" className="h-10 w-10 shrink-0" />
             <h1 className="text-xl font-extrabold tracking-wide text-text">BulkPosting</h1>
           </div>
+
+          {displayedError && (
+            <p id="login-error" role="alert" className="mb-4 text-sm text-error">
+              {displayedError}
+            </p>
+          )}
+
+          <GoogleSignInButton label="Continue with Google" />
+
+          <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-text-muted">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <label className="mb-1 block text-sm text-text-muted" htmlFor="username">
             Username
           </label>
@@ -50,7 +69,7 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
-            aria-describedby={error ? 'login-error' : undefined}
+            aria-describedby={displayedError ? 'login-error' : undefined}
           />
           <label className="mb-1 block text-sm text-text-muted" htmlFor="password">
             Password
@@ -63,13 +82,8 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
-            aria-describedby={error ? 'login-error' : undefined}
+            aria-describedby={displayedError ? 'login-error' : undefined}
           />
-          {error && (
-            <p id="login-error" role="alert" className="mb-4 text-sm text-error">
-              {error}
-            </p>
-          )}
           <PrimaryButton type="submit" disabled={submitting} className="w-full">
             {submitting ? 'Signing in...' : 'Sign in'}
           </PrimaryButton>

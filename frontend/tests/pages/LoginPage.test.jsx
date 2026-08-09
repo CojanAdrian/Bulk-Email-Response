@@ -87,4 +87,29 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /sign up/i }));
     expect(onSwitchToRegister).toHaveBeenCalled();
   });
+
+  test('renders a "Continue with Google" button that navigates to the Google sign-in URL', () => {
+    // Stubbing window.location (needed so the real navigation doesn't make
+    // jsdom log "Not implemented: navigation") replaces the real Location
+    // object entirely, which would otherwise break every later test in this
+    // file that reads window.location.search/history -- restore it after.
+    const originalLocation = window.location;
+    authApi.getGoogleSignInUrl.mockReturnValue('http://localhost:4000/api/auth/google');
+    delete window.location;
+    window.location = { href: '' };
+    render(<LoginPage onLoginSuccess={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /continue with google/i }));
+    expect(window.location.href).toBe('http://localhost:4000/api/auth/google');
+
+    window.location = originalLocation;
+  });
+
+  test('shows a message when redirected back with a ?authError= from a failed Google sign-in', () => {
+    window.history.replaceState(null, '', '/?authError=account_exists');
+    render(<LoginPage onLoginSuccess={vi.fn()} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/already exists/i);
+    window.history.replaceState(null, '', '/');
+  });
 });

@@ -2,8 +2,13 @@ const express = require('express');
 const bcrypt = require('bcrypt');
 const asyncHandler = require('../lib/asyncHandler');
 const requireAuth = require('../middleware/requireAuth');
+const { getSignInAuthUrl, exchangeSignInCodeForTokens, getGoogleIdentity } = require('../lib/googleOAuth');
 
 const MIN_PASSWORD_LENGTH = 8;
+
+function frontendUrl(path) {
+  return `${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}${path}`;
+}
 
 function createAuthRouter(pool) {
   const router = express.Router();
@@ -44,7 +49,10 @@ function createAuthRouter(pool) {
     const { username, password } = req.body;
     const [rows] = await pool.query('SELECT * FROM users WHERE username = ?', [username]);
     const user = rows[0];
-    if (!user) {
+    // A Google-only account (no password ever set) has password_hash NULL --
+    // bcrypt.compare requires a string hash, so this must be rejected before
+    // reaching it rather than crashing into a 500.
+    if (!user || !user.password_hash) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     const valid = await bcrypt.compare(password, user.password_hash);
@@ -66,6 +74,66 @@ function createAuthRouter(pool) {
   router.get('/me', requireAuth, (req, res) => {
     res.json({ username: req.session.username, role: req.session.role });
   });
+
+  router.get('/google', (req, res) => {
+    res.redirect(getSignInAuthUrl());
+  });
+
+  router.get('/google/callback', asyncHandler(async (req, res) => {
+    const { code } = req.query;
+    if (!code) {
+      return res.redirect(frontendUrl('/?authError=missing_code'));
+    }
+
+    let tokens;
+    try {
+      tokens = await exchangeSignInCodeForTokens(code);
+    } catch (err) {
+      return res.redirect(frontendUrl('/?authError=google_auth_failed'));
+    }
+
+    const identity = await getGoogleIdentity(tokens.access_token);
+    if (!identity.emailVerified) {
+      return res.redirect(frontendUrl('/?authError=email_not_verified'));
+    }
+
+    const [existingRows] = await pool.query('SELECT * FROM users WHERE google_id = ?', [identity.googleId]);
+    let user = existingRows[0];
+
+    if (!user) {
+      try {
+        const [result] = await pool.query(
+          "INSERT INTO users (username, password_hash, google_id, role) VALUES (?, NULL, ?, 'user')",
+          [identity.email, identity.googleId]
+        );
+        user = { id: result.insertId, username: identity.email, role: 'user' };
+      } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          return res.redirect(frontendUrl('/?authError=account_exists'));
+        }
+        throw err;
+      }
+    }
+
+    // Same token pair that authenticated the sign-in also connects Gmail --
+    // this is the "auto-connect on Google sign-up" behavior. Only meaningful
+    // if a refresh_token actually came back (always true for
+    // access_type=offline + prompt=consent, but don't clobber an existing
+    // connection on the rare response that omits one).
+    if (tokens.refresh_token) {
+      await pool.query(
+        `INSERT INTO email_accounts (user_id, gmail_address, refresh_token, connected_at)
+         VALUES (?, ?, ?, NOW())
+         ON DUPLICATE KEY UPDATE gmail_address = VALUES(gmail_address), refresh_token = VALUES(refresh_token), connected_at = VALUES(connected_at)`,
+        [user.id, identity.email, tokens.refresh_token]
+      );
+    }
+
+    req.session.userId = user.id;
+    req.session.username = user.username;
+    req.session.role = user.role;
+    res.redirect(frontendUrl('/'));
+  }));
 
   return router;
 }

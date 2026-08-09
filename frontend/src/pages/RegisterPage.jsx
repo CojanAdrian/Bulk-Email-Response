@@ -1,17 +1,21 @@
 import { useState } from 'react';
 import { register } from '../api/auth';
+import { useGoogleAuthError } from '../lib/useGoogleAuthError';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 import ThemeToggle from '../components/ThemeToggle';
 import AuroraBackground from '../components/AuroraBackground';
 import logoIcon from '../assets/logo-icon.png';
 
 function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
+  const googleAuthError = useGoogleAuthError();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const displayedError = error || googleAuthError;
 
   function handleSubmit(e) {
     e.preventDefault();
@@ -47,6 +51,21 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
             <img src={logoIcon} alt="" className="h-10 w-10 shrink-0" />
             <h1 className="text-xl font-extrabold tracking-wide text-text">Create an account</h1>
           </div>
+
+          {displayedError && (
+            <p id="register-error" role="alert" className="mb-4 text-sm text-error">
+              {displayedError}
+            </p>
+          )}
+
+          <GoogleSignInButton label="Sign up with Google" />
+
+          <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-text-muted">
+            <span className="h-px flex-1 bg-border" />
+            or
+            <span className="h-px flex-1 bg-border" />
+          </div>
+
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-username">
             Username
           </label>
@@ -57,7 +76,7 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
-            aria-describedby={error ? 'register-error' : undefined}
+            aria-describedby={displayedError ? 'register-error' : undefined}
           />
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-password">
             Password
@@ -70,7 +89,7 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
-            aria-describedby={error ? 'register-error' : undefined}
+            aria-describedby={displayedError ? 'register-error' : undefined}
           />
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-confirm-password">
             Confirm password
@@ -83,13 +102,8 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
-            aria-describedby={error ? 'register-error' : undefined}
+            aria-describedby={displayedError ? 'register-error' : undefined}
           />
-          {error && (
-            <p id="register-error" role="alert" className="mb-4 text-sm text-error">
-              {error}
-            </p>
-          )}
           <PrimaryButton type="submit" disabled={submitting} className="w-full">
             {submitting ? 'Creating account...' : 'Create account'}
           </PrimaryButton>

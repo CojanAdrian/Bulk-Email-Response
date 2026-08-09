@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 321 tests across 35 suites, covering
+Runs the Vitest suite (`vitest run`) — 351 tests across 38 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -261,6 +261,22 @@ and can only see/edit loads it uploads itself. There's no way to
 self-register as `role: 'admin'`; see the backend README's "Accounts and
 roles" section for how the one admin account is seeded and what admins can
 see that regular users can't.
+
+**Continue with Google** — both the login and register screens also have
+a "Continue with Google" / "Sign up with Google" button (`GoogleSignInButton.jsx`)
+above the username/password form. This is a real page navigation to
+`GET /api/auth/google`, not a fetch, since it has to land on Google's own
+consent screen. A first-time Google sign-in creates the account (username
+defaults to the Gmail address) **and connects that same Gmail account
+automatically** — no separate "Connect Gmail" step needed, since the one
+OAuth consent grants both identity and Gmail access together. A returning
+Google user just logs in. If the flow fails or hits an edge case (email
+not verified with Google, or the resolved username collides with an
+existing manual account), the backend redirects back with a
+`?authError=<code>` the page reads once on mount, shows as a normal error
+message, and strips from the URL (`src/lib/useGoogleAuthError.js`) — see
+the backend README's "Sign in / sign up with Google" section for the full
+flow and every error code.
 
 ## Inquiries tab
 

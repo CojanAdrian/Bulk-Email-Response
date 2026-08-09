@@ -28,6 +28,7 @@ const {
   getAuthUrl,
   getSignInAuthUrl,
   exchangeCodeForTokens,
+  exchangeSignInCodeForTokens,
   getAccessToken,
   getUserEmailAddress,
   getGoogleIdentity,
@@ -95,5 +96,36 @@ describe('googleOAuth', () => {
     const identity = await getGoogleIdentity('some-access-token');
     expect(identity).toEqual({ googleId: 'google-sub-123', email: 'kenny@igtfreight.com', emailVerified: true, name: 'Kenny' });
     expect(googleapis.__mockOAuth2Instance.setCredentials).toHaveBeenCalledWith({ access_token: 'some-access-token' });
+  });
+
+  // Regression test for a real bug caught before shipping: an OAuth2
+  // client's redirect_uri is fixed at construction and must match the
+  // endpoint Google actually sent the user back to. getAuthUrl (Gmail
+  // connect) and getSignInAuthUrl (sign-in) hit two different callback
+  // routes, so they must build the client with two different redirect URIs
+  // -- reusing one would send the sign-in flow's consent screen back to the
+  // Gmail-connect callback instead of the sign-in callback.
+  test('getAuthUrl and getSignInAuthUrl construct the OAuth client with different, flow-specific redirect URIs', () => {
+    googleapis.__mockOAuth2Instance.generateAuthUrl.mockReturnValue('url');
+
+    getAuthUrl();
+    const gmailRedirectUri = googleapis.google.auth.OAuth2.mock.calls[0][2];
+
+    getSignInAuthUrl();
+    const signInRedirectUri = googleapis.google.auth.OAuth2.mock.calls[1][2];
+
+    expect(gmailRedirectUri).toContain('/api/gmail/oauth/callback');
+    expect(signInRedirectUri).toContain('/api/auth/google/callback');
+    expect(gmailRedirectUri).not.toBe(signInRedirectUri);
+  });
+
+  test('exchangeSignInCodeForTokens exchanges the code using the sign-in redirect URI, not the Gmail-connect one', async () => {
+    googleapis.__mockOAuth2Instance.getToken.mockResolvedValue({ tokens: { access_token: 'abc' } });
+
+    await exchangeSignInCodeForTokens('auth-code-123');
+
+    const redirectUriUsed = googleapis.google.auth.OAuth2.mock.calls[0][2];
+    expect(redirectUriUsed).toContain('/api/auth/google/callback');
+    expect(googleapis.__mockOAuth2Instance.getToken).toHaveBeenCalledWith('auth-code-123');
   });
 });
