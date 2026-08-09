@@ -103,7 +103,7 @@ function LoadLookupPanel({ loads, onOpenBlast }) {
           {selectedLoad.comment && (
             <div>
               <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-text-muted">Planning Comment</div>
-              <div className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text">{selectedLoad.comment}</div>
+              <div className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text">{selectedLoad.comment}</div>
             </div>
           )}
         </div>

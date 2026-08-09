@@ -78,7 +78,7 @@ function UploadPanel({ onUploadComplete }) {
         aria-label="Upload loads CSV"
         onChange={handleFileChange}
         disabled={status === 'parsing' || status === 'uploading'}
-        className="block w-full text-sm text-text-muted file:mr-4 file:rounded-lg file:border-0 file:bg-gradient-to-br file:from-gold-light file:to-gold-dark file:px-4 file:py-2 file:font-semibold file:text-accent-strong hover:file:shadow-md"
+        className="block w-full text-sm text-text-muted file:mr-4 file:rounded-full file:border-0 file:bg-accent file:px-4 file:py-2 file:font-semibold file:text-accent-ink hover:file:bg-accent-strong"
       />
       {status === 'parsing' && <p className="mt-3 text-sm text-text-muted">Parsing file...</p>}
       {status === 'uploading' && <p className="mt-3 text-sm text-text-muted">Uploading...</p>}

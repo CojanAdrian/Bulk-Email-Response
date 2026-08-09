@@ -24,22 +24,35 @@ root for the full design history.
 
 ## Design system
 
-The UI uses a navy + gold palette lifted directly from the original
-`IGT_DAT_Processor.html` tool (`#152a52` navy, `#c9a227` gold, plus their
-light/dark variants) rather than a generic dashboard theme. A light/dark
-toggle lives in the header (defaults to the visitor's OS preference, then
-falls back to light, persisted to `localStorage`). Every color is a
-semantic CSS custom property (`--color-bg`, `--color-surface`,
-`--color-accent`, etc. — see `src/styles/tokens.css`) mapped into Tailwind
-via `tailwind.config.js`'s `colors` extension (`bg-bg`, `bg-surface`,
-`text-accent`, ...), so components never hardcode a raw hex or a
-light/dark-specific class — the same `bg-surface` resolves correctly in
-both themes automatically. Four shared building blocks
-(`src/components/Card.jsx`, `PrimaryButton.jsx`, `SecondaryButton.jsx`,
-`Badge.jsx`) carry the brand's signature patterns (gold-top-accent cards,
-gold-gradient primary buttons, navy-outline secondary buttons, colored
-status pills) and are used by every panel in the app instead of each
-component reinventing its own card/button styling.
+The UI is a dark-mode-first "shell and cards" layout: a near-black (light
+mode: pale sage) shell holds an icon-based sidebar, and every panel of
+actual content floats on top of it as a white, heavily-rounded card. The
+accent is a single vibrant lime (`#d7ff3d`), used for the active nav item,
+primary buttons, and focus rings — never as body text, since a lime this
+bright fails WCAG contrast as a foreground color and is restricted to
+fills-with-dark-text or backgrounds-with-dark-text-on-top. A light/dark
+toggle lives in the sidebar (defaults to the visitor's OS preference, then
+persisted to `localStorage`).
+
+Two token families live in `src/styles/tokens.css`: `shell-*` tokens
+(`shell-bg`, `shell-surface`, `shell-text`, `shell-text-muted`,
+`shell-border`) theme the outer app frame and swap between light/dark;
+`surface`/`text`/`border`/status-color tokens theme the content cards and
+stay constant across both themes, since cards are always white/light
+regardless of shell theme. Both families are mapped into Tailwind via
+`tailwind.config.js`'s `colors` extension, so components never hardcode a
+raw hex or a light/dark-specific class.
+
+Shared building blocks carry the look consistently: `Card.jsx`
+(`rounded-3xl` white card, soft shadow), `PrimaryButton.jsx` (lime
+`rounded-full` pill), `SecondaryButton.jsx` (outlined `rounded-full`
+pill), `Badge.jsx` (pastel `rounded-full` status/tag pills), and
+`Sidebar.jsx` (icon + label nav, lime pill on the active tab). The rest of
+the UI follows a consistent radius scale on top of these — `rounded-lg`
+for inputs and small inline buttons, `rounded-xl` for nested panels inside
+a card, `rounded-2xl` for the logo mark and sidebar nav buttons,
+`rounded-3xl` for cards, `rounded-full` for pills/badges/primary actions
+— rather than mixing arbitrary corner radii per component.
 
 ## Prerequisites
 
@@ -90,7 +103,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 280 tests across 29 suites, covering
+Runs the Vitest suite (`vitest run`) — 285 tests across 30 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -186,8 +199,8 @@ see that regular users can't.
 
 ## Inquiries tab
 
-The header has two tabs: **Loads** (the default, everything above) and
-**Inquiries** — the email auto-reply dashboard. Switching to it renders
+The sidebar has two nav items: **Loads** (the default, everything above)
+and **Inquiries** — the email auto-reply dashboard. Switching to it renders
 three independent panels, each with its own loading/error state (one
 panel's failure doesn't block the others):
 

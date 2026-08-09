@@ -42,7 +42,7 @@ function App() {
 
   if (status === 'checking') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-bg text-text-muted">
+      <div className="flex min-h-screen items-center justify-center bg-shell-bg text-shell-text-muted">
         Loading...
       </div>
     );

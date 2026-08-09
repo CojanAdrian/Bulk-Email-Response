@@ -27,15 +27,16 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
+    <div className="flex min-h-screen items-center justify-center bg-shell-bg px-4">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
       <Card className="w-full max-w-sm">
         <form onSubmit={handleSubmit}>
-          <h1 className="mb-6 bg-gradient-to-r from-gold-light to-gold bg-clip-text text-xl font-extrabold tracking-wide text-transparent">
-            BulkPosting
-          </h1>
+          <div className="mb-6 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-accent text-lg font-black text-accent-ink">B</div>
+            <h1 className="text-xl font-extrabold tracking-wide text-text">BulkPosting</h1>
+          </div>
           <label className="mb-1 block text-sm text-text-muted" htmlFor="username">
             Username
           </label>
@@ -72,7 +73,7 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
           <button
             type="button"
             onClick={onSwitchToRegister}
-            className="mt-4 w-full text-center text-sm text-text-muted hover:text-accent"
+            className="mt-4 w-full text-center text-sm text-text-muted hover:text-text"
           >
             Don't have an account? Sign up
           </button>

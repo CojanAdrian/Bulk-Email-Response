@@ -149,7 +149,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
             }`}
           />
           {dragActive && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent bg-accent/10 text-sm font-semibold text-accent">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-strong bg-accent/10 text-sm font-semibold text-text">
               ↓ Drop file to import emails
             </div>
           )}
@@ -162,7 +162,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
 
         <div className="mt-5 flex justify-end gap-2">
           <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          {/* Gmail's own brand blue, deliberately not the app's gold/navy accent — matches the original tool's identical choice for this one external-service button. */}
+          {/* Gmail's own brand blue, deliberately not the app's lime accent — matches the original tool's identical choice for this one external-service button. */}
           <button
             onClick={handleOpenGmail}
             className="rounded-lg bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
