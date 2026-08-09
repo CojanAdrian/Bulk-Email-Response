@@ -6,13 +6,15 @@ const { createLoadsRouter } = require('./routes/loads');
 const createGmailRouter = require('./routes/gmail');
 const createInquiriesRouter = require('./routes/inquiries');
 const requireAuth = require('./middleware/requireAuth');
+const { store } = require('./lib/sessionStore');
 
-function createApp(pool) {
+function createApp(pool, wsHub) {
   const app = express();
 
   app.use(cors({ origin: process.env.FRONTEND_ORIGIN, credentials: true }));
   app.use(express.json());
   app.use(session({
+    store,
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
@@ -24,9 +26,9 @@ function createApp(pool) {
   });
 
   app.use('/api/auth', createAuthRouter(pool));
-  app.use('/api/loads', requireAuth, createLoadsRouter(pool));
-  app.use('/api/gmail', requireAuth, createGmailRouter(pool));
-  app.use('/api/inquiries', requireAuth, createInquiriesRouter(pool));
+  app.use('/api/loads', requireAuth, createLoadsRouter(pool, wsHub));
+  app.use('/api/gmail', requireAuth, createGmailRouter(pool, wsHub));
+  app.use('/api/inquiries', requireAuth, createInquiriesRouter(pool, wsHub));
 
   app.use((err, req, res, next) => {
     console.error(err);
