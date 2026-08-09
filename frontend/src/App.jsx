@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { me, logout } from './api/auth';
+import { connect as connectLiveSocket, disconnect as disconnectLiveSocket } from './lib/liveSocket';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import MainToolPage from './pages/MainToolPage';
@@ -22,6 +23,12 @@ function App() {
         setStatus('loggedOut');
       });
   }, []);
+
+  useEffect(() => {
+    if (status !== 'loggedIn') return undefined;
+    connectLiveSocket();
+    return () => disconnectLiveSocket();
+  }, [status]);
 
   function handleAuthSuccess(data) {
     setUsername(data.username);

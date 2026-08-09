@@ -3,14 +3,18 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import App from '../src/App';
 import * as authApi from '../src/api/auth';
 import * as loadsApi from '../src/api/loads';
+import * as liveSocket from '../src/lib/liveSocket';
 
 vi.mock('../src/api/auth');
 vi.mock('../src/api/loads');
+vi.mock('../src/lib/liveSocket');
 
 describe('App', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     loadsApi.listLoads.mockResolvedValue([]);
+    liveSocket.getStatus.mockReturnValue('closed');
+    liveSocket.subscribeStatus.mockReturnValue(() => {});
   });
 
   test('shows the login page when there is no active session', async () => {
@@ -62,7 +66,17 @@ describe('App', () => {
     });
   });
 
-  test('logging out returns to the login page', async () => {
+  test('connects the live socket once a session is active', async () => {
+    authApi.me.mockResolvedValue({ username: 'admin' });
+    render(<App />);
+
+    await waitFor(() => {
+      expect(liveSocket.connect).toHaveBeenCalledTimes(1);
+    });
+    expect(liveSocket.disconnect).not.toHaveBeenCalled();
+  });
+
+  test('logging out returns to the login page and disconnects the live socket', async () => {
     authApi.me.mockResolvedValue({ username: 'admin' });
     authApi.logout.mockResolvedValue({ ok: true });
     render(<App />);
@@ -73,6 +87,7 @@ describe('App', () => {
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
     });
+    expect(liveSocket.disconnect).toHaveBeenCalled();
   });
 
   test('still returns to the login page even if the logout request fails', async () => {

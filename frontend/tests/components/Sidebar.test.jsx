@@ -34,4 +34,9 @@ describe('Sidebar', () => {
     render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
     expect(screen.getByRole('button', { name: /switch to (dark|light) theme/i })).toBeInTheDocument();
   });
+
+  test('renders the live-connection status indicator next to the username', () => {
+    render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    expect(screen.getByRole('status')).toBeInTheDocument();
+  });
 });

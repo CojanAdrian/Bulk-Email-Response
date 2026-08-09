@@ -1,5 +1,6 @@
 import { BoxIcon, MailIcon, LogoutIcon } from './icons';
 import ThemeToggle from './ThemeToggle';
+import ConnectionIndicator from './ConnectionIndicator';
 
 function NavButton({ icon, label, active, onClick }) {
   return (
@@ -29,7 +30,10 @@ function Sidebar({ tab, onTabChange, username, onLogout }) {
       </nav>
       <div className="flex flex-col gap-3 border-t border-shell-border pt-4">
         <div className="flex items-center justify-between px-2">
-          <span className="truncate text-sm text-shell-text-muted">{username}</span>
+          <span className="flex min-w-0 items-center gap-2 truncate text-sm text-shell-text-muted">
+            <ConnectionIndicator />
+            <span className="truncate">{username}</span>
+          </span>
           <ThemeToggle />
         </div>
         <button
