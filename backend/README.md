@@ -102,13 +102,14 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 104 tests across 10 suites: `tests/health.test.js`,
+There are 133 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
-`tests/inquiries.test.js`, `tests/lib/googleOAuth.test.js`,
-`tests/lib/gmailClient.test.js`, `tests/lib/matchingEngine.test.js`,
-`tests/lib/replyComposer.test.js`, `tests/lib/emailPoller.test.js`. All
-Gmail API calls are mocked — no real Google credentials are needed to run
-the suite.
+`tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
+`tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
+`tests/lib/matchingEngine.test.js`, `tests/lib/replyComposer.test.js`,
+`tests/lib/emailPoller.test.js`, `tests/lib/wsHub.test.js`,
+`tests/lib/wsAuth.test.js`. All Gmail API calls are mocked — no real
+Google credentials are needed to run the suite.
 
 ## Manual smoke test (curl)
 
@@ -162,6 +163,47 @@ curl -b cookies.txt http://localhost:4000/api/loads     # -> both loads, plus ad
 
 All `/api/loads/*` routes require an authenticated session — an unauthenticated
 request to any of them returns `401 {"error":"Unauthorized"}`.
+
+## Live updates (WebSocket)
+
+`src/server.js` builds an `http.Server` (`src/createHttpServer.js`) around
+the Express app and handles the `'upgrade'` event manually, since a raw
+WebSocket upgrade happens before Express's middleware chain runs and so
+never gets a `req.session` for free. Connecting to `ws://<host>/ws` is
+authenticated by parsing and unsigning the `connect.sid` cookie off the
+raw upgrade request (`src/lib/wsAuth.js`) and looking up the session in a
+`MemoryStore` now shared between `express-session` and the upgrade
+handler (`src/lib/sessionStore.js` — previously constructed inline inside
+`app.js` and inaccessible outside it). A connection with no cookie, or one
+that doesn't resolve to a session with a `userId`, gets a `401` and the
+socket is closed; anything not at the `/ws` path is rejected outright.
+
+`src/lib/wsHub.js` is an in-process registry (`userId -> Set<WebSocket>`,
+no Redis or external broker — this app has always run as a single Node
+process) that route handlers and the email poller push events through via
+`wsHub.emitToUser(userId, event, payload)`. A user with multiple open tabs
+gets every socket registered under their `userId`, so a push fans out to
+all of them. Every route factory (`createLoadsRouter`, `createGmailRouter`,
+`createInquiriesRouter`) and `pollAccount`/`pollAllAccounts` now take an
+optional `wsHub` as an extra parameter — emits are guarded (`if (wsHub)`)
+so tests and other callers that don't pass one are unaffected. Events
+emitted:
+
+| Event | Emitted after | Payload |
+|---|---|---|
+| `load:changed` | `PATCH /api/loads/:id`, `POST /api/loads/upload` | `{ loadId }` for a PATCH, `{}` for an upload (frontend just refetches either way) |
+| `gmail:status` | OAuth callback succeeds, `POST /api/gmail/disconnect` | same shape as `GET /api/gmail/status` |
+| `inquiry:updated` | `POST /api/inquiries/:id/send`, `POST /api/inquiries/:id/reject` | the full updated `email_inquiries` row |
+| `inquiry:new` | the poller stores a newly-detected message | the full inserted `email_inquiries` row |
+
+This makes the *frontend* reflect *backend/database* state changes
+instantly — it does **not** shrink the 2-minute Gmail polling interval
+described below; an email still takes up to 2 minutes to be *detected*.
+Once the poller has processed a message, though, the resulting row now
+reaches every open browser tab the instant it's stored, instead of
+waiting for a manual refresh. See
+`docs/superpowers/specs/2026-08-09-realtime-infrastructure-design.md` for
+the full design.
 
 ## API reference
 

@@ -54,6 +54,35 @@ a card, `rounded-2xl` for the logo mark and sidebar nav buttons,
 `rounded-3xl` for cards, `rounded-full` for pills/badges/primary actions
 — rather than mixing arbitrary corner radii per component.
 
+## Live updates
+
+The app holds one WebSocket connection open (`src/lib/liveSocket.js`) so
+changes made anywhere — this tab, another tab, another device, or the
+backend's own Gmail poller — show up immediately, with no manual refresh
+and no polling delay. The connection starts once a session is confirmed
+active and closes on logout; a small status dot next to the username in
+the sidebar (green/amber/gray, `ConnectionIndicator.jsx`) shows whether
+it's currently connected, reconnecting, or offline, so a background
+feature the user is relying on never silently stops working with no
+visible sign. If the connection drops, it reconnects automatically with
+exponential backoff (1s, 2s, 4s, 8s, capped at 30s), resetting back to 1s
+once a connection has stayed open more than 5 seconds.
+
+Each panel that shows server-owned data subscribes to the specific events
+that affect it: the loads table and DAT export section refetch on
+`load:changed` (a PATCH, an upload, from any tab); the Gmail connection
+panel applies a pushed `gmail:status` directly; the review queue and
+inquiry log both react to `inquiry:new`/`inquiry:updated` — a message the
+backend's poller just processed appears in the log (and, if it needs a
+human, the review queue) the instant it's stored, and sending or
+rejecting an inquiry in one tab removes it from every other open tab's
+queue too. This does **not** shrink the backend's Gmail polling interval
+(still up to 2 minutes to *detect* a new email) — it only removes the
+delay between the backend having processed something and the browser
+reflecting it. See
+`docs/superpowers/specs/2026-08-09-realtime-infrastructure-design.md` for
+the full design.
+
 ## Prerequisites
 
 - Node.js (v18+ recommended)
@@ -103,7 +132,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 285 tests across 30 suites, covering
+Runs the Vitest suite (`vitest run`) — 309 tests across 32 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -223,9 +252,10 @@ panel's failure doesn't block the others):
   Pending review / Rejected / No match).
 
 A "Refresh" button above the panels manually re-fetches the review queue
-and inquiry log (there's no live/websocket update — this is a small
-internal tool, a manual refresh is enough). The Gmail connection panel
-re-checks on every tab switch since it remounts each time.
+and inquiry log — redundant now that both panels also update live (see
+"Live updates" below), but harmless to keep pressing if you want to force
+a fresh fetch. The Gmail connection panel re-checks on every tab switch
+since it remounts each time.
 
 **None of this works meaningfully without real Google OAuth credentials
 configured on the backend** (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/
