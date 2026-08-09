@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { updateLoad } from '../api/loads';
+import Card from './Card';
+import PrimaryButton from './PrimaryButton';
+import SecondaryButton from './SecondaryButton';
 
 function RateModal({ load, onClose, onSaved }) {
   const [targetPay, setTargetPay] = useState(load.target_pay ?? '');
@@ -67,11 +70,11 @@ function RateModal({ load, onClose, onSaved }) {
       aria-labelledby="rate-modal-title"
       className="fixed inset-0 flex items-center justify-center bg-black/60 px-4"
     >
-      <div className="w-full max-w-sm rounded-2xl border border-slate-800 bg-slate-900 p-6">
-        <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-slate-100">
+      <Card className="w-full max-w-sm">
+        <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-text">
           Edit load {load.load_number}
         </h2>
-        <label className="mb-1 block text-sm text-slate-400" htmlFor="targetPay">
+        <label className="mb-1 block text-sm text-text-muted" htmlFor="targetPay">
           Target pay
         </label>
         <input
@@ -80,39 +83,33 @@ function RateModal({ load, onClose, onSaved }) {
           step="0.01"
           value={targetPay}
           onChange={(e) => setTargetPay(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
         />
-        <label className="mb-1 block text-sm text-slate-400" htmlFor="status">
+        <label className="mb-1 block text-sm text-text-muted" htmlFor="status">
           Status
         </label>
         <select
           id="status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100"
+          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
         >
           <option value="active">Active</option>
           <option value="booked">Booked</option>
           <option value="expired">Expired</option>
         </select>
         {error && (
-          <p role="alert" className="mb-4 text-sm text-red-400">
+          <p role="alert" className="mb-4 text-sm text-error">
             {error}
           </p>
         )}
         <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800">
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-          >
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          <PrimaryButton onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
-          </button>
+          </PrimaryButton>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }

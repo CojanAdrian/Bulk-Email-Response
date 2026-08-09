@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Papa from 'papaparse';
 import { parseMcleodRows, cleanText } from '../lib/mcleodParser';
 import { uploadLoads } from '../api/loads';
+import Card from './Card';
 
 function UploadPanel({ onUploadComplete }) {
   const [status, setStatus] = useState('idle'); // 'idle' | 'parsing' | 'uploading' | 'done'
@@ -69,29 +70,29 @@ function UploadPanel({ onUploadComplete }) {
   }
 
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-      <h2 className="mb-3 text-sm font-semibold text-slate-100">Upload loads CSV</h2>
+    <Card>
+      <h2 className="mb-3 text-sm font-semibold text-text">Upload loads CSV</h2>
       <input
         type="file"
         accept=".csv"
         aria-label="Upload loads CSV"
         onChange={handleFileChange}
         disabled={status === 'parsing' || status === 'uploading'}
-        className="block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-600 file:px-4 file:py-2 file:text-white hover:file:bg-indigo-500"
+        className="block w-full text-sm text-text-muted file:mr-4 file:rounded-lg file:border-0 file:bg-gradient-to-br file:from-gold-light file:to-gold-dark file:px-4 file:py-2 file:font-semibold file:text-accent-strong hover:file:shadow-md"
       />
-      {status === 'parsing' && <p className="mt-3 text-sm text-slate-400">Parsing file...</p>}
-      {status === 'uploading' && <p className="mt-3 text-sm text-slate-400">Uploading...</p>}
+      {status === 'parsing' && <p className="mt-3 text-sm text-text-muted">Parsing file...</p>}
+      {status === 'uploading' && <p className="mt-3 text-sm text-text-muted">Uploading...</p>}
       {error && (
-        <p role="alert" className="mt-3 text-sm text-red-400">
+        <p role="alert" className="mt-3 text-sm text-error">
           {error}
         </p>
       )}
       {result && (
-        <p className="mt-3 text-sm text-emerald-400">
+        <p className="mt-3 text-sm text-success">
           Uploaded: {result.inserted} new, {result.updated} updated.
         </p>
       )}
-    </div>
+    </Card>
   );
 }
 
