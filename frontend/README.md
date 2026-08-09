@@ -17,9 +17,29 @@ rejecting queued auto-reply drafts, and a log of every processed inquiry.
 See `docs/superpowers/specs/2026-08-04-backend-foundation-design.md`,
 `docs/superpowers/specs/2026-08-08-email-matching-engine-design.md`,
 `docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`,
-`docs/superpowers/specs/2026-08-09-live-dashboard-design.md`, and
-`docs/superpowers/specs/2026-08-09-frontend-phase3-design.md` in the repo
+`docs/superpowers/specs/2026-08-09-live-dashboard-design.md`,
+`docs/superpowers/specs/2026-08-09-frontend-phase3-design.md`, and
+`docs/superpowers/specs/2026-08-09-design-system-design.md` in the repo
 root for the full design history.
+
+## Design system
+
+The UI uses a navy + gold palette lifted directly from the original
+`IGT_DAT_Processor.html` tool (`#152a52` navy, `#c9a227` gold, plus their
+light/dark variants) rather than a generic dashboard theme. A light/dark
+toggle lives in the header (defaults to the visitor's OS preference, then
+falls back to light, persisted to `localStorage`). Every color is a
+semantic CSS custom property (`--color-bg`, `--color-surface`,
+`--color-accent`, etc. — see `src/styles/tokens.css`) mapped into Tailwind
+via `tailwind.config.js`'s `colors` extension (`bg-bg`, `bg-surface`,
+`text-accent`, ...), so components never hardcode a raw hex or a
+light/dark-specific class — the same `bg-surface` resolves correctly in
+both themes automatically. Four shared building blocks
+(`src/components/Card.jsx`, `PrimaryButton.jsx`, `SecondaryButton.jsx`,
+`Badge.jsx`) carry the brand's signature patterns (gold-top-accent cards,
+gold-gradient primary buttons, navy-outline secondary buttons, colored
+status pills) and are used by every panel in the app instead of each
+component reinventing its own card/button styling.
 
 ## Prerequisites
 
@@ -70,15 +90,17 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 260 tests across 24 suites, covering
+Runs the Vitest suite (`vitest run`) — 280 tests across 29 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
-`src/lib/lookupMessage.js` for search/message-building) and every
-component (upload, loads table, rate modal, Gmail connection, review
-queue, inquiry log, DAT export section, the two pre-export modals, the
-anomaly report, the load lookup panel, and the blast modal). All API
-calls are mocked, so **no backend is required** to run tests.
+`src/lib/lookupMessage.js` for search/message-building), every component
+(upload, loads table, rate modal, Gmail connection, review queue, inquiry
+log, DAT export section, the two pre-export modals, the anomaly report,
+the load lookup panel, and the blast modal), and the design system's
+shared building blocks (`Card`, `PrimaryButton`, `SecondaryButton`,
+`Badge`, `ThemeToggle`). All API calls are mocked, so **no backend is
+required** to run tests.
 
 ## Uploading loads
 
