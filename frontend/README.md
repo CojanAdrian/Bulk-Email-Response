@@ -4,19 +4,21 @@ A React/Vite frontend for the BulkPosting backend — the tool freight brokers
 use to bulk-manage loads (CSV upload, a loads table, rate editing, DAT
 export, and a "blast" email/notification flow).
 
-**This is Phase 1/2 of the loads UI, plus the full email auto-reply
-dashboard (sub-project 4 of the email roadmap).** It implements
-session-based login and self-service registration, a logged-in/logged-out
-state machine, uploading a McLeod CSV export, viewing/filtering the
-resulting loads table, editing a load's target pay and status, connecting
-a Gmail account, reviewing/editing/sending or rejecting queued auto-reply
-drafts, and a log of every processed inquiry. DAT export, load
-lookup/search, and the blast modal are **not implemented yet** — those are
-frontend Phase 3, ported from the original tool, and land after this. See
-`docs/superpowers/specs/2026-08-04-backend-foundation-design.md`,
+**This is the complete rebuild of the original `IGT_DAT_Processor.html`
+tool, plus the full email auto-reply dashboard.** It implements
+session-based login and self-service registration, uploading a McLeod CSV
+export, viewing/filtering the resulting loads table, editing a load's
+target pay and status, generating a DAT bulk-upload CSV (with the same
+anomaly detection, cross-post expansion, and dedup rules as the original
+tool), searching/looking up a load and getting an email-ready description,
+blasting that description to a list of carrier emails via Gmail, connecting
+a Gmail account for inbound carrier inquiries, reviewing/editing/sending or
+rejecting queued auto-reply drafts, and a log of every processed inquiry.
+See `docs/superpowers/specs/2026-08-04-backend-foundation-design.md`,
 `docs/superpowers/specs/2026-08-08-email-matching-engine-design.md`,
-`docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`, and
-`docs/superpowers/specs/2026-08-09-live-dashboard-design.md` in the repo
+`docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`,
+`docs/superpowers/specs/2026-08-09-live-dashboard-design.md`, and
+`docs/superpowers/specs/2026-08-09-frontend-phase3-design.md` in the repo
 root for the full design history.
 
 ## Prerequisites
@@ -68,15 +70,15 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 121 tests across 16 suites
-(`src/App.jsx`, `src/api/client.js`, `src/api/auth.js`, `src/api/loads.js`,
-`src/api/gmail.js`, `src/api/inquiries.js`, `src/lib/mcleodParser.js`,
-`src/pages/LoginPage.jsx`, `src/pages/RegisterPage.jsx`,
-`src/pages/MainToolPage.jsx`, `src/components/UploadPanel.jsx`,
-`src/components/LoadsTable.jsx`, `src/components/RateModal.jsx`,
-`src/components/GmailConnectionPanel.jsx`,
-`src/components/ReviewQueue.jsx`, `src/components/InquiriesLog.jsx`). All
-API calls are mocked, so **no backend is required** to run tests.
+Runs the Vitest suite (`vitest run`) — 260 tests across 24 suites, covering
+every API module, page, and component, including the two pure-function
+pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
+`src/lib/datExport.js` for the DAT export pipeline, and
+`src/lib/lookupMessage.js` for search/message-building) and every
+component (upload, loads table, rate modal, Gmail connection, review
+queue, inquiry log, DAT export section, the two pre-export modals, the
+anomaly report, the load lookup panel, and the blast modal). All API
+calls are mocked, so **no backend is required** to run tests.
 
 ## Uploading loads
 
@@ -88,15 +90,61 @@ re-upload with the same load numbers updates rates/details rather than
 creating duplicates, and never changes a load's `active`/`booked`/`expired`
 status (that's manual-only, via "Edit rate" on the loads table).
 
-Note: only the column-mapping logic is ported from the original
-`IGT_DAT_Processor.html` tool so far — anomaly detection, cross-posting,
-and DAT export are Phase 3 work and aren't available yet.
-
 Known limitation: if you have "Edit rate" open for a load and someone
 re-uploads a CSV that updates that same load in the background, saving
 your edit will overwrite the freshly-uploaded data with whatever you
 had open in the modal — there's no conflict detection yet. Close and
 reopen "Edit rate" if you know a re-upload just happened.
+
+## DAT export, load lookup, and blast email
+
+Below the loads table, the "DAT Export" section works entirely on your
+**currently active loads** (whatever `GET /api/loads?status=active` returns
+right now) — not on a fresh CSV, and not tied to when you last uploaded.
+This is a deliberate difference from the original tool, which ran its
+whole pipeline once, immediately after a CSV upload; since loads now
+persist, export works on-demand instead. See
+`docs/superpowers/specs/2026-08-09-frontend-phase3-design.md` for the full
+reasoning and every business rule transcribed from the original tool.
+
+**Generating a DAT export:**
+1. Click **Generate DAT Export**. A modal asks for the DAT contact method
+   (phone or email — straight-box equipment like `SB`/`BR`/`BZ` always
+   uses email, overriding this choice), whether to append a contact line
+   to every load's DAT comment, and whether to include the DAT Loadboard
+   Rate for all loads, none, or a per-load choice.
+2. If you chose "per load," a follow-up table lets you check/uncheck each
+   load and edit its rate before continuing.
+3. A CSV downloads immediately (`DAT_Bulk_Upload_YYYY-MM-DD.csv`), and an
+   **Anomaly Report** appears below — one section per category (same-city
+   loads, excluded blank-equipment loads, unrecognized equipment codes,
+   duplicate lanes that got collapsed, rate anomalies over $10,000 or
+   exactly $0, cross-posted equipment that got added automatically, city
+   overrides parsed from a `"post as X, ST to Y, ST"` comment, ambiguous
+   cases that need a human to verify, and Canadian-province/atypical-city
+   location flags). Nothing in this report blocks the export — it's there
+   so you can double-check the CSV before actually uploading it to DAT.
+
+**Load Detail Lookup:** search by order number, city, or state (order
+number and an exact state match rank highest) to pull up a load and get a
+ready-to-paste email description — pickup/delivery lines built from the
+load's schedule, commodity, weight, and temperature (for reefer loads),
+plus either the rate or a "how much would you need for this?" fallback
+depending on a rate-visibility toggle. A multi-stop warning appears when
+the load's comment mentions a second pickup/delivery, or it has a nonzero
+stop count, since those details need to be added manually. "Copy to
+clipboard" copies the current message text.
+
+**Blast email:** once a load is selected in lookup, click **Blast email**
+to open a modal pre-filled with a subject line and the same message body.
+Paste carrier emails (one per line or comma-separated) or drop a `.csv`/
+`.txt` file to extract every email-shaped substring from it (`.xlsx`/`.xls`
+aren't supported — export to CSV first). **Open in Gmail** builds a Gmail
+compose link (`bcc` set to every valid email, prefilled subject/body) and
+opens it in a new tab — this is a manual compose handoff, separate from
+the OAuth-connected Gmail account used for auto-replying to inbound
+inquiries (see "Gmail integration" in the backend README); nothing is sent
+through this app's own connected account.
 
 ## Registration
 
