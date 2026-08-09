@@ -1,3 +1,6 @@
+import Card from './Card';
+import Badge from './Badge';
+
 const SECTIONS = [
   { key: 'sameCity', title: 'Same city (round-trip/dedicated)', columns: [{ key: 'order', label: 'Order #' }, { key: 'route', label: 'Route' }] },
   { key: 'blankEquipment', title: 'Excluded — blank equipment', columns: [{ key: 'order', label: 'Order #' }] },
@@ -28,23 +31,23 @@ const SECTIONS = [
 
 function AnomalyReport({ anomalies }) {
   return (
-    <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-      <h2 className="mb-4 text-lg font-semibold text-slate-100">Anomaly Report</h2>
+    <Card>
+      <h2 className="mb-4 text-lg font-semibold text-text">Anomaly Report</h2>
       <div className="space-y-4">
         {SECTIONS.map((section) => {
           const rows = anomalies[section.key] || [];
           return (
-            <div key={section.key} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
-              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-slate-100">
+            <div key={section.key} className="rounded-xl border border-border bg-surface-alt p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-text">
                 {section.title}
-                <span className="rounded-full bg-slate-800 px-2 py-0.5 text-xs text-slate-300">{rows.length}</span>
+                <Badge>{rows.length}</Badge>
               </h3>
               {rows.length === 0 ? (
-                <p className="text-sm text-slate-500">None found.</p>
+                <p className="text-sm text-text-muted">None found.</p>
               ) : (
-                <table className="w-full text-left text-sm text-slate-300">
+                <table className="w-full text-left text-sm text-text">
                   <thead>
-                    <tr className="border-b border-slate-800 text-slate-500">
+                    <tr className="border-b border-border text-text-muted">
                       {section.columns.map((c) => (
                         <th key={c.key} className="py-1 pr-4">
                           {c.label}
@@ -54,7 +57,7 @@ function AnomalyReport({ anomalies }) {
                   </thead>
                   <tbody>
                     {rows.map((row, i) => (
-                      <tr key={i} className="border-b border-slate-800/60">
+                      <tr key={i} className="border-b border-border/60">
                         {section.columns.map((c) => (
                           <td key={c.key} className="py-1 pr-4">
                             {row[c.key]}
@@ -69,7 +72,7 @@ function AnomalyReport({ anomalies }) {
           );
         })}
       </div>
-    </div>
+    </Card>
   );
 }
 

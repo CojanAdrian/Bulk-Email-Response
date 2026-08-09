@@ -6,6 +6,8 @@ import RateSelectionModal from './RateSelectionModal';
 import AnomalyReport from './AnomalyReport';
 import LoadLookupPanel from './LoadLookupPanel';
 import BlastModal from './BlastModal';
+import Card from './Card';
+import PrimaryButton from './PrimaryButton';
 
 function downloadCsv(csv, filename) {
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
@@ -74,29 +76,25 @@ function DatExportSection({ refreshKey }) {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <Card className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-slate-100">DAT Export</h2>
-          {fetchStatus === 'loading' && <p className="text-sm text-slate-400">Loading active loads...</p>}
+          <h2 className="text-sm font-semibold text-text">DAT Export</h2>
+          {fetchStatus === 'loading' && <p className="text-sm text-text-muted">Loading active loads...</p>}
           {fetchStatus === 'error' && (
-            <p role="alert" className="text-sm text-red-400">
+            <p role="alert" className="text-sm text-error">
               {fetchError}
             </p>
           )}
-          {fetchStatus === 'ready' && <p className="text-sm text-slate-400">{loads.length} active load(s) ready to export.</p>}
+          {fetchStatus === 'ready' && <p className="text-sm text-text-muted">{loads.length} active load(s) ready to export.</p>}
         </div>
-        <button
-          onClick={() => setStep('contactMethod')}
-          disabled={fetchStatus !== 'ready' || loads.length === 0}
-          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-        >
+        <PrimaryButton onClick={() => setStep('contactMethod')} disabled={fetchStatus !== 'ready' || loads.length === 0}>
           Generate DAT Export
-        </button>
-      </div>
+        </PrimaryButton>
+      </Card>
 
       {result && (
         <>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-text-muted">
             Downloaded a DAT CSV with {result.exportedCount} row(s). {countAnomalies(result.anomalies)} anomaly flag(s) below.
           </p>
           <AnomalyReport anomalies={result.anomalies} />
