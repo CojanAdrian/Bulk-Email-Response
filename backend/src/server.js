@@ -12,10 +12,16 @@ assertRequiredEnvVars();
 
 const { createApp } = require('./app');
 const { createPool } = require('./db');
+const { pollAllAccounts } = require('./lib/emailPoller');
 
 const pool = createPool(process.env.DB_NAME);
 const app = createApp(pool);
 const port = process.env.PORT || 4000;
+
+const POLL_INTERVAL_MS = 2 * 60 * 1000;
+setInterval(() => {
+  pollAllAccounts(pool).catch((err) => console.error('Email poll cycle failed:', err));
+}, POLL_INTERVAL_MS);
 
 app.listen(port, () => {
   console.log(`Backend listening on port ${port}`);
