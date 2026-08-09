@@ -3,7 +3,7 @@ const asyncHandler = require('../lib/asyncHandler');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
-  'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
+  'dest_city', 'dest_state', 'dest_zip', 'equipment', 'raw_equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
   'commodity', 'temperature', 'comment',
 ];

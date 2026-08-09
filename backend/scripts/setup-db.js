@@ -72,6 +72,14 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE loads ADD COLUMN user_id INT NULL`);
   }
 
+  const [rawEquipmentCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'raw_equipment'`,
+    [databaseName]
+  );
+  if (rawEquipmentCol[0].count === 0) {
+    await conn.query(`ALTER TABLE loads ADD COLUMN raw_equipment VARCHAR(20) NULL`);
+  }
+
   const [indexRows] = await conn.query(`SHOW INDEX FROM loads WHERE Key_name != 'PRIMARY'`);
   const indexMap = {};
   indexRows.forEach((row) => {

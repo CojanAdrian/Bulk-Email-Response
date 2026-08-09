@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS loads (
   dest_state VARCHAR(2),
   dest_zip VARCHAR(10),
   equipment VARCHAR(50),
+  raw_equipment VARCHAR(20),
   weight VARCHAR(50),
   target_pay DECIMAL(10,2),
   early_pu DATETIME NULL,
