@@ -195,6 +195,39 @@ describe('emailPoller', () => {
     expect(gmailClient.sendReply).not.toHaveBeenCalled();
   });
 
+  test('pollAccount emits inquiry:new to the account owner when a wsHub is given', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', subject: 'Random question', body: 'Do you have parking available?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
+    const wsHub = { emitToUser: jest.fn() };
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, accountRows[0], wsHub);
+
+    expect(wsHub.emitToUser).toHaveBeenCalledTimes(1);
+    const [userIdArg, event, payload] = wsHub.emitToUser.mock.calls[0];
+    expect(userIdArg).toBe(userId);
+    expect(event).toBe('inquiry:new');
+    expect(payload.gmail_message_id).toBe('m1');
+  });
+
+  test('pollAccount does not touch wsHub when none is given', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', subject: 'Random question', body: 'Do you have parking available?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await expect(pollAccount(pool, accountRows[0])).resolves.not.toThrow();
+  });
+
   test('pollAllAccounts continues polling other accounts if one account fails', async () => {
     const passwordHash = await bcrypt.hash('otherpw', 10);
     const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);

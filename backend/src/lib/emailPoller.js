@@ -8,7 +8,7 @@ function replySubject(originalSubject) {
   return subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`;
 }
 
-async function pollAccount(pool, account) {
+async function pollAccount(pool, account, wsHub) {
   const accessToken = await getAccessToken(account.refresh_token);
   const sinceDate = account.last_polled_at ? new Date(account.last_polled_at) : null;
   const messageIds = await listNewMessageIds(accessToken, sinceDate);
@@ -56,7 +56,7 @@ async function pollAccount(pool, account) {
       }
     }
 
-    await pool.query(
+    const [insertResult] = await pool.query(
       `INSERT INTO email_inquiries
        (user_id, email_account_id, gmail_message_id, from_address, subject, body_snippet, received_at,
         matched_load_id, match_tier, status, gmail_thread_id, gmail_in_reply_to,
@@ -69,16 +69,21 @@ async function pollAccount(pool, account) {
         replyStatus, replyBody, replySentAt,
       ]
     );
+
+    if (wsHub) {
+      const [insertedRows] = await pool.query('SELECT * FROM email_inquiries WHERE id = ?', [insertResult.insertId]);
+      wsHub.emitToUser(account.user_id, 'inquiry:new', insertedRows[0]);
+    }
   }
 
   await pool.query('UPDATE email_accounts SET last_polled_at = NOW() WHERE id = ?', [account.id]);
 }
 
-async function pollAllAccounts(pool) {
+async function pollAllAccounts(pool, wsHub) {
   const [accounts] = await pool.query('SELECT * FROM email_accounts');
   for (const account of accounts) {
     try {
-      await pollAccount(pool, account);
+      await pollAccount(pool, account, wsHub);
     } catch (err) {
       console.error(`Failed to poll Gmail for account ${account.id}:`, err);
     }

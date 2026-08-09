@@ -295,6 +295,34 @@ describe('loads routes', () => {
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
 
+  describe('wsHub emits', () => {
+    let hubApp;
+    let hubAgent;
+    let wsHub;
+
+    beforeEach(async () => {
+      wsHub = { emitToUser: jest.fn() };
+      hubApp = createApp(pool, wsHub);
+      hubAgent = request.agent(hubApp);
+      await hubAgent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+    });
+
+    test('PATCH emits load:changed to the owning user with the load id', async () => {
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay, user_id) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', 1500, userId]);
+      await hubAgent.patch(`/api/loads/${result.insertId}`).send({ target_pay: 1700 });
+
+      expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', { loadId: result.insertId });
+    });
+
+    test('upload emits load:changed to the uploading user', async () => {
+      await hubAgent.post('/api/loads/upload').send({
+        loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1500 }],
+      });
+
+      expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', {});
+    });
+  });
+
   test('POST /api/loads/upload returns 500 instead of crashing when the database is unavailable', async () => {
     const express = require('express');
     const { createLoadsRouter } = require('../src/routes/loads');

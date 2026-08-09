@@ -2,7 +2,7 @@ const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { getAuthUrl, exchangeCodeForTokens, getUserEmailAddress } = require('../lib/googleOAuth');
 
-function createGmailRouter(pool) {
+function createGmailRouter(pool, wsHub) {
   const router = express.Router();
 
   router.get('/status', asyncHandler(async (req, res) => {
@@ -35,11 +35,19 @@ function createGmailRouter(pool) {
       [req.session.userId, gmailAddress, tokens.refresh_token]
     );
 
+    if (wsHub) {
+      const [rows] = await pool.query(
+        'SELECT gmail_address, connected_at FROM email_accounts WHERE user_id = ?',
+        [req.session.userId]
+      );
+      wsHub.emitToUser(req.session.userId, 'gmail:status', { connected: true, gmailAddress: rows[0].gmail_address, connectedAt: rows[0].connected_at });
+    }
     res.redirect(`${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}/?gmail=connected`);
   }));
 
   router.post('/disconnect', asyncHandler(async (req, res) => {
     await pool.query('DELETE FROM email_accounts WHERE user_id = ?', [req.session.userId]);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'gmail:status', { connected: false });
     res.json({ ok: true });
   }));
 

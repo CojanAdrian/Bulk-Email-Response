@@ -8,7 +8,7 @@ const LOAD_COLUMNS = [
   'commodity', 'temperature', 'comment',
 ];
 
-function createLoadsRouter(pool) {
+function createLoadsRouter(pool, wsHub) {
   const router = express.Router();
 
   router.get('/', asyncHandler(async (req, res) => {
@@ -62,6 +62,7 @@ function createLoadsRouter(pool) {
     values.push(req.params.id);
     await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: rows[0].id });
     res.json(rows[0]);
   }));
 
@@ -128,6 +129,7 @@ function createLoadsRouter(pool) {
       }
 
       await connection.commit();
+      if (wsHub) wsHub.emitToUser(userId, 'load:changed', {});
       res.json({ inserted, updated });
     } catch (err) {
       await connection.rollback();

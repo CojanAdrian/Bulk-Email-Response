@@ -218,4 +218,51 @@ describe('inquiries routes', () => {
       expect(res.status).toBe(400);
     });
   });
+
+  describe('wsHub emits', () => {
+    let hubApp;
+    let hubAgent;
+    let wsHub;
+    let inquiryId;
+
+    beforeEach(async () => {
+      wsHub = { emitToUser: jest.fn() };
+      hubApp = createApp(pool, wsHub);
+      hubAgent = request.agent(hubApp);
+      await hubAgent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+
+      const [result] = await pool.query(
+        `INSERT INTO email_inquiries
+         (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body, gmail_thread_id, gmail_in_reply_to)
+         VALUES (?, ?, 'm1', 'carrier@example.com', 'Dallas load?', '2026-08-01 08:00:00', 1, 'city_state', 'matched', 'pending_review', 'Yes, load #4521 is still available.', 't1', '<abc@mail.gmail.com>')`,
+        [userId, accountId]
+      );
+      inquiryId = result.insertId;
+    });
+
+    test('send emits inquiry:updated with the updated row', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      await hubAgent.post(`/api/inquiries/${inquiryId}/send`);
+
+      expect(wsHub.emitToUser).toHaveBeenCalledTimes(1);
+      const [userIdArg, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(userIdArg).toBe(userId);
+      expect(event).toBe('inquiry:updated');
+      expect(payload.id).toBe(inquiryId);
+      expect(payload.reply_status).toBe('sent');
+    });
+
+    test('reject emits inquiry:updated with the updated row', async () => {
+      await hubAgent.post(`/api/inquiries/${inquiryId}/reject`);
+
+      expect(wsHub.emitToUser).toHaveBeenCalledTimes(1);
+      const [userIdArg, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(userIdArg).toBe(userId);
+      expect(event).toBe('inquiry:updated');
+      expect(payload.id).toBe(inquiryId);
+      expect(payload.reply_status).toBe('rejected');
+    });
+  });
 });

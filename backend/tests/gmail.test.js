@@ -94,4 +94,44 @@ describe('gmail routes', () => {
     const statusRes = await agent.get('/api/gmail/status');
     expect(statusRes.body.connected).toBe(false);
   });
+
+  describe('wsHub emits', () => {
+    let hubApp;
+    let hubAgent;
+    let wsHub;
+
+    beforeEach(async () => {
+      wsHub = { emitToUser: jest.fn() };
+      hubApp = createApp(pool, wsHub);
+      hubAgent = request.agent(hubApp);
+      await hubAgent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+    });
+
+    test('oauth callback emits gmail:status with the connected shape', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+
+      await hubAgent.get('/api/gmail/oauth/callback?code=auth-code-123');
+
+      expect(wsHub.emitToUser).toHaveBeenCalledTimes(1);
+      const [userIdArg, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(event).toBe('gmail:status');
+      expect(payload.connected).toBe(true);
+      expect(payload.gmailAddress).toBe('kenny@igtfreight.com');
+      expect(typeof userIdArg).toBe('number');
+    });
+
+    test('disconnect emits gmail:status with connected: false', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+      await hubAgent.get('/api/gmail/oauth/callback?code=auth-code-123');
+      wsHub.emitToUser.mockClear();
+
+      await hubAgent.post('/api/gmail/disconnect');
+
+      const [, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(event).toBe('gmail:status');
+      expect(payload).toEqual({ connected: false });
+    });
+  });
 });

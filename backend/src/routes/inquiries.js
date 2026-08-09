@@ -8,7 +8,7 @@ function replySubject(originalSubject) {
   return subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`;
 }
 
-function createInquiriesRouter(pool) {
+function createInquiriesRouter(pool, wsHub) {
   const router = express.Router();
 
   router.get('/', asyncHandler(async (req, res) => {
@@ -55,6 +55,7 @@ function createInquiriesRouter(pool) {
     );
 
     const [updated] = await pool.query('SELECT * FROM email_inquiries WHERE id = ?', [inquiry.id]);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'inquiry:updated', updated[0]);
     res.json(updated[0]);
   }));
 
@@ -69,6 +70,7 @@ function createInquiriesRouter(pool) {
 
     await pool.query("UPDATE email_inquiries SET reply_status = 'rejected' WHERE id = ?", [req.params.id]);
     const [updated] = await pool.query('SELECT * FROM email_inquiries WHERE id = ?', [req.params.id]);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'inquiry:updated', updated[0]);
     res.json(updated[0]);
   }));
 
