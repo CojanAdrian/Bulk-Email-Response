@@ -5,6 +5,7 @@ import RateModal from '../components/RateModal';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
+import DatExportSection from '../components/DatExportSection';
 
 function MainToolPage({ username, onLogout }) {
   const [tab, setTab] = useState('loads'); // 'loads' | 'inquiries'
@@ -60,6 +61,7 @@ function MainToolPage({ username, onLogout }) {
         <main className="space-y-6 p-6">
           <UploadPanel onUploadComplete={handleUploadComplete} />
           <LoadsTable refreshKey={refreshKey} onSelectLoad={setSelectedLoad} />
+          <DatExportSection refreshKey={refreshKey} />
         </main>
       )}
       {tab === 'inquiries' && (

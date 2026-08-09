@@ -27,6 +27,14 @@ describe('MainToolPage', () => {
     });
   });
 
+  test('renders the DAT export section on the Loads tab', async () => {
+    render(<MainToolPage username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /generate dat export/i })).toBeInTheDocument();
+    });
+    expect(screen.getByText(/dat export/i, { selector: 'h2' })).toBeInTheDocument();
+  });
+
   test('does not fetch Gmail/inquiries data until the Inquiries tab is opened', async () => {
     render(<MainToolPage username="admin" onLogout={vi.fn()} />);
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalled());
@@ -83,8 +91,9 @@ describe('MainToolPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
+    // LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
     await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(2);
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(4);
     });
   });
 
@@ -112,7 +121,8 @@ describe('MainToolPage', () => {
     loadsApi.uploadLoads.mockResolvedValue({ inserted: 1, updated: 0 });
 
     render(<MainToolPage username="admin" onLogout={vi.fn()} />);
-    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(1));
+    // LoadsTable + DatExportSection each fetch independently on mount
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(2));
 
     const file = new File(['irrelevant'], 'loads.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [file] } });
@@ -121,7 +131,7 @@ describe('MainToolPage', () => {
       expect(loadsApi.uploadLoads).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(2);
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(4);
     });
   });
 });
