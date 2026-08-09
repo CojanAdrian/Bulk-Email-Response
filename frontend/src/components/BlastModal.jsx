@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { buildLookupMessage } from '../lib/lookupMessage';
+import Card from './Card';
+import SecondaryButton from './SecondaryButton';
 
 function parseBlastEmails(raw) {
   return raw
@@ -84,20 +86,20 @@ function BlastModal({ load, initialShowRate, onClose }) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6">
+      <Card className="w-full max-w-lg">
         <div className="mb-1 flex items-start justify-between">
-          <h2 id="blast-modal-title" className="text-lg font-semibold text-slate-100">
+          <h2 id="blast-modal-title" className="text-lg font-semibold text-text">
             Blast Email
           </h2>
-          <button onClick={onClose} aria-label="Close" className="text-slate-500 hover:text-slate-300">
+          <button onClick={onClose} aria-label="Close" className="text-text-muted hover:text-text">
             ✕
           </button>
         </div>
-        <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+        <div className="mb-4 text-xs font-semibold uppercase tracking-wide text-text-muted">
           Order {load.load_number} · {load.origin_city}, {load.origin_state} → {load.dest_city}, {load.dest_state} · {load.equipment}
         </div>
 
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="blastSubject">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastSubject">
           Subject
         </label>
         <input
@@ -105,10 +107,10 @@ function BlastModal({ load, initialShowRate, onClose }) {
           type="text"
           value={subject}
           onChange={(e) => setSubject(e.target.value)}
-          className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+          className="mb-3 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
         />
 
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="blastBody">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastBody">
           Message
         </label>
         <textarea
@@ -116,14 +118,14 @@ function BlastModal({ load, initialShowRate, onClose }) {
           value={body}
           onChange={(e) => setBody(e.target.value)}
           rows={6}
-          className="mb-2 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100"
+          className="mb-2 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
         />
-        <label className="mb-4 flex items-center gap-2 text-sm text-slate-300">
+        <label className="mb-4 flex items-center gap-2 text-sm text-text">
           <input type="checkbox" checked={showRate} onChange={handleRateToggle} />
           {showRate ? 'Rate shown' : 'Rate hidden'}
         </label>
 
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" htmlFor="blastEmails">
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastEmails">
           Carrier Emails ({validEmails.length} valid) — or drop a CSV / TXT file
         </label>
         <div
@@ -142,26 +144,25 @@ function BlastModal({ load, initialShowRate, onClose }) {
             onChange={(e) => setEmailsText(e.target.value)}
             rows={4}
             placeholder="Paste carrier emails — one per line or comma-separated"
-            className={`w-full rounded-lg border bg-slate-800 px-3 py-2 text-sm text-slate-100 ${
-              invalidFlash ? 'border-red-600' : 'border-slate-700'
+            className={`w-full rounded-lg border bg-surface-alt px-3 py-2 text-sm text-text ${
+              invalidFlash ? 'border-error' : 'border-border'
             }`}
           />
           {dragActive && (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-indigo-500 bg-indigo-500/10 text-sm font-semibold text-indigo-300">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent bg-accent/10 text-sm font-semibold text-accent">
               ↓ Drop file to import emails
             </div>
           )}
         </div>
         {fileError && (
-          <p role="alert" className="mt-2 text-sm text-red-400">
+          <p role="alert" className="mt-2 text-sm text-error">
             {fileError}
           </p>
         )}
 
         <div className="mt-5 flex justify-end gap-2">
-          <button onClick={onClose} className="rounded-lg border border-slate-700 px-4 py-2 text-sm hover:bg-slate-800">
-            Cancel
-          </button>
+          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
+          {/* Gmail's own brand blue, deliberately not the app's gold/navy accent — matches the original tool's identical choice for this one external-service button. */}
           <button
             onClick={handleOpenGmail}
             className="rounded-lg bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
@@ -169,7 +170,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
             Open in Gmail →
           </button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
