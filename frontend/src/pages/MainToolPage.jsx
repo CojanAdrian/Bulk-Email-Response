@@ -2,13 +2,16 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import UploadPanel from '../components/UploadPanel';
 import LoadsTable from '../components/LoadsTable';
+import LoadsStatsRow from '../components/LoadsStatsRow';
 import RateModal from '../components/RateModal';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
+import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
 import Sidebar from '../components/Sidebar';
+import AuroraBackground from '../components/AuroraBackground';
 import { useToast } from '../components/Toast';
 import { subscribe } from '../lib/liveSocket';
 import { useMotionPreset } from '../lib/motionConfig';
@@ -43,15 +46,17 @@ function MainToolPage({ username, onLogout }) {
   }, [showToast]);
 
   return (
-    <div className="flex min-h-screen bg-shell-bg text-shell-text">
+    <div className="relative flex min-h-screen overflow-hidden bg-shell-bg text-shell-text">
+      <AuroraBackground />
       <Sidebar tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
-      <div className="min-w-0 flex-1">
+      <div className="relative z-10 min-w-0 flex-1">
         <header className="px-8 pt-8">
           <h1 className="text-2xl font-extrabold tracking-tight text-shell-text">{TAB_TITLES[tab]}</h1>
         </header>
         <AnimatePresence>
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-8">
+              <LoadsStatsRow refreshKey={refreshKey} />
               <UploadPanel onUploadComplete={handleUploadComplete} />
               <LoadsTable refreshKey={refreshKey} onSelectLoad={setSelectedLoad} />
               <DatExportSection refreshKey={refreshKey} />
@@ -64,6 +69,7 @@ function MainToolPage({ username, onLogout }) {
                   Refresh
                 </SecondaryButton>
               </div>
+              <InquiriesStatsRow refreshKey={inquiriesRefreshKey} />
               <GmailConnectionPanel />
               <ReviewQueue key={`review-${inquiriesRefreshKey}`} />
               <InquiriesLog refreshKey={inquiriesRefreshKey} />

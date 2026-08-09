@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getGmailStatus, getGmailConnectUrl, disconnectGmail } from '../api/gmail';
 import { subscribe } from '../lib/liveSocket';
+import { GoogleIcon } from './icons';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
@@ -75,7 +76,10 @@ function GmailConnectionPanel() {
 
   return (
     <Card>
-      <h2 className="mb-3 text-sm font-semibold text-text">Gmail connection</h2>
+      <div className="mb-3 flex items-center gap-2">
+        <GoogleIcon className="h-5 w-5" />
+        <h2 className="text-sm font-semibold text-text">Gmail connection</h2>
+      </div>
       {status === 'loading' && <p className="text-sm text-text-muted">Checking connection...</p>}
       {status === 'error' && (
         <p role="alert" className="text-sm text-error">
@@ -83,15 +87,19 @@ function GmailConnectionPanel() {
         </p>
       )}
       {status === 'ready' && !gmailStatus.connected && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-text-muted">No Gmail account connected yet.</p>
-          <PrimaryButton onClick={handleConnect}>Connect Gmail</PrimaryButton>
+        <div className="flex items-center justify-between gap-4 rounded-xl border border-dashed border-border bg-surface-alt px-4 py-3">
+          <p className="text-sm text-text-muted">Connect a Gmail account so BulkPosting can read and reply to carrier inquiries automatically.</p>
+          <PrimaryButton onClick={handleConnect} className="flex shrink-0 items-center gap-2">
+            <GoogleIcon className="h-4 w-4" />
+            Connect Gmail
+          </PrimaryButton>
         </div>
       )}
       {status === 'ready' && gmailStatus.connected && (
         <div>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-text">
+            <p className="flex items-center gap-2 text-sm text-text">
+              <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-success" />
               Connected: <span className="font-medium text-text">{gmailStatus.gmailAddress}</span>
             </p>
             {!confirmingDisconnect && (

@@ -44,10 +44,11 @@ describe('MainToolPage', () => {
     expect(screen.getByText(/dat export/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
-  test('does not fetch Gmail/inquiries data until the Inquiries tab is opened', async () => {
+  test('does not fetch inquiries data until the Inquiries tab is opened', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalled());
-    expect(gmailApi.getGmailStatus).not.toHaveBeenCalled();
+    // the sidebar itself checks Gmail status (for its "not connected" nav
+    // nudge badge) regardless of tab, so getGmailStatus is called from mount
     expect(inquiriesApi.listInquiries).not.toHaveBeenCalled();
   });
 
@@ -70,10 +71,11 @@ describe('MainToolPage', () => {
   test('the Refresh button on the Inquiries tab re-fetches inquiries', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(2)); // ReviewQueue + InquiriesLog
+    // ReviewQueue + InquiriesLog + InquiriesStatsRow each fetch independently on mount
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(3));
 
     fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }));
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(4));
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(6));
   });
 
   test('switching back to Loads keeps the loads table working as before', async () => {
@@ -106,9 +108,9 @@ describe('MainToolPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
-    // LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
+    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
     await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(4);
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
     });
   });
 
@@ -136,8 +138,8 @@ describe('MainToolPage', () => {
     loadsApi.uploadLoads.mockResolvedValue({ inserted: 1, updated: 0 });
 
     renderPage({ username: 'admin', onLogout: vi.fn() });
-    // LoadsTable + DatExportSection each fetch independently on mount
-    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(2));
+    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(3));
 
     const file = new File(['irrelevant'], 'loads.csv', { type: 'text/csv' });
     fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [file] } });
@@ -146,7 +148,7 @@ describe('MainToolPage', () => {
       expect(loadsApi.uploadLoads).toHaveBeenCalledTimes(1);
     });
     await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(4);
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
     });
   });
 });

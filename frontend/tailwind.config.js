@@ -30,6 +30,25 @@ export default {
       borderRadius: {
         '4xl': '2rem',
       },
+      keyframes: {
+        'aurora-drift-a': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '50%': { transform: 'translate(6%, 8%) scale(1.12)' },
+        },
+        'aurora-drift-b': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '50%': { transform: 'translate(-8%, 5%) scale(1.08)' },
+        },
+        'aurora-drift-c': {
+          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+          '50%': { transform: 'translate(5%, -7%) scale(1.1)' },
+        },
+      },
+      animation: {
+        'aurora-drift-a': 'aurora-drift-a 22s ease-in-out infinite',
+        'aurora-drift-b': 'aurora-drift-b 26s ease-in-out infinite',
+        'aurora-drift-c': 'aurora-drift-c 19s ease-in-out infinite',
+      },
     },
   },
   plugins: [],

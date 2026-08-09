@@ -86,7 +86,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="blast-modal-title"
-      className="fixed inset-0 flex items-center justify-center bg-black/60 px-4"
+      className="fixed inset-0 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

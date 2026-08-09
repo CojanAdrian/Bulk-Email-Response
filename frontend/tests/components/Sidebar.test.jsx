@@ -1,8 +1,19 @@
-import { describe, test, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import Sidebar from '../../src/components/Sidebar';
+import * as gmailApi from '../../src/api/gmail';
+import * as liveSocket from '../../src/lib/liveSocket';
+
+vi.mock('../../src/api/gmail');
+vi.mock('../../src/lib/liveSocket');
 
 describe('Sidebar', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    liveSocket.subscribe.mockReturnValue(() => {});
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'a@b.com' });
+  });
+
   test('renders both nav items and the username', () => {
     render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
     expect(screen.getByRole('button', { name: /^loads$/i })).toBeInTheDocument();
@@ -37,6 +48,23 @@ describe('Sidebar', () => {
 
   test('renders the live-connection status indicator next to the username', () => {
     render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
-    expect(screen.getByRole('status')).toBeInTheDocument();
+    expect(screen.getAllByRole('status').length).toBeGreaterThan(0);
+  });
+
+  test('shows a nudge badge on Inquiries when Gmail is not connected, without changing the button\'s accessible name', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('gmail-nudge-badge')).toBeInTheDocument();
+    });
+    // the badge is decorative -- the nav button's name must stay exactly "Inquiries"
+    expect(screen.getByRole('button', { name: /^inquiries$/i })).toBeInTheDocument();
+  });
+
+  test('does not show a nudge badge when Gmail is already connected', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'a@b.com' });
+    render(<Sidebar tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => expect(gmailApi.getGmailStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId('gmail-nudge-badge')).not.toBeInTheDocument();
   });
 });
