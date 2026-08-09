@@ -10,19 +10,21 @@ function assertRequiredEnvVars() {
 
 assertRequiredEnvVars();
 
-const { createApp } = require('./app');
+const { createHttpServer } = require('./createHttpServer');
 const { createPool } = require('./db');
+const { createWsHub } = require('./lib/wsHub');
 const { pollAllAccounts } = require('./lib/emailPoller');
 
 const pool = createPool(process.env.DB_NAME);
-const app = createApp(pool);
+const wsHub = createWsHub();
+const server = createHttpServer(pool, wsHub, process.env.SESSION_SECRET);
 const port = process.env.PORT || 4000;
 
 const POLL_INTERVAL_MS = 2 * 60 * 1000;
 setInterval(() => {
-  pollAllAccounts(pool).catch((err) => console.error('Email poll cycle failed:', err));
+  pollAllAccounts(pool, wsHub).catch((err) => console.error('Email poll cycle failed:', err));
 }, POLL_INTERVAL_MS);
 
-app.listen(port, () => {
+server.listen(port, () => {
   console.log(`Backend listening on port ${port}`);
 });
