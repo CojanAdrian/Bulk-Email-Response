@@ -20,7 +20,11 @@ const wsHub = createWsHub();
 const server = createHttpServer(pool, wsHub, process.env.SESSION_SECRET);
 const port = process.env.PORT || 4000;
 
-const POLL_INTERVAL_MS = 2 * 60 * 1000;
+// Configurable so this can be tuned without a code change; defaults to 30s
+// (down from an original 2 minutes) -- a single connected account's poll is
+// two cheap Gmail API calls (list + get-per-new-message), nowhere near
+// Gmail's per-user quota even at this cadence.
+const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS) || 30 * 1000;
 setInterval(() => {
   pollAllAccounts(pool, wsHub).catch((err) => console.error('Email poll cycle failed:', err));
 }, POLL_INTERVAL_MS);

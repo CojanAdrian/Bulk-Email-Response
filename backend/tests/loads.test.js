@@ -148,16 +148,89 @@ describe('loads routes', () => {
 
   test('PATCH with no valid fields returns 400', async () => {
     const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
-    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston' });
+    // load_number isn't editable via PATCH -- see the "ignores disallowed fields" test below.
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ load_number: 'CHANGED' });
     expect(res.status).toBe(400);
   });
 
   test('PATCH ignores disallowed fields but still applies allowed ones', async () => {
     const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, target_pay, user_id) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', 1500, userId]);
-    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ origin_city: 'Houston', target_pay: 2000 });
+    // load_number is deliberately not editable via PATCH (it's the upload/matching key).
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ load_number: 'CHANGED', target_pay: 2000 });
     expect(res.status).toBe(200);
     expect(Number(res.body.target_pay)).toBe(2000);
-    expect(res.body.origin_city).toBe('Dallas');
+    expect(res.body.load_number).toBe('L1001');
+  });
+
+  test('PATCH can edit the full set of load fields, not just rate and status', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({
+      origin_city: 'Fort Worth', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL',
+      equipment: 'Reefer', weight: '42000', stops: 1, commodity: 'Produce', temperature: '34F',
+      comment: 'Call on arrival',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.origin_city).toBe('Fort Worth');
+    expect(res.body.dest_city).toBe('Chicago');
+    expect(res.body.equipment).toBe('Reefer');
+    expect(res.body.commodity).toBe('Produce');
+    expect(res.body.comment).toBe('Call on arrival');
+  });
+
+  test('PATCH accepts "covered" as a status value', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ status: 'covered' });
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('covered');
+  });
+
+  describe('DELETE /:id', () => {
+    test('rejects unauthenticated requests', async () => {
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const res = await request(app).delete(`/api/loads/${result.insertId}`);
+      expect(res.status).toBe(401);
+    });
+
+    test('deletes an owned load', async () => {
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const res = await agent.delete(`/api/loads/${result.insertId}`);
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ ok: true });
+
+      const [rows] = await pool.query('SELECT id FROM loads WHERE id = ?', [result.insertId]);
+      expect(rows).toHaveLength(0);
+    });
+
+    test('returns 404 for a load owned by a different user, and does not delete it', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L9999', 'Someone Elses', otherUser.insertId]);
+
+      const res = await agent.delete(`/api/loads/${result.insertId}`);
+      expect(res.status).toBe(404);
+
+      const [rows] = await pool.query('SELECT id FROM loads WHERE id = ?', [result.insertId]);
+      expect(rows).toHaveLength(1);
+    });
+
+    test('returns 404 for an unknown load id', async () => {
+      const res = await agent.delete('/api/loads/99999');
+      expect(res.status).toBe(404);
+    });
+
+    test('an admin can delete any user\'s load', async () => {
+      const passwordHash = await bcrypt.hash('adminpw', 10);
+      await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+      const adminAgent = request.agent(app);
+      await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const res = await adminAgent.delete(`/api/loads/${result.insertId}`);
+      expect(res.status).toBe(200);
+
+      const [rows] = await pool.query('SELECT id FROM loads WHERE id = ?', [result.insertId]);
+      expect(rows).toHaveLength(0);
+    });
   });
 
   test('an admin\'s own upload is tagged with the admin\'s own user_id, not shared/ownerless', async () => {
@@ -320,6 +393,13 @@ describe('loads routes', () => {
       });
 
       expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', {});
+    });
+
+    test('DELETE emits load:changed to the owning user with the load id', async () => {
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      await hubAgent.delete(`/api/loads/${result.insertId}`);
+
+      expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', { loadId: result.insertId, deleted: true });
     });
   });
 

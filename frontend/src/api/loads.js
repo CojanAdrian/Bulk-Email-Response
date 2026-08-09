@@ -1,4 +1,4 @@
-import { get, post, patch } from './client';
+import { get, post, patch, del } from './client';
 
 export function listLoads(status) {
   const query = status ? `?status=${encodeURIComponent(status)}` : '';
@@ -11,6 +11,10 @@ export function getLoad(id) {
 
 export function updateLoad(id, data) {
   return patch(`/api/loads/${id}`, data);
+}
+
+export function deleteLoad(id) {
+  return del(`/api/loads/${id}`);
 }
 
 export function uploadLoads(loads) {

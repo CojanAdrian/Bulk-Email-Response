@@ -8,6 +8,13 @@ vi.mock('../../src/api/loads');
 
 const LOAD = { id: 1, load_number: 'L1001', target_pay: '1500.00', status: 'active' };
 
+const BLANK_EXTRA_FIELDS = {
+  origin_city: null, origin_state: null, origin_zip: null,
+  dest_city: null, dest_state: null, dest_zip: null,
+  equipment: null, weight: null, commodity: null, temperature: null, comment: null,
+  stops: null,
+};
+
 describe('RateModal', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -24,10 +31,45 @@ describe('RateModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { target_pay: 1700, status: 'booked' });
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { ...BLANK_EXTRA_FIELDS, target_pay: 1700, status: 'booked' });
       expect(onSaved).toHaveBeenCalledWith({ ...LOAD, target_pay: '1700', status: 'booked' });
       expect(onClose).toHaveBeenCalled();
     });
+  });
+
+  test('saves edits to route, equipment, and cargo fields alongside rate and status', async () => {
+    const fullLoad = {
+      id: 5, load_number: 'L5005', origin_city: 'Dallas', origin_state: 'TX', origin_zip: '75201',
+      dest_city: 'Chicago', dest_state: 'IL', dest_zip: '60601', equipment: 'V', weight: '40000',
+      commodity: 'General', temperature: null, stops: 0, comment: 'Call ahead', target_pay: '1500.00', status: 'active',
+    };
+    loadsApi.updateLoad.mockResolvedValue({ ...fullLoad, dest_city: 'Milwaukee', status: 'covered' });
+    render(<RateModal load={fullLoad} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/dest city/i), { target: { value: 'Milwaukee' } });
+    fireEvent.change(screen.getByLabelText(/^status$/i), { target: { value: 'covered' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(5, {
+        origin_city: 'Dallas', origin_state: 'TX', origin_zip: '75201',
+        dest_city: 'Milwaukee', dest_state: 'IL', dest_zip: '60601',
+        equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead',
+        stops: 0, target_pay: 1500, status: 'covered',
+      });
+    });
+  });
+
+  test('rejects a non-integer stops value without calling the API', async () => {
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/^stops$/i), { target: { value: '1.5' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/stops must be a whole number/i)).toBeInTheDocument();
+    });
+    expect(loadsApi.updateLoad).not.toHaveBeenCalled();
   });
 
   test('sends null instead of an empty string when target pay is left blank', async () => {
@@ -39,7 +81,7 @@ describe('RateModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
-      expect(loadsApi.updateLoad).toHaveBeenCalledWith(2, { target_pay: null, status: 'booked' });
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(2, { ...BLANK_EXTRA_FIELDS, target_pay: null, status: 'booked' });
     });
   });
 

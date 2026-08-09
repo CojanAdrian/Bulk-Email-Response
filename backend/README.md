@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 157 tests across 13 suites: `tests/health.test.js`,
+There are 165 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -197,8 +197,8 @@ emitted:
 | `inquiry:new` | the poller stores a newly-detected message | the full inserted `email_inquiries` row |
 
 This makes the *frontend* reflect *backend/database* state changes
-instantly — it does **not** shrink the 2-minute Gmail polling interval
-described below; an email still takes up to 2 minutes to be *detected*.
+instantly — it does **not** shrink the Gmail polling interval described
+below; an email still takes up to `POLL_INTERVAL_MS` to be *detected*.
 Once the poller has processed a message, though, the resulting row now
 reaches every open browser tab the instant it's stored, instead of
 waiting for a manual refresh. See
@@ -261,11 +261,12 @@ strip it from the URL (`frontend/src/lib/useGoogleAuthError.js`).
 
 ### Loads (`/api/loads`) — all routes require an authenticated session
 
-`GET /api/loads`, `GET /api/loads/:id`, and `PATCH /api/loads/:id` are
-scoped to the caller's own loads (matched by the `user_id` recorded on each
-load), **except** for users with `role: 'admin'`, who can see and edit
-every user's loads on those three routes, not just their own. See
-"Accounts and roles" below for who has the admin role.
+`GET /api/loads`, `GET /api/loads/:id`, `PATCH /api/loads/:id`, and
+`DELETE /api/loads/:id` are scoped to the caller's own loads (matched by
+the `user_id` recorded on each load), **except** for users with
+`role: 'admin'`, who can see, edit, and delete every user's loads on those
+four routes, not just their own. See "Accounts and roles" below for who
+has the admin role.
 
 **`POST /api/loads/upload` is the one exception — it is NOT admin-bypassed.**
 Every upload, admin or not, always upserts under the *caller's own*
@@ -276,12 +277,24 @@ There is currently no route for editing another user's load by re-upload;
 `PATCH /api/loads/:id` (admin-bypassed) is the only way to edit a load you
 don't own.
 
+`status` is one of `active`, `booked`, `covered`, or `expired`.
+
 | Method | Path | Request body | Response |
 |---|---|---|---|
-| GET | `/api/loads` | — (optional query `?status=active\|booked\|expired`) | `200` array of load rows the caller owns (all users' rows if admin), newest (`created_at`) first |
+| GET | `/api/loads` | — (optional query `?status=active\|booked\|covered\|expired`) | `200` array of load rows the caller owns (all users' rows if admin), newest (`created_at`) first |
 | GET | `/api/loads/:id` | — | `200` load row, if it belongs to the caller (or the caller is admin); `404 {"error": "Load not found"}` if no such id, or it exists but belongs to a different, non-admin caller |
-| PATCH | `/api/loads/:id` | `{"target_pay"?: number, "status"?: "active"\|"booked"\|"expired"}` (at least one) | `200` updated load row; `400 {"error": "No valid fields to update"}` if neither field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
+| PATCH | `/api/loads/:id` | Any of `origin_city`, `origin_state`, `origin_zip`, `dest_city`, `dest_state`, `dest_zip`, `equipment`, `weight`, `target_pay`, `early_pu`, `late_pu`, `late_del`, `stops`, `commodity`, `temperature`, `comment`, `status` (at least one). `load_number` and `raw_equipment` are deliberately not editable — see the code comment in `src/routes/loads.js` | `200` updated load row; `400 {"error": "No valid fields to update"}` if no editable field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
+| DELETE | `/api/loads/:id` | — | `200 {"ok": true}`; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
 | POST | `/api/loads/upload` | `{"loads": [{ "load_number": string, ... other load fields }]}` | `200 {"inserted": number, "updated": number}`; `400 {"error": "loads must be an array"}` if `loads` isn't an array. Always upserted into the **uploader's own** set, regardless of role — see above and below for details |
+
+`DELETE /api/loads/:id` emits `load:changed` with `{ loadId, deleted: true }`
+over the caller's WebSocket connection, same as a PATCH, so
+`frontend/src/components/LoadsTable.jsx` refetches automatically.
+
+The frontend's load edit modal (`frontend/src/components/RateModal.jsx`)
+currently does not expose `early_pu`, `late_pu`, or `late_del` — those
+pickup/delivery datetime fields are editable via this API but not yet
+wired into the UI.
 
 `load_number` uniqueness is per-user, not global: two different users can
 each upload a load numbered, say, `"TEST-001"`, and they'll be stored as
@@ -425,8 +438,9 @@ way to forcibly terminate a specific user's active session.
 Each user can connect their own Gmail account (`GET /api/gmail/connect`,
 see "Gmail" in the API reference above). Once connected, a background
 poller (started in `src/server.js`, running `pollAllAccounts` on a
-`setInterval` every 2 minutes) checks that inbox for new messages and tries
-to match each one against **that same user's own active loads** — the same
+`setInterval` every `POLL_INTERVAL_MS` — an env var, default `30000`
+(30 seconds); previously hardcoded to 2 minutes) checks that inbox for new
+messages and tries to match each one against **that same user's own active loads** — the same
 per-user data isolation enforced everywhere else in this backend. Every
 processed message is logged to `email_inquiries` (see "Inquiries" above)
 whether or not it matched anything, so nothing is silently dropped.

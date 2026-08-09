@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 357 tests across 38 suites, covering
+Runs the Vitest suite (`vitest run`) — 367 tests across 40 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -187,14 +187,26 @@ The file is parsed entirely in the browser (column names are matched
 flexibly, e.g. "Dest City" or "Destination City" both work) and the
 resulting loads are upserted into the database by load number — a
 re-upload with the same load numbers updates rates/details rather than
-creating duplicates, and never changes a load's `active`/`booked`/`expired`
-status (that's manual-only, via "Edit rate" on the loads table).
+creating duplicates, and never changes a load's `active`/`booked`/`covered`/`expired`
+status (that's manual-only, via "Edit" or the per-row status dropdown on
+the loads table).
 
-Known limitation: if you have "Edit rate" open for a load and someone
+Each row in the loads table (`LoadsTable.jsx`) has:
+- An **"Edit" button**, which opens `RateModal.jsx` — a full edit form for
+  origin/destination, equipment, weight, commodity, temperature, stops,
+  comment, target pay, and status. It does **not** yet expose the
+  pickup/delivery datetime fields (`early_pu`, `late_pu`, `late_del`) —
+  those are editable via the API but not wired into this form yet.
+- A **per-row status dropdown** for quickly marking a load
+  active/booked/covered/expired without opening the full edit modal.
+- A **"Delete" button**, which asks for inline confirmation ("Confirm" /
+  "Cancel") before permanently removing the load.
+
+Known limitation: if you have "Edit" open for a load and someone
 re-uploads a CSV that updates that same load in the background, saving
 your edit will overwrite the freshly-uploaded data with whatever you
 had open in the modal — there's no conflict detection yet. Close and
-reopen "Edit rate" if you know a re-upload just happened.
+reopen "Edit" if you know a re-upload just happened.
 
 ## DAT export, load lookup, and blast email
 
@@ -380,7 +392,7 @@ editing all work against the real backend (not mocks).
    with a nonzero "inserted" count, and the loads table below should
    populate.
 
-10. **Click "Edit rate"** on a row, change the target pay or status, and
+10. **Click "Edit"** on a row, change the target pay or status, and
     save. The table should reflect the change immediately.
 
 11. **Re-upload the same CSV.** The success message should now show

@@ -103,7 +103,7 @@ describe('MainToolPage', () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.click(screen.getByRole('button', { name: /edit rate/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
     expect(screen.getByText(/edit load L1001/i)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));

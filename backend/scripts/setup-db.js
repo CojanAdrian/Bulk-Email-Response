@@ -113,6 +113,14 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE loads ADD COLUMN raw_equipment VARCHAR(20) NULL`);
   }
 
+  const [statusCol] = await conn.query(
+    `SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'status'`,
+    [databaseName]
+  );
+  if (statusCol[0] && !statusCol[0].COLUMN_TYPE.includes("'covered'")) {
+    await conn.query(`ALTER TABLE loads MODIFY COLUMN status ENUM('active','booked','covered','expired') NOT NULL DEFAULT 'active'`);
+  }
+
   const [indexRows] = await conn.query(`SHOW INDEX FROM loads WHERE Key_name != 'PRIMARY'`);
   const indexMap = {};
   indexRows.forEach((row) => {

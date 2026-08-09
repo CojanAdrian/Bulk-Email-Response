@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { get, post, patch } from '../../src/api/client';
+import { get, post, patch, del } from '../../src/api/client';
 
 describe('api client', () => {
   beforeEach(() => {
@@ -39,6 +39,17 @@ describe('api client', () => {
     const [, options] = global.fetch.mock.calls[0];
     expect(options.method).toBe('PATCH');
     expect(JSON.parse(options.body)).toEqual({ target_pay: 1700 });
+  });
+
+  test('del() sends a DELETE request', async () => {
+    global.fetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true }),
+    });
+    await del('/api/loads/1');
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/1');
+    expect(options.method).toBe('DELETE');
   });
 
   test('throws an error with the server-provided message when the response is not ok', async () => {

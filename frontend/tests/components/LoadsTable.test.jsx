@@ -54,14 +54,80 @@ describe('LoadsTable', () => {
     });
   });
 
-  test('calls onSelectLoad with the load when "Edit rate" is clicked', async () => {
+  test('calls onSelectLoad with the load when "Edit" is clicked', async () => {
     loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
     const onSelectLoad = vi.fn();
     render(<LoadsTable refreshKey={0} onSelectLoad={onSelectLoad} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.click(screen.getByRole('button', { name: /edit rate/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
     expect(onSelectLoad).toHaveBeenCalledWith(SAMPLE_LOAD);
+  });
+
+  test('changing the per-row status select calls updateLoad with the new status', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, status: 'booked' });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { status: 'booked' });
+    });
+  });
+
+  test('shows an error when the status quick-change fails', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockRejectedValue(new Error('Update failed'));
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'covered' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Update failed')).toBeInTheDocument();
+    });
+  });
+
+  test('clicking Delete then Confirm calls deleteLoad', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.deleteLoad.mockResolvedValue({ ok: true });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+
+    await waitFor(() => {
+      expect(loadsApi.deleteLoad).toHaveBeenCalledWith(1);
+    });
+  });
+
+  test('clicking Delete then Cancel does not call deleteLoad', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    expect(screen.queryByRole('button', { name: /^confirm$/i })).not.toBeInTheDocument();
+    expect(loadsApi.deleteLoad).not.toHaveBeenCalled();
+  });
+
+  test('shows an error when delete fails', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.deleteLoad.mockRejectedValue(new Error('Delete failed'));
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.click(screen.getByRole('button', { name: /^delete$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Delete failed')).toBeInTheDocument();
+    });
   });
 
   test('refetches with the new filter when the status dropdown changes', async () => {
@@ -72,6 +138,16 @@ describe('LoadsTable', () => {
     fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'booked' } });
 
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('booked'));
+  });
+
+  test('offers "Covered" as a status filter option', async () => {
+    loadsApi.listLoads.mockResolvedValue([]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('active'));
+
+    fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'covered' } });
+
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('covered'));
   });
 
   test('refetches when refreshKey changes', async () => {

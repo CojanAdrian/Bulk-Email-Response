@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS loads (
   commodity VARCHAR(100),
   temperature VARCHAR(50),
   comment TEXT,
-  status ENUM('active','booked','expired') NOT NULL DEFAULT 'active',
+  status ENUM('active','booked','covered','expired') NOT NULL DEFAULT 'active',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listLoads, getLoad, updateLoad, uploadLoads } from '../../src/api/loads';
+import { listLoads, getLoad, updateLoad, deleteLoad, uploadLoads } from '../../src/api/loads';
 
 describe('loads api', () => {
   beforeEach(() => {
@@ -35,6 +35,14 @@ describe('loads api', () => {
     expect(url).toContain('/api/loads/1');
     expect(options.method).toBe('PATCH');
     expect(JSON.parse(options.body)).toEqual({ target_pay: 1700 });
+  });
+
+  test('deleteLoad sends a DELETE to /api/loads/:id', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) });
+    await deleteLoad(1);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/1');
+    expect(options.method).toBe('DELETE');
   });
 
   test('uploadLoads posts /api/loads/upload with a loads array', async () => {

@@ -8,6 +8,17 @@ const LOAD_COLUMNS = [
   'commodity', 'temperature', 'comment',
 ];
 
+// Deliberately excludes load_number (the upload/matching key -- editing it here
+// could desync a load from future CSV re-uploads keyed on the original number),
+// raw_equipment (an internal parsing artifact from CSV upload, not something a
+// person types), and of course id/user_id/created_at/updated_at.
+const EDITABLE_FIELDS = [
+  'origin_city', 'origin_state', 'origin_zip',
+  'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
+  'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
+  'commodity', 'temperature', 'comment', 'status',
+];
+
 function createLoadsRouter(pool, wsHub) {
   const router = express.Router();
 
@@ -47,10 +58,9 @@ function createLoadsRouter(pool, wsHub) {
       return res.status(404).json({ error: 'Load not found' });
     }
 
-    const allowedFields = ['target_pay', 'status'];
     const updates = [];
     const values = [];
-    for (const field of allowedFields) {
+    for (const field of EDITABLE_FIELDS) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
         values.push(req.body[field]);
@@ -64,6 +74,19 @@ function createLoadsRouter(pool, wsHub) {
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: rows[0].id });
     res.json(rows[0]);
+  }));
+
+  router.delete('/:id', asyncHandler(async (req, res) => {
+    const [existingRows] = await pool.query('SELECT id, user_id FROM loads WHERE id = ?', [req.params.id]);
+    const existing = existingRows[0];
+    const isAdmin = req.session.role === 'admin';
+    if (!existing || (!isAdmin && existing.user_id !== req.session.userId)) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+
+    await pool.query('DELETE FROM loads WHERE id = ?', [req.params.id]);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: existing.id, deleted: true });
+    res.json({ ok: true });
   }));
 
   router.post('/upload', asyncHandler(async (req, res) => {

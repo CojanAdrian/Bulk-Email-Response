@@ -8,8 +8,23 @@ import SecondaryButton from './SecondaryButton';
 
 const MotionCard = motion(Card);
 
+const TEXT_FIELDS = [
+  'origin_city', 'origin_state', 'origin_zip',
+  'dest_city', 'dest_state', 'dest_zip',
+  'equipment', 'weight', 'commodity', 'temperature', 'comment',
+];
+
+function blankToNull(value) {
+  const trimmed = String(value ?? '').trim();
+  return trimmed === '' ? null : trimmed;
+}
+
 function RateModal({ load, onClose, onSaved }) {
   const preset = useMotionPreset();
+  const [fields, setFields] = useState(() =>
+    Object.fromEntries(TEXT_FIELDS.map((field) => [field, load[field] ?? '']))
+  );
+  const [stops, setStops] = useState(load.stops ?? '');
   const [targetPay, setTargetPay] = useState(load.target_pay ?? '');
   const [status, setStatus] = useState(load.status);
   const [error, setError] = useState(null);
@@ -37,13 +52,17 @@ function RateModal({ load, onClose, onSaved }) {
     };
   }, [onClose]);
 
+  function handleFieldChange(field, value) {
+    setFields((prev) => ({ ...prev, [field]: value }));
+  }
+
   function handleSave() {
     setError(null);
 
-    const trimmed = String(targetPay).trim();
+    const trimmedPay = String(targetPay).trim();
     let normalizedTargetPay = null;
-    if (trimmed !== '') {
-      const parsed = Number(trimmed);
+    if (trimmedPay !== '') {
+      const parsed = Number(trimmedPay);
       if (Number.isNaN(parsed)) {
         setError('Target pay must be a number.');
         return;
@@ -51,8 +70,26 @@ function RateModal({ load, onClose, onSaved }) {
       normalizedTargetPay = parsed;
     }
 
+    const trimmedStops = String(stops).trim();
+    let normalizedStops = null;
+    if (trimmedStops !== '') {
+      const parsed = Number(trimmedStops);
+      if (Number.isNaN(parsed) || !Number.isInteger(parsed)) {
+        setError('Stops must be a whole number.');
+        return;
+      }
+      normalizedStops = parsed;
+    }
+
+    const payload = {
+      ...Object.fromEntries(TEXT_FIELDS.map((field) => [field, blankToNull(fields[field])])),
+      stops: normalizedStops,
+      target_pay: normalizedTargetPay,
+      status,
+    };
+
     setSaving(true);
-    updateLoad(load.id, { target_pay: normalizedTargetPay, status })
+    updateLoad(load.id, payload)
       .then((updated) => {
         if (isMountedRef.current) {
           onSaved(updated);
@@ -79,34 +116,187 @@ function RateModal({ load, onClose, onSaved }) {
       className="fixed inset-0 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
-      <MotionCard className="w-full max-w-sm" {...preset.modal.card}>
+      <MotionCard className="max-h-[85vh] w-full max-w-lg overflow-y-auto" {...preset.modal.card}>
         <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-text">
           Edit load {load.load_number}
         </h2>
-        <label className="mb-1 block text-sm text-text-muted" htmlFor="targetPay">
-          Target pay
+
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="col-span-1">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_city">
+              Origin city
+            </label>
+            <input
+              id="origin_city"
+              value={fields.origin_city}
+              onChange={(e) => handleFieldChange('origin_city', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
+              State
+            </label>
+            <input
+              id="origin_state"
+              value={fields.origin_state}
+              onChange={(e) => handleFieldChange('origin_state', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_zip">
+              Zip
+            </label>
+            <input
+              id="origin_zip"
+              value={fields.origin_zip}
+              onChange={(e) => handleFieldChange('origin_zip', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div className="col-span-1">
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_city">
+              Dest city
+            </label>
+            <input
+              id="dest_city"
+              value={fields.dest_city}
+              onChange={(e) => handleFieldChange('dest_city', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
+              State
+            </label>
+            <input
+              id="dest_state"
+              value={fields.dest_state}
+              onChange={(e) => handleFieldChange('dest_state', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_zip">
+              Zip
+            </label>
+            <input
+              id="dest_zip"
+              value={fields.dest_zip}
+              onChange={(e) => handleFieldChange('dest_zip', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
+              Equipment
+            </label>
+            <input
+              id="equipment"
+              value={fields.equipment}
+              onChange={(e) => handleFieldChange('equipment', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
+              Weight
+            </label>
+            <input
+              id="weight"
+              value={fields.weight}
+              onChange={(e) => handleFieldChange('weight', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="commodity">
+              Commodity
+            </label>
+            <input
+              id="commodity"
+              value={fields.commodity}
+              onChange={(e) => handleFieldChange('commodity', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="temperature">
+              Temperature
+            </label>
+            <input
+              id="temperature"
+              value={fields.temperature}
+              onChange={(e) => handleFieldChange('temperature', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="stops">
+              Stops
+            </label>
+            <input
+              id="stops"
+              value={stops}
+              onChange={(e) => setStops(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+        </div>
+
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="comment">
+          Comment
         </label>
-        <input
-          id="targetPay"
-          type="number"
-          step="0.01"
-          value={targetPay}
-          onChange={(e) => setTargetPay(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
+        <textarea
+          id="comment"
+          value={fields.comment}
+          onChange={(e) => handleFieldChange('comment', e.target.value)}
+          rows={2}
+          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
         />
-        <label className="mb-1 block text-sm text-text-muted" htmlFor="status">
-          Status
-        </label>
-        <select
-          id="status"
-          value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
-        >
-          <option value="active">Active</option>
-          <option value="booked">Booked</option>
-          <option value="expired">Expired</option>
-        </select>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-sm text-text-muted" htmlFor="targetPay">
+              Target pay
+            </label>
+            <input
+              id="targetPay"
+              type="number"
+              step="0.01"
+              value={targetPay}
+              onChange={(e) => setTargetPay(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm text-text-muted" htmlFor="status">
+              Status
+            </label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
+            >
+              <option value="active">Active</option>
+              <option value="booked">Booked</option>
+              <option value="covered">Covered</option>
+              <option value="expired">Expired</option>
+            </select>
+          </div>
+        </div>
+
         {error && (
           <p role="alert" className="mb-4 text-sm text-error">
             {error}
