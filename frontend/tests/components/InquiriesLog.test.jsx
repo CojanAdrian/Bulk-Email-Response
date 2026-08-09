@@ -1,13 +1,24 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, act } from '@testing-library/react';
 import InquiriesLog from '../../src/components/InquiriesLog';
 import * as inquiriesApi from '../../src/api/inquiries';
+import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/inquiries');
+vi.mock('../../src/lib/liveSocket');
 
 describe('InquiriesLog', () => {
+  let liveHandlers;
+
   beforeEach(() => {
     vi.resetAllMocks();
+    liveHandlers = {};
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      liveHandlers[event] = handler;
+      return () => {
+        delete liveHandlers[event];
+      };
+    });
   });
 
   test('fetches all inquiries with no filter', async () => {
@@ -60,5 +71,37 @@ describe('InquiriesLog', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Network error');
     });
+  });
+
+  test('a live inquiry:new event prepends a row', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText(/no inquiries yet/i));
+
+    act(() => {
+      liveHandlers['inquiry:new']({
+        id: 5, from_address: 'live@carrier.com', subject: 'Live one', match_tier: 'none',
+        reply_status: 'pending_review', received_at: '2026-08-09T10:00:00.000Z',
+      });
+    });
+
+    expect(screen.getByText('live@carrier.com')).toBeInTheDocument();
+  });
+
+  test('a live inquiry:updated event replaces the matching row in place', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { id: 1, from_address: 'carrier@example.com', subject: 'Subj', match_tier: 'none', reply_status: 'pending_review', received_at: '2026-08-09T10:00:00.000Z' },
+    ]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText('carrier@example.com'));
+
+    act(() => {
+      liveHandlers['inquiry:updated']({
+        id: 1, from_address: 'carrier@example.com', subject: 'Subj', match_tier: 'none',
+        reply_status: 'sent', received_at: '2026-08-09T10:00:00.000Z',
+      });
+    });
+
+    expect(screen.getByText('Sent')).toBeInTheDocument();
   });
 });

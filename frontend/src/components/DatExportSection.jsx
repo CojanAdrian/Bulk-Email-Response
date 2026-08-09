@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listLoads } from '../api/loads';
+import { subscribe } from '../lib/liveSocket';
 import { processLoadsForExport, buildDatCsv, buildDatExportFilename, countAnomalies } from '../lib/datExport';
 import ContactMethodModal from './ContactMethodModal';
 import RateSelectionModal from './RateSelectionModal';
@@ -29,6 +30,7 @@ function DatExportSection({ refreshKey }) {
   const [contactOptions, setContactOptions] = useState(null);
   const [result, setResult] = useState(null);
   const [blastTarget, setBlastTarget] = useState(null);
+  const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -50,7 +52,11 @@ function DatExportSection({ refreshKey }) {
     return () => {
       ignore = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, liveTick]);
+
+  useEffect(() => {
+    return subscribe('load:changed', () => setLiveTick((t) => t + 1));
+  }, []);
 
   function runExport(options, rateOverrides) {
     const { exportRows, anomalies } = processLoadsForExport(loads, { ...options, rateOverrides: rateOverrides || {} });

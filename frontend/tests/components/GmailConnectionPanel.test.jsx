@@ -1,15 +1,26 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import GmailConnectionPanel from '../../src/components/GmailConnectionPanel';
 import * as gmailApi from '../../src/api/gmail';
+import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/gmail');
+vi.mock('../../src/lib/liveSocket');
 
 describe('GmailConnectionPanel', () => {
+  let liveHandlers;
+
   beforeEach(() => {
     vi.resetAllMocks();
     delete window.location;
     window.location = { href: '' };
+    liveHandlers = {};
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      liveHandlers[event] = handler;
+      return () => {
+        delete liveHandlers[event];
+      };
+    });
   });
 
   test('shows a Connect button when no account is connected', async () => {
@@ -74,5 +85,19 @@ describe('GmailConnectionPanel', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Network error');
     });
+  });
+
+  test('a live gmail:status event applies the pushed status directly, without a refetch', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    render(<GmailConnectionPanel />);
+    await waitFor(() => screen.getByRole('button', { name: /connect gmail/i }));
+    gmailApi.getGmailStatus.mockClear();
+
+    act(() => {
+      liveHandlers['gmail:status']({ connected: true, gmailAddress: 'pushed@igtfreight.com' });
+    });
+
+    expect(screen.getByText('pushed@igtfreight.com')).toBeInTheDocument();
+    expect(gmailApi.getGmailStatus).not.toHaveBeenCalled();
   });
 });

@@ -1,9 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ReviewQueue from '../../src/components/ReviewQueue';
 import * as inquiriesApi from '../../src/api/inquiries';
+import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/inquiries');
+vi.mock('../../src/lib/liveSocket');
 
 const INQUIRY = {
   id: 1,
@@ -13,8 +15,17 @@ const INQUIRY = {
 };
 
 describe('ReviewQueue', () => {
+  let liveHandlers;
+
   beforeEach(() => {
     vi.resetAllMocks();
+    liveHandlers = {};
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      liveHandlers[event] = handler;
+      return () => {
+        delete liveHandlers[event];
+      };
+    });
   });
 
   test('fetches only pending_review inquiries', async () => {
@@ -103,5 +114,42 @@ describe('ReviewQueue', () => {
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Network error');
     });
+  });
+
+  test('a live inquiry:new event prepends a pending_review inquiry to the list', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText(/nothing waiting for review/i));
+
+    act(() => {
+      liveHandlers['inquiry:new']({ id: 9, from_address: 'new@carrier.com', subject: 'New load?', reply_body: 'draft', reply_status: 'pending_review' });
+    });
+
+    expect(screen.getByText('new@carrier.com')).toBeInTheDocument();
+    expect(screen.getByLabelText(/reply/i)).toHaveValue('draft');
+  });
+
+  test('a live inquiry:new event for a non-pending inquiry is ignored', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText(/nothing waiting for review/i));
+
+    act(() => {
+      liveHandlers['inquiry:new']({ id: 9, from_address: 'new@carrier.com', reply_status: 'auto_sent' });
+    });
+
+    expect(screen.queryByText('new@carrier.com')).not.toBeInTheDocument();
+  });
+
+  test('a live inquiry:updated event removes the inquiry once it is no longer pending_review', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    act(() => {
+      liveHandlers['inquiry:updated']({ ...INQUIRY, reply_status: 'sent' });
+    });
+
+    expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
   });
 });

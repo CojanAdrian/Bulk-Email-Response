@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listInquiries } from '../api/inquiries';
+import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
 import Badge from './Badge';
 
@@ -45,6 +46,19 @@ function InquiriesLog({ refreshKey }) {
       ignore = true;
     };
   }, [refreshKey]);
+
+  useEffect(() => {
+    const unsubscribeNew = subscribe('inquiry:new', (inquiry) => {
+      setInquiries((prev) => [inquiry, ...prev]);
+    });
+    const unsubscribeUpdated = subscribe('inquiry:updated', (inquiry) => {
+      setInquiries((prev) => prev.map((existing) => (existing.id === inquiry.id ? inquiry : existing)));
+    });
+    return () => {
+      unsubscribeNew();
+      unsubscribeUpdated();
+    };
+  }, []);
 
   return (
     <Card>

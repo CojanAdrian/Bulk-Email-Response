@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { listInquiries, sendInquiryReply, rejectInquiry } from '../api/inquiries';
+import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
@@ -39,6 +40,22 @@ function ReviewQueue() {
 
   useEffect(() => {
     fetchQueue();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribeNew = subscribe('inquiry:new', (inquiry) => {
+      if (inquiry.reply_status !== 'pending_review') return;
+      setInquiries((prev) => [inquiry, ...prev]);
+      setDrafts((prev) => ({ ...prev, [inquiry.id]: inquiry.reply_body || '' }));
+    });
+    const unsubscribeUpdated = subscribe('inquiry:updated', (inquiry) => {
+      if (inquiry.reply_status === 'pending_review') return;
+      setInquiries((prev) => prev.filter((existing) => existing.id !== inquiry.id));
+    });
+    return () => {
+      unsubscribeNew();
+      unsubscribeUpdated();
+    };
   }, []);
 
   function handleDraftChange(id, value) {

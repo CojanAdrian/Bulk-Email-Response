@@ -1,9 +1,11 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import DatExportSection from '../../src/components/DatExportSection';
 import * as loadsApi from '../../src/api/loads';
+import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/loads');
+vi.mock('../../src/lib/liveSocket');
 
 const LOADS = [
   {
@@ -15,10 +17,19 @@ const LOADS = [
 ];
 
 describe('DatExportSection', () => {
+  let liveHandlers;
+
   beforeEach(() => {
     vi.resetAllMocks();
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
+    liveHandlers = {};
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      liveHandlers[event] = handler;
+      return () => {
+        delete liveHandlers[event];
+      };
+    });
   });
 
   test('fetches active loads and shows the count once ready', async () => {
@@ -98,5 +109,17 @@ describe('DatExportSection', () => {
     fireEvent.click(screen.getByRole('button', { name: /blast email/i }));
 
     expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
+  });
+
+  test('refetches active loads when a live load:changed event arrives', async () => {
+    loadsApi.listLoads.mockResolvedValue(LOADS);
+    render(<DatExportSection refreshKey={0} />);
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(1));
+
+    act(() => {
+      liveHandlers['load:changed']({});
+    });
+
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(2));
   });
 });

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getGmailStatus, getGmailConnectUrl, disconnectGmail } from '../api/gmail';
+import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
@@ -38,6 +39,13 @@ function GmailConnectionPanel() {
 
   useEffect(() => {
     fetchStatus();
+  }, []);
+
+  useEffect(() => {
+    return subscribe('gmail:status', (payload) => {
+      setGmailStatus(payload);
+      setStatus('ready');
+    });
   }, []);
 
   function handleConnect() {

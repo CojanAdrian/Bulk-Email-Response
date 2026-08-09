@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { listLoads } from '../api/loads';
+import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
 
 function LoadsTable({ refreshKey, onSelectLoad }) {
@@ -7,6 +8,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
   const [error, setError] = useState(null);
+  const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
     let ignore = false;
@@ -28,7 +30,11 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
     return () => {
       ignore = true;
     };
-  }, [refreshKey, statusFilter]);
+  }, [refreshKey, statusFilter, liveTick]);
+
+  useEffect(() => {
+    return subscribe('load:changed', () => setLiveTick((t) => t + 1));
+  }, []);
 
   return (
     <Card>
