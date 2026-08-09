@@ -1,1 +1,5 @@
 .worktrees/
+
+# Downloaded Google Cloud OAuth client credential files (contain a client secret)
+client_secret_*.json
+
