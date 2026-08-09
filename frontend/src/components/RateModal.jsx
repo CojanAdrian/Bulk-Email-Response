@@ -17,6 +17,9 @@ function RateModal({ load, onClose, onSaved }) {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    // Reset on every mount -- see GmailConnectionPanel.jsx for why this
+    // matters under React 18 StrictMode's dev-only double-mount.
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };

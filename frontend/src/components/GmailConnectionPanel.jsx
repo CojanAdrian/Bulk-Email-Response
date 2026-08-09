@@ -15,6 +15,12 @@ function GmailConnectionPanel() {
   const isMountedRef = useRef(true);
 
   useEffect(() => {
+    // Reset (not just initialize) on every mount -- React 18 StrictMode
+    // deliberately mounts -> cleans up -> re-mounts in development, and
+    // without this reset the ref would be stuck false after that first
+    // simulated unmount, silently dropping every future fetchStatus()
+    // result and leaving the panel on "Checking connection..." forever.
+    isMountedRef.current = true;
     return () => {
       isMountedRef.current = false;
     };

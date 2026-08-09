@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import RateModal from '../../src/components/RateModal';
 import * as loadsApi from '../../src/api/loads';
@@ -128,5 +129,27 @@ describe('RateModal', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  // Regression test: see GmailConnectionPanel.test.jsx's StrictMode test for
+  // the full explanation. Here the same stale-ref bug would have made
+  // onSaved/onClose never fire after a real click, leaving the button stuck
+  // on "Saving..." forever in development.
+  test('calling onSaved/onClose after Save still works under React StrictMode\'s dev-only double-mount', async () => {
+    loadsApi.updateLoad.mockResolvedValue({ ...LOAD, target_pay: '1700', status: 'booked' });
+    const onClose = vi.fn();
+    const onSaved = vi.fn();
+    render(
+      <StrictMode>
+        <RateModal load={LOAD} onClose={onClose} onSaved={onSaved} />
+      </StrictMode>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(onSaved).toHaveBeenCalled();
+      expect(onClose).toHaveBeenCalled();
+    });
   });
 });

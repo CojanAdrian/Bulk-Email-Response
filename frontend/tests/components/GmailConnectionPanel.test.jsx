@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import GmailConnectionPanel from '../../src/components/GmailConnectionPanel';
 import * as gmailApi from '../../src/api/gmail';
@@ -99,5 +100,25 @@ describe('GmailConnectionPanel', () => {
 
     expect(screen.getByText('pushed@igtfreight.com')).toBeInTheDocument();
     expect(gmailApi.getGmailStatus).not.toHaveBeenCalled();
+  });
+
+  // Regression test for a real bug: React 18 StrictMode deliberately mounts
+  // -> cleans up -> re-mounts every component once in development. The old
+  // isMountedRef.current = false set by that first simulated cleanup was
+  // never reset back to true on the real second mount, so every fetchStatus()
+  // result afterward was silently dropped and the panel stayed on "Checking
+  // connection..." forever -- exactly what a user saw in the running app,
+  // even though every other (non-StrictMode) test here passed.
+  test('resolves out of the loading state even under React StrictMode\'s dev-only double-mount', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    render(
+      <StrictMode>
+        <GmailConnectionPanel />
+      </StrictMode>
+    );
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /connect gmail/i })).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/checking connection/i)).not.toBeInTheDocument();
   });
 });

@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { StrictMode } from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ReviewQueue from '../../src/components/ReviewQueue';
 import * as inquiriesApi from '../../src/api/inquiries';
@@ -151,5 +152,26 @@ describe('ReviewQueue', () => {
     });
 
     expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
+  });
+
+  // Regression test: see GmailConnectionPanel.test.jsx's StrictMode test for
+  // the full explanation. Here the same stale-ref bug would have left the
+  // queue stuck loading forever, and Send/Reject clicks would silently do
+  // nothing (button stuck on "Sending...") in development.
+  test('loads and reacts to Send under React StrictMode\'s dev-only double-mount', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
+    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
+    render(
+      <StrictMode>
+        <ReviewQueue />
+      </StrictMode>
+    );
+
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
+    });
   });
 });
