@@ -83,6 +83,42 @@ reflecting it. See
 `docs/superpowers/specs/2026-08-09-realtime-infrastructure-design.md` for
 the full design.
 
+## Animations
+
+Every live event above now has motion behind it, via Framer Motion.
+`src/lib/motionConfig.js`'s `useMotionPreset()` is the single source every
+animated component pulls its transition/spring/stagger values from — when
+the visitor's OS has `prefers-reduced-motion` enabled, it swaps every
+animation to a near-instant duration-only transition (no spring bounce, no
+stagger) in one place, rather than each component handling that itself.
+
+- **New inquiries pop in live** — the headline "I want to see it pop up
+  live" feature. `ReviewQueue`'s rows enter with a spring pop
+  (`AnimatePresence` + `motion.li`), staggered ~40ms apart if several
+  arrive in a burst; `InquiriesLog`'s rows fade in (table rows don't
+  reliably support the `transform` a full pop-in needs). A toast
+  (`Toast.jsx` / `useToast()`) surfaces `"New inquiry from {address}"` for
+  ~4s, click it to jump straight to the Inquiries tab.
+- **Modals** (`RateModal`, `ContactMethodModal`, `RateSelectionModal`,
+  `BlastModal`) animate open and closed instead of appearing/vanishing
+  instantly — backdrop fade, card scale-in-from-0.95-with-upward-motion.
+  Escape and backdrop-click-to-close are unchanged, only how the close
+  looks. (`Card.jsx` gained a `forwardRef` so `motion(Card)` can drive it
+  directly.)
+- **Tab switching** (Loads ↔ Inquiries) crossfades instead of swapping
+  instantly.
+- **The connection-health dot** (`ConnectionIndicator.jsx`) pulses only
+  while `'connecting'`/reconnecting and goes static once `'open'` — the
+  pulse itself means "still trying," which stops being true once
+  connected, so no motion plays on a settled connection.
+- **Loading states**: `Skeleton.jsx` (a small pulsing placeholder block)
+  replaces plain "Loading..." text in `LoadsTable`, `ReviewQueue`,
+  `InquiriesLog`, and `DatExportSection`'s loads fetch.
+
+See `docs/superpowers/specs/2026-08-09-live-animations-design.md` for the
+full design, including which `ui-ux-pro-max` guidance each choice is
+sourced from.
+
 ## Prerequisites
 
 - Node.js (v18+ recommended)
@@ -132,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 309 tests across 32 suites, covering
+Runs the Vitest suite (`vitest run`) — 321 tests across 35 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
