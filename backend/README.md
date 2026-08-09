@@ -102,8 +102,12 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 35 tests across 3 suites: `tests/health.test.js`,
-`tests/auth.test.js`, `tests/loads.test.js`.
+There are 78 tests across 9 suites: `tests/health.test.js`,
+`tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
+`tests/inquiries.test.js`, `tests/lib/googleOAuth.test.js`,
+`tests/lib/gmailClient.test.js`, `tests/lib/matchingEngine.test.js`,
+`tests/lib/emailPoller.test.js`. All Gmail API calls are mocked — no real
+Google credentials are needed to run the suite.
 
 ## Manual smoke test (curl)
 
@@ -239,6 +243,55 @@ Any unhandled error in a route (e.g. a dropped DB connection) is caught by
 a shared error handler and returned as `500 {"error": "Internal server error"}`
 instead of crashing the server — see "Behavior notes" below.
 
+### Gmail (`/api/gmail`) — all routes require an authenticated session
+
+Lets a user connect their own Gmail inbox so incoming carrier emails can be
+matched against their own loads. See "Gmail integration" below for the full
+picture (background poller, matching pipeline, how to set up real Google
+credentials). Each user can connect at most one Gmail account.
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/gmail/status` | `200 {"connected": false}`, or `200 {"connected": true, "gmailAddress": string, "connectedAt": string}` if the caller has a connected account |
+| GET | `/api/gmail/connect` | `302` redirect to Google's OAuth consent screen |
+| GET | `/api/gmail/oauth/callback` | Google redirects here after consent (`?code=...`). Exchanges the code for tokens, stores them against the caller's account, then `302` redirects to `{FRONTEND_ORIGIN}/?gmail=connected`. `400 {"error": "Missing authorization code"}` if `code` is absent. Reconnecting replaces the caller's existing stored tokens rather than creating a second row (`email_accounts.user_id` is unique) |
+| POST | `/api/gmail/disconnect` | `200 {"ok": true}` — deletes the caller's stored connection. Past `email_inquiries` rows are kept, not deleted |
+
+### Inquiries (`/api/inquiries`)
+
+Lists the caller's own processed email inquiries — the output of the
+background poller described below. Not yet surfaced in any UI; this
+endpoint exists so the poller's work is inspectable/testable now, ahead of
+a future dashboard.
+
+| Method | Path | Response |
+|---|---|---|
+| GET | `/api/inquiries` | `200` array of the caller's own `email_inquiries` rows, newest (`received_at`) first |
+
+An inquiry row has this shape:
+
+```json
+{
+  "id": 1,
+  "user_id": 2,
+  "email_account_id": 1,
+  "gmail_message_id": "18abc...",
+  "from_address": "dispatch@carrierco.com",
+  "subject": "Load #TEST-001 availability",
+  "body_snippet": "Hi, is load TEST-001 still available for pickup...",
+  "received_at": "2026-08-08T14:02:00.000Z",
+  "matched_load_id": 1,
+  "match_tier": "load_number",
+  "status": "matched",
+  "created_at": "2026-08-08T14:04:00.000Z"
+}
+```
+
+`match_tier` is one of `load_number`, `city_state`, `city`, `state`, `none`
+(see "Gmail integration" below for what each tier means). `status` is
+`matched` or `needs_review`; `matched_load_id` is `null` when `status` is
+`needs_review`.
+
 ## Accounts and roles
 
 Anyone can self-register an account via `POST /api/auth/register` (see
@@ -269,6 +322,80 @@ not re-checked against the database on every request. Demoting an admin
 via direct SQL doesn't revoke their access until they log out, their
 session expires, or the session store is cleared — there's currently no
 way to forcibly terminate a specific user's active session.
+
+## Gmail integration
+
+Each user can connect their own Gmail account (`GET /api/gmail/connect`,
+see "Gmail" in the API reference above). Once connected, a background
+poller (started in `src/server.js`, running `pollAllAccounts` on a
+`setInterval` every 2 minutes) checks that inbox for new messages and tries
+to match each one against **that same user's own active loads** — the same
+per-user data isolation enforced everywhere else in this backend. Every
+processed message is logged to `email_inquiries` (see "Inquiries" above)
+whether or not it matched anything, so nothing is silently dropped.
+
+**This phase does not send any replies.** Detecting and matching inquiries
+is as far as this goes right now — auto-sending a response, and a review
+queue for low-confidence matches, are separate, not-yet-built features.
+
+**Matching pipeline** (`src/lib/matchingEngine.js`), tried in this order,
+first match wins:
+
+1. **Load number** — the email mentions a load number that matches one of
+   the user's own loads exactly. Unambiguous; always wins outright even if
+   city/state text is also present.
+2. **City + state** — a city and its matching state (either the origin or
+   destination of a load) are both mentioned, e.g. "Dallas, TX" or "a load
+   from Dallas going to Texas."
+3. **City alone** — just a city name, no state.
+4. **State alone** — just a state, matched by 2-letter abbreviation
+   (**must be written in capitals**, e.g. "TX" — lowercase abbreviations
+   are deliberately not matched, since abbreviations like `hi`/`in`/`or`/
+   `me`/`ok` collide with common English words and would otherwise produce
+   false matches on ordinary sentences) or by full state name in any case
+   (e.g. "Texas" or "texas").
+
+If a tier matches more than one load, a date mentioned in the email (e.g.
+"picking up 8/12") narrows the field to loads whose pickup date matches; if
+that's still ambiguous, or no date was mentioned, the load with the
+earliest pickup wins — on the assumption that a carrier asking generically
+about, say, "a Dallas load" most likely wants whichever one is leaving
+soonest.
+
+An AI-based fallback for genuinely ambiguous emails (nothing above
+matches, or a human should double-check a low-confidence match) is
+deliberately out of scope for this phase — the `email_inquiries` schema
+(`match_tier`, `status`) leaves room for it to be added later without a
+rework.
+
+### Setting up real Gmail access
+
+Everything above is built and tested against mocked Gmail API responses —
+no real Google credentials are needed to develop against or run the test
+suite. Connecting a *real* Gmail inbox, however, requires OAuth credentials
+from a Google Cloud project, which only the app owner can create (it's
+tied to a Google account):
+
+1. Create a project at [console.cloud.google.com](https://console.cloud.google.com).
+2. Enable the **Gmail API** for that project.
+3. Configure the **OAuth consent screen** (app name, and scopes
+   `gmail.readonly` and `gmail.send`).
+4. Create an **OAuth 2.0 Client ID** (application type: **Web
+   application**), with `http://localhost:4000/api/gmail/oauth/callback`
+   (or your production callback URL) as an authorized redirect URI.
+5. Put the resulting values into `.env`:
+   ```
+   GOOGLE_CLIENT_ID=...
+   GOOGLE_CLIENT_SECRET=...
+   GOOGLE_REDIRECT_URI=http://localhost:4000/api/gmail/oauth/callback
+   ```
+
+Without these three variables set, `GET /api/gmail/connect` will redirect
+to an invalid Google URL (Google will show its own error page) — everything
+else in the app, including `GET /api/gmail/status` for a never-connected
+user, works fine either way. The server does not fail to start if these
+are unset; they're only read lazily when a Gmail route or the poller
+actually needs them.
 
 ## Behavior notes
 
