@@ -7,13 +7,18 @@ function createGmailRouter(pool, wsHub) {
 
   router.get('/status', asyncHandler(async (req, res) => {
     const [rows] = await pool.query(
-      'SELECT gmail_address, connected_at FROM email_accounts WHERE user_id = ?',
+      'SELECT gmail_address, connected_at, auto_send_enabled FROM email_accounts WHERE user_id = ?',
       [req.session.userId]
     );
     if (rows.length === 0) {
       return res.json({ connected: false });
     }
-    res.json({ connected: true, gmailAddress: rows[0].gmail_address, connectedAt: rows[0].connected_at });
+    res.json({
+      connected: true,
+      gmailAddress: rows[0].gmail_address,
+      connectedAt: rows[0].connected_at,
+      autoSendEnabled: Boolean(rows[0].auto_send_enabled),
+    });
   }));
 
   router.get('/connect', (req, res) => {
@@ -37,10 +42,15 @@ function createGmailRouter(pool, wsHub) {
 
     if (wsHub) {
       const [rows] = await pool.query(
-        'SELECT gmail_address, connected_at FROM email_accounts WHERE user_id = ?',
+        'SELECT gmail_address, connected_at, auto_send_enabled FROM email_accounts WHERE user_id = ?',
         [req.session.userId]
       );
-      wsHub.emitToUser(req.session.userId, 'gmail:status', { connected: true, gmailAddress: rows[0].gmail_address, connectedAt: rows[0].connected_at });
+      wsHub.emitToUser(req.session.userId, 'gmail:status', {
+        connected: true,
+        gmailAddress: rows[0].gmail_address,
+        connectedAt: rows[0].connected_at,
+        autoSendEnabled: Boolean(rows[0].auto_send_enabled),
+      });
     }
     res.redirect(`${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}/?gmail=connected`);
   }));
@@ -49,6 +59,29 @@ function createGmailRouter(pool, wsHub) {
     await pool.query('DELETE FROM email_accounts WHERE user_id = ?', [req.session.userId]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'gmail:status', { connected: false });
     res.json({ ok: true });
+  }));
+
+  router.patch('/auto-send', asyncHandler(async (req, res) => {
+    const { enabled } = req.body;
+    const [existingRows] = await pool.query('SELECT id FROM email_accounts WHERE user_id = ?', [req.session.userId]);
+    if (existingRows.length === 0) {
+      return res.status(404).json({ error: 'No Gmail account connected' });
+    }
+
+    await pool.query('UPDATE email_accounts SET auto_send_enabled = ? WHERE user_id = ?', [enabled ? 1 : 0, req.session.userId]);
+
+    const [rows] = await pool.query(
+      'SELECT gmail_address, connected_at, auto_send_enabled FROM email_accounts WHERE user_id = ?',
+      [req.session.userId]
+    );
+    const status = {
+      connected: true,
+      gmailAddress: rows[0].gmail_address,
+      connectedAt: rows[0].connected_at,
+      autoSendEnabled: Boolean(rows[0].auto_send_enabled),
+    };
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'gmail:status', status);
+    res.json(status);
   }));
 
   return router;

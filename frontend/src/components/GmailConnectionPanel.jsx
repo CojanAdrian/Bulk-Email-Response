@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getGmailStatus, getGmailConnectUrl, disconnectGmail } from '../api/gmail';
+import { getGmailStatus, getGmailConnectUrl, disconnectGmail, setAutoSendEnabled } from '../api/gmail';
 import { subscribe } from '../lib/liveSocket';
 import { GoogleIcon } from './icons';
 import Card from './Card';
@@ -12,6 +12,7 @@ function GmailConnectionPanel() {
   const [error, setError] = useState(null);
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
+  const [togglingAutoSend, setTogglingAutoSend] = useState(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -59,6 +60,28 @@ function GmailConnectionPanel() {
     window.location.href = getGmailConnectUrl();
   }
 
+  function handleToggleAutoSend() {
+    const next = !gmailStatus.autoSendEnabled;
+    setTogglingAutoSend(true);
+    setError(null);
+    setAutoSendEnabled(next)
+      .then((data) => {
+        if (isMountedRef.current) {
+          setGmailStatus(data);
+        }
+      })
+      .catch((err) => {
+        if (isMountedRef.current) {
+          setError(err.message || 'Failed to update auto-send.');
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current) {
+          setTogglingAutoSend(false);
+        }
+      });
+  }
+
   function handleDisconnect() {
     setDisconnecting(true);
     disconnectGmail()
@@ -87,7 +110,7 @@ function GmailConnectionPanel() {
         <h2 className="text-sm font-semibold text-text">Gmail connection</h2>
       </div>
       {status === 'loading' && <p className="text-sm text-text-muted">Checking connection...</p>}
-      {status === 'error' && (
+      {error && (
         <p role="alert" className="text-sm text-error">
           {error}
         </p>
@@ -131,6 +154,31 @@ function GmailConnectionPanel() {
               </div>
             </div>
           )}
+          <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-alt px-4 py-3">
+            <div>
+              <p className="text-sm font-medium text-text">Auto-send confident matches</p>
+              <p className="text-xs text-text-muted">
+                When on, an inquiry that mentions an exact load number is replied to automatically. Every other match
+                always waits in the review queue for you, no matter what.
+              </p>
+            </div>
+            <button
+              role="switch"
+              aria-checked={gmailStatus.autoSendEnabled}
+              aria-label="Auto-send confident matches"
+              onClick={handleToggleAutoSend}
+              disabled={togglingAutoSend}
+              className={`relative h-6 w-11 shrink-0 rounded-full transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                gmailStatus.autoSendEnabled ? 'bg-accent' : 'bg-border'
+              }`}
+            >
+              <span
+                className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
+                  gmailStatus.autoSendEnabled ? 'left-5' : 'left-0.5'
+                }`}
+              />
+            </button>
+          </div>
         </div>
       )}
     </Card>

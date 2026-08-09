@@ -59,6 +59,7 @@ describe('gmail routes', () => {
     const statusRes = await agent.get('/api/gmail/status');
     expect(statusRes.body.connected).toBe(true);
     expect(statusRes.body.gmailAddress).toBe('kenny@igtfreight.com');
+    expect(statusRes.body.autoSendEnabled).toBe(false);
   });
 
   test('oauth callback with no code returns 400', async () => {
@@ -93,6 +94,65 @@ describe('gmail routes', () => {
 
     const statusRes = await agent.get('/api/gmail/status');
     expect(statusRes.body.connected).toBe(false);
+  });
+
+  describe('PATCH /auto-send', () => {
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).patch('/api/gmail/auto-send').send({ enabled: true });
+      expect(res.status).toBe(401);
+    });
+
+    test('returns 404 when no Gmail account is connected', async () => {
+      const res = await agent.patch('/api/gmail/auto-send').send({ enabled: true });
+      expect(res.status).toBe(404);
+    });
+
+    test('enables auto-send for the connected account', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+      await agent.get('/api/gmail/oauth/callback?code=auth-code-123');
+
+      const res = await agent.patch('/api/gmail/auto-send').send({ enabled: true });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({
+        connected: true,
+        gmailAddress: 'kenny@igtfreight.com',
+        connectedAt: expect.any(String),
+        autoSendEnabled: true,
+      });
+
+      const statusRes = await agent.get('/api/gmail/status');
+      expect(statusRes.body.autoSendEnabled).toBe(true);
+    });
+
+    test('disables auto-send again', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+      await agent.get('/api/gmail/oauth/callback?code=auth-code-123');
+      await agent.patch('/api/gmail/auto-send').send({ enabled: true });
+
+      const res = await agent.patch('/api/gmail/auto-send').send({ enabled: false });
+      expect(res.status).toBe(200);
+      expect(res.body.autoSendEnabled).toBe(false);
+    });
+
+    test('only affects the caller\'s own account, not another user\'s', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const otherAgent = request.agent(app);
+      await otherAgent.post('/api/auth/login').send({ username: 'otheruser', password: 'otherpw' });
+
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+      await agent.get('/api/gmail/oauth/callback?code=auth-code-123');
+      googleOAuth.getUserEmailAddress.mockResolvedValue('other@example.com');
+      await otherAgent.get('/api/gmail/oauth/callback?code=other-code');
+
+      await agent.patch('/api/gmail/auto-send').send({ enabled: true });
+
+      const otherStatus = await otherAgent.get('/api/gmail/status');
+      expect(otherStatus.body.autoSendEnabled).toBe(false);
+    });
   });
 
   describe('wsHub emits', () => {
@@ -132,6 +192,19 @@ describe('gmail routes', () => {
       const [, event, payload] = wsHub.emitToUser.mock.calls[0];
       expect(event).toBe('gmail:status');
       expect(payload).toEqual({ connected: false });
+    });
+
+    test('PATCH /auto-send emits gmail:status with the updated autoSendEnabled value', async () => {
+      googleOAuth.exchangeCodeForTokens.mockResolvedValue({ access_token: 'access-1', refresh_token: 'refresh-1' });
+      googleOAuth.getUserEmailAddress.mockResolvedValue('kenny@igtfreight.com');
+      await hubAgent.get('/api/gmail/oauth/callback?code=auth-code-123');
+      wsHub.emitToUser.mockClear();
+
+      await hubAgent.patch('/api/gmail/auto-send').send({ enabled: true });
+
+      const [, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(event).toBe('gmail:status');
+      expect(payload.autoSendEnabled).toBe(true);
     });
   });
 });

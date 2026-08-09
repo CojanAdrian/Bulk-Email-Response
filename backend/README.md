@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 146 tests across 13 suites: `tests/health.test.js`,
+There are 157 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -335,10 +335,11 @@ credentials). Each user can connect at most one Gmail account.
 
 | Method | Path | Response |
 |---|---|---|
-| GET | `/api/gmail/status` | `200 {"connected": false}`, or `200 {"connected": true, "gmailAddress": string, "connectedAt": string}` if the caller has a connected account |
+| GET | `/api/gmail/status` | `200 {"connected": false}`, or `200 {"connected": true, "gmailAddress": string, "connectedAt": string, "autoSendEnabled": boolean}` if the caller has a connected account |
 | GET | `/api/gmail/connect` | `302` redirect to Google's OAuth consent screen |
-| GET | `/api/gmail/oauth/callback` | Google redirects here after consent (`?code=...`). Exchanges the code for tokens, stores them against the caller's account, then `302` redirects to `{FRONTEND_ORIGIN}/?gmail=connected`. `400 {"error": "Missing authorization code"}` if `code` is absent. Reconnecting replaces the caller's existing stored tokens rather than creating a second row (`email_accounts.user_id` is unique) |
+| GET | `/api/gmail/oauth/callback` | Google redirects here after consent (`?code=...`). Exchanges the code for tokens, stores them against the caller's account, then `302` redirects to `{FRONTEND_ORIGIN}/?gmail=connected`. `400 {"error": "Missing authorization code"}` if `code` is absent. Reconnecting replaces the caller's existing stored tokens rather than creating a second row (`email_accounts.user_id` is unique) — `auto_send_enabled` is left untouched on reconnect, not reset |
 | POST | `/api/gmail/disconnect` | `200 {"ok": true}` — deletes the caller's stored connection. Past `email_inquiries` rows are kept, not deleted |
+| PATCH | `/api/gmail/auto-send` | Body `{"enabled": boolean}`. `200` with the same shape as `GET /status` on success; `404 {"error": "No Gmail account connected"}` if the caller has no connected account yet. See "Auto-send and review queue" below for what this actually gates |
 
 ### Inquiries (`/api/inquiries`)
 
@@ -444,8 +445,15 @@ messages that arrive *after* that first poll are ever processed.
 **Auto-send and review queue.** Only an exact **load number** match
 (`match_tier: 'load_number'`) is confident enough to reply without a human
 looking at it — the carrier gave a unique, unambiguous identifier, so
-there's no risk of answering about the wrong load. When that happens, the
-poller composes a reply from the matched load's fields (see
+there's no risk of answering about the wrong load. Even then, sending
+still requires the user to have explicitly opted in via
+`email_accounts.auto_send_enabled` (`PATCH /api/gmail/auto-send`,
+`{"enabled": boolean}` — see "Gmail" in the API reference; toggled from
+the frontend's Gmail connection panel). **Every account starts with this
+off** — a newly connected account, or one that hasn't touched the
+setting, queues even its most confident matches for review until the
+user turns it on. When both the tier and the toggle line up, the poller
+composes a reply from the matched load's fields (see
 `src/lib/replyComposer.js`) and sends it immediately via Gmail, as a proper
 threaded reply (`In-Reply-To`/`References` headers, same `threadId`, `Re:`
 subject) — `reply_status` becomes `auto_sent`. Every other matched tier

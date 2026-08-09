@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 351 tests across 38 suites, covering
+Runs the Vitest suite (`vitest run`) — 357 tests across 38 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -291,7 +291,12 @@ panel's failure doesn't block the others):
   to Google's consent screen, so it can't go through the JSON API client)
   to start the OAuth flow. If connected, shows the address and a
   "Disconnect" button, which requires an explicit confirm step first since
-  disconnecting stops auto-replies going out until reconnected.
+  disconnecting stops auto-replies going out until reconnected. Below that,
+  an **"Auto-send confident matches"** toggle (off by default on every
+  account, including a brand-new connection) controls whether an inquiry
+  that mentions an exact load number gets replied to immediately
+  (`PATCH /api/gmail/auto-send`) — every other match always waits in the
+  review queue regardless of this setting.
 - **Review queue** — every inquiry waiting on a human
   (`reply_status: 'pending_review'`): who asked, what they asked, and an
   editable textarea pre-filled with the composed reply. **Send** posts the

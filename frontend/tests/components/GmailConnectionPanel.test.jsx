@@ -102,6 +102,67 @@ describe('GmailConnectionPanel', () => {
     expect(gmailApi.getGmailStatus).not.toHaveBeenCalled();
   });
 
+  describe('auto-send toggle', () => {
+    test('shows the toggle off by default and describes the confidence policy', async () => {
+      gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: false });
+      render(<GmailConnectionPanel />);
+      await waitFor(() => screen.getByRole('switch'));
+
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      expect(screen.getByText(/exact load number/i)).toBeInTheDocument();
+    });
+
+    test('shows the toggle on when auto-send is already enabled', async () => {
+      gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: true });
+      render(<GmailConnectionPanel />);
+      await waitFor(() => screen.getByRole('switch'));
+
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+    });
+
+    test('clicking the toggle turns auto-send on', async () => {
+      gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: false });
+      gmailApi.setAutoSendEnabled.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: true });
+      render(<GmailConnectionPanel />);
+      await waitFor(() => screen.getByRole('switch'));
+
+      fireEvent.click(screen.getByRole('switch'));
+
+      expect(gmailApi.setAutoSendEnabled).toHaveBeenCalledWith(true);
+      await waitFor(() => {
+        expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+      });
+    });
+
+    test('clicking the toggle again turns auto-send back off', async () => {
+      gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: true });
+      gmailApi.setAutoSendEnabled.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: false });
+      render(<GmailConnectionPanel />);
+      await waitFor(() => screen.getByRole('switch'));
+
+      fireEvent.click(screen.getByRole('switch'));
+
+      expect(gmailApi.setAutoSendEnabled).toHaveBeenCalledWith(false);
+      await waitFor(() => {
+        expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+      });
+    });
+
+    test('shows an error and leaves the toggle unchanged if the update fails', async () => {
+      gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'kenny@igtfreight.com', autoSendEnabled: false });
+      gmailApi.setAutoSendEnabled.mockRejectedValue(new Error('Failed to update auto-send.'));
+      render(<GmailConnectionPanel />);
+      await waitFor(() => screen.getByRole('switch'));
+
+      fireEvent.click(screen.getByRole('switch'));
+
+      await waitFor(() => {
+        expect(screen.getByRole('alert')).toHaveTextContent('Failed to update auto-send.');
+      });
+      expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
+    });
+  });
+
   // Regression test for a real bug: React 18 StrictMode deliberately mounts
   // -> cleans up -> re-mounts every component once in development. The old
   // isMountedRef.current = false set by that first simulated cleanup was

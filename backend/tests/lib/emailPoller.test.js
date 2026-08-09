@@ -29,11 +29,13 @@ describe('emailPoller', () => {
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     const [userResult] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')", ['testuser', passwordHash]);
     userId = userResult.insertId;
-    // Seeded with a past last_polled_at so these tests represent an account
-    // that has already been through its first poll -- the dedicated "first
-    // poll" tests below cover the null/never-polled case separately.
+    // Seeded with a past last_polled_at (already through its first poll --
+    // the dedicated "first poll" tests below cover the null case) and
+    // auto_send_enabled = 1 (the dedicated "auto-send gating" tests below
+    // cover the disabled case) so the rest of this file's tests exercise
+    // the matching/sending pipeline itself, not these two gates.
     const [accountResult] = await pool.query(
-      "INSERT INTO email_accounts (user_id, gmail_address, refresh_token, last_polled_at) VALUES (?, ?, ?, '2020-01-01 00:00:00')",
+      "INSERT INTO email_accounts (user_id, gmail_address, refresh_token, last_polled_at, auto_send_enabled) VALUES (?, ?, ?, '2020-01-01 00:00:00', 1)",
       [userId, 'testuser@example.com', 'refresh-token-abc']
     );
     accountId = accountResult.insertId;
@@ -229,6 +231,71 @@ describe('emailPoller', () => {
 
     const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
     await expect(pollAccount(pool, accountRows[0])).resolves.not.toThrow();
+  });
+
+  describe('auto-send gating (email_accounts.auto_send_enabled)', () => {
+    test('a load_number match still only queues a reply for review when auto-send is disabled', async () => {
+      await pool.query('UPDATE email_accounts SET auto_send_enabled = 0 WHERE id = ?', [accountId]);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', from: 'carrier@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({
+        matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number',
+      });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries[0].reply_status).toBe('pending_review');
+      expect(inquiries[0].reply_body).toContain('load #4521 is still available');
+      expect(inquiries[0].match_tier).toBe('load_number');
+    });
+
+    test('a load_number match auto-sends when auto-send is enabled', async () => {
+      await pool.query('UPDATE email_accounts SET auto_send_enabled = 1 WHERE id = ?', [accountId]);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', from: 'carrier@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({
+        matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number',
+      });
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(gmailClient.sendReply).toHaveBeenCalledTimes(1);
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries[0].reply_status).toBe('auto_sent');
+    });
+
+    test('a lower-confidence tier still never auto-sends, even with auto-send enabled', async () => {
+      await pool.query('UPDATE email_accounts SET auto_send_enabled = 1 WHERE id = ?', [accountId]);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', from: 'carrier@example.com', subject: 'Dallas load?', body: 'Anything from Dallas, TX?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({
+        matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX' }, tier: 'city_state',
+      });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries[0].reply_status).toBe('pending_review');
+    });
   });
 
   describe('first poll for a newly-connected account', () => {

@@ -1,4 +1,4 @@
-import { get, post, API_URL } from './client';
+import { get, post, patch, API_URL } from './client';
 
 export function getGmailStatus() {
   return get('/api/gmail/status');
@@ -10,4 +10,8 @@ export function getGmailConnectUrl() {
 
 export function disconnectGmail() {
   return post('/api/gmail/disconnect', {});
+}
+
+export function setAutoSendEnabled(enabled) {
+  return patch('/api/gmail/auto-send', { enabled });
 }

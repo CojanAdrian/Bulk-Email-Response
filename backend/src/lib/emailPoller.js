@@ -41,13 +41,15 @@ async function pollAccount(pool, account, wsHub) {
     // human looking at it first -- every other matched tier is ambiguous enough
     // (multiple candidate loads existed and were tie-broken by heuristics) that it
     // waits in the review queue instead. See the design spec's "Confidence policy".
+    // Even a load_number match only actually sends when the user has explicitly
+    // opted in via email_accounts.auto_send_enabled -- everyone starts opted out.
     let replyStatus = 'none';
     let replyBody = null;
     let replySentAt = null;
 
     if (matchedLoad) {
       replyBody = composeReply(matchedLoad);
-      if (tier === 'load_number') {
+      if (tier === 'load_number' && account.auto_send_enabled) {
         try {
           await sendReply(accessToken, {
             to: message.from,

@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { getGmailStatus, getGmailConnectUrl, disconnectGmail } from '../../src/api/gmail';
+import { getGmailStatus, getGmailConnectUrl, disconnectGmail, setAutoSendEnabled } from '../../src/api/gmail';
 import { API_URL } from '../../src/api/client';
 
 describe('gmail api', () => {
@@ -24,5 +24,14 @@ describe('gmail api', () => {
     const [url, options] = global.fetch.mock.calls[0];
     expect(url).toContain('/api/gmail/disconnect');
     expect(options.method).toBe('POST');
+  });
+
+  test('setAutoSendEnabled patches /api/gmail/auto-send with the requested value', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ connected: true, autoSendEnabled: true }) });
+    await setAutoSendEnabled(true);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/gmail/auto-send');
+    expect(options.method).toBe('PATCH');
+    expect(JSON.parse(options.body)).toEqual({ enabled: true });
   });
 });

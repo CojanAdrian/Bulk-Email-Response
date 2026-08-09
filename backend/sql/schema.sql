@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS email_accounts (
   gmail_address VARCHAR(255) NOT NULL,
   refresh_token TEXT NOT NULL,
   connected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  last_polled_at TIMESTAMP NULL
+  last_polled_at TIMESTAMP NULL,
+  auto_send_enabled TINYINT(1) NOT NULL DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS email_inquiries (
