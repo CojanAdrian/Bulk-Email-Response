@@ -60,6 +60,29 @@ describe('matchInquiry', () => {
     expect(result.tier).toBe('load_number');
     expect(result.matchedLoad.id).toBe(2);
   });
+
+  test('does not treat common English words as state abbreviations when lowercase', () => {
+    const loadsWithCollidingStates = [
+      { id: 10, load_number: '9001', origin_city: 'Honolulu', origin_state: 'HI', dest_city: 'Portland', dest_state: 'OR', early_pu: '2026-08-10 08:00:00' },
+      { id: 11, load_number: '9002', origin_city: 'Indianapolis', origin_state: 'IN', dest_city: 'Bangor', dest_state: 'ME', early_pu: '2026-08-11 08:00:00' },
+    ];
+    // "Hi," is a greeting (collides with Hawaii's abbreviation), "in" and "or" are
+    // ordinary prepositions/conjunctions (collide with Indiana/Oregon) -- none of
+    // this should match, since none of these abbreviations appear in uppercase and
+    // none of the full state names ("Hawaii", "Oregon", "Indiana", "Maine") are mentioned.
+    const result = matchInquiry('Hi, do you have anything in or around the area?', loadsWithCollidingStates);
+    expect(result.tier).toBe('none');
+    expect(result.matchedLoad).toBeNull();
+  });
+
+  test('still matches a state abbreviation that collides with a common word when written in caps', () => {
+    const loadsWithCollidingStates = [
+      { id: 10, load_number: '9001', origin_city: 'Honolulu', origin_state: 'HI', dest_city: 'Portland', dest_state: 'OR', early_pu: '2026-08-10 08:00:00' },
+    ];
+    const result = matchInquiry('Do you have anything in HI this week?', loadsWithCollidingStates);
+    expect(result.tier).toBe('state');
+    expect(result.matchedLoad.id).toBe(10);
+  });
 });
 
 describe('extractDate', () => {

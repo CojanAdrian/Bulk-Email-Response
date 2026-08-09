@@ -15,12 +15,21 @@ function normalizeText(s) {
   return String(s || '').toLowerCase();
 }
 
-function textMentionsState(normalizedText, stateAbbr) {
+// State abbreviations are matched case-sensitively against the ORIGINAL text (not
+// lowercased) because many abbreviations collide with common English words when
+// lowercased -- "hi" (Hawaii), "in" (Indiana), "or" (Oregon), "me" (Maine), "ok"
+// (Oklahoma), "pa" (Pennsylvania), "la" (Louisiana), "ma" (Massachusetts), "co"
+// (Colorado). A carrier writing "Hi, do you have anything?" or "this or that" should
+// not spuriously match a Hawaii/Oregon load. People do write state abbreviations in
+// caps ("TX", "GA") when referring to a state, so requiring uppercase is a reliable
+// signal. Full state names ("Texas", "Georgia") don't collide with common words, so
+// those stay case-insensitive.
+function textMentionsState(originalText, stateAbbr) {
   if (!stateAbbr) return false;
-  const abbr = String(stateAbbr).toLowerCase();
-  if (new RegExp(`\\b${abbr}\\b`).test(normalizedText)) return true;
-  const fullName = STATE_NAMES[abbr];
-  return fullName ? normalizedText.includes(fullName) : false;
+  const abbrUpper = String(stateAbbr).toUpperCase();
+  if (new RegExp(`\\b${abbrUpper}\\b`).test(originalText)) return true;
+  const fullName = STATE_NAMES[abbrUpper.toLowerCase()];
+  return fullName ? normalizeText(originalText).includes(fullName) : false;
 }
 
 function findLoadNumberMatch(text, loads) {
@@ -33,10 +42,10 @@ function findCityStateMatches(text, loads) {
   return loads.filter((load) => {
     const originMatch = load.origin_city && load.origin_state &&
       normalized.includes(String(load.origin_city).toLowerCase()) &&
-      textMentionsState(normalized, load.origin_state);
+      textMentionsState(text, load.origin_state);
     const destMatch = load.dest_city && load.dest_state &&
       normalized.includes(String(load.dest_city).toLowerCase()) &&
-      textMentionsState(normalized, load.dest_state);
+      textMentionsState(text, load.dest_state);
     return originMatch || destMatch;
   });
 }
@@ -50,9 +59,8 @@ function findCityMatches(text, loads) {
 }
 
 function findStateMatches(text, loads) {
-  const normalized = normalizeText(text);
   return loads.filter((load) =>
-    textMentionsState(normalized, load.origin_state) || textMentionsState(normalized, load.dest_state)
+    textMentionsState(text, load.origin_state) || textMentionsState(text, load.dest_state)
   );
 }
 
