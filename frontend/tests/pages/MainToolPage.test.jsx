@@ -3,22 +3,69 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import Papa from 'papaparse';
 import MainToolPage from '../../src/pages/MainToolPage';
 import * as loadsApi from '../../src/api/loads';
+import * as gmailApi from '../../src/api/gmail';
+import * as inquiriesApi from '../../src/api/inquiries';
 
 vi.mock('papaparse');
 vi.mock('../../src/api/loads');
+vi.mock('../../src/api/gmail');
+vi.mock('../../src/api/inquiries');
 
 describe('MainToolPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     loadsApi.listLoads.mockResolvedValue([]);
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    inquiriesApi.listInquiries.mockResolvedValue([]);
   });
 
-  test('renders the upload panel and the loads table', async () => {
+  test('renders the upload panel and the loads table by default', async () => {
     render(<MainToolPage username="admin" onLogout={vi.fn()} />);
     expect(screen.getByText(/upload loads csv/i)).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByText(/no loads found/i)).toBeInTheDocument();
     });
+  });
+
+  test('does not fetch Gmail/inquiries data until the Inquiries tab is opened', async () => {
+    render(<MainToolPage username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalled());
+    expect(gmailApi.getGmailStatus).not.toHaveBeenCalled();
+    expect(inquiriesApi.listInquiries).not.toHaveBeenCalled();
+  });
+
+  test('switches to the Inquiries tab and renders its panels', async () => {
+    render(<MainToolPage username="admin" onLogout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+
+    await waitFor(() => {
+      expect(gmailApi.getGmailStatus).toHaveBeenCalled();
+    });
+    expect(screen.getByText(/gmail connection/i)).toBeInTheDocument();
+    expect(screen.getByText(/review queue/i)).toBeInTheDocument();
+    expect(screen.getByText(/inquiry log/i)).toBeInTheDocument();
+    expect(screen.queryByText(/upload loads csv/i)).not.toBeInTheDocument();
+  });
+
+  test('the Refresh button on the Inquiries tab re-fetches inquiries', async () => {
+    render(<MainToolPage username="admin" onLogout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(2)); // ReviewQueue + InquiriesLog
+
+    fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }));
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(4));
+  });
+
+  test('switching back to Loads keeps the loads table working as before', async () => {
+    render(<MainToolPage username="admin" onLogout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+    await waitFor(() => screen.getByText(/gmail connection/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /^loads$/i }));
+    await waitFor(() => {
+      expect(screen.getByText(/upload loads csv/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/gmail connection/i)).not.toBeInTheDocument();
   });
 
   test('opens the rate modal when a load row is selected, and refreshes the table on save', async () => {
