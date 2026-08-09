@@ -41,6 +41,8 @@ async function getMessage(accessToken, messageId) {
   const getHeader = (name) => (headers.find((h) => h.name && h.name.toLowerCase() === name.toLowerCase()) || {}).value || '';
   return {
     id: res.data.id,
+    threadId: res.data.threadId,
+    messageIdHeader: getHeader('Message-ID') || null,
     from: getHeader('From'),
     subject: getHeader('Subject'),
     body: extractPlainTextBody(res.data.payload),
@@ -48,4 +50,28 @@ async function getMessage(accessToken, messageId) {
   };
 }
 
-module.exports = { listNewMessageIds, getMessage, extractPlainTextBody };
+function buildRawMessage({ to, subject, body, inReplyToMessageId }) {
+  const headers = [
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    'Content-Type: text/plain; charset="UTF-8"',
+  ];
+  if (inReplyToMessageId) {
+    headers.push(`In-Reply-To: ${inReplyToMessageId}`);
+    headers.push(`References: ${inReplyToMessageId}`);
+  }
+  const message = `${headers.join('\r\n')}\r\n\r\n${body}`;
+  return Buffer.from(message).toString('base64url');
+}
+
+async function sendReply(accessToken, { to, subject, body, threadId, inReplyToMessageId }) {
+  const gmail = buildGmailClient(accessToken);
+  const requestBody = { raw: buildRawMessage({ to, subject, body, inReplyToMessageId }) };
+  if (threadId) {
+    requestBody.threadId = threadId;
+  }
+  const res = await gmail.users.messages.send({ userId: 'me', requestBody });
+  return res.data;
+}
+
+module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, sendReply };

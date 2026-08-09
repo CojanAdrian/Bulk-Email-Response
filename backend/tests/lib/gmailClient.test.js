@@ -7,6 +7,7 @@ jest.mock('googleapis', () => {
       messages: {
         list: jest.fn(),
         get: jest.fn(),
+        send: jest.fn(),
       },
     },
   };
@@ -21,7 +22,7 @@ jest.mock('googleapis', () => {
 });
 
 const googleapis = require('googleapis');
-const { listNewMessageIds, getMessage, extractPlainTextBody } = require('../../src/lib/gmailClient');
+const { listNewMessageIds, getMessage, extractPlainTextBody, sendReply } = require('../../src/lib/gmailClient');
 
 describe('listNewMessageIds', () => {
   beforeEach(() => {
@@ -100,16 +101,18 @@ describe('getMessage', () => {
     jest.clearAllMocks();
   });
 
-  test('parses headers and body from a Gmail message response', async () => {
+  test('parses headers, threading info, and body from a Gmail message response', async () => {
     googleapis.__mockGmailClient.users.messages.get.mockResolvedValue({
       data: {
         id: 'm1',
+        threadId: 't1',
         internalDate: '1735689600000',
         payload: {
           mimeType: 'text/plain',
           headers: [
             { name: 'From', value: 'carrier@example.com' },
             { name: 'Subject', value: 'Load #4521 availability' },
+            { name: 'Message-ID', value: '<abc123@mail.gmail.com>' },
           ],
           body: { data: Buffer.from('Is load 4521 still available?').toString('base64url') },
         },
@@ -119,11 +122,31 @@ describe('getMessage', () => {
     const message = await getMessage('token', 'm1');
     expect(message).toEqual({
       id: 'm1',
+      threadId: 't1',
+      messageIdHeader: '<abc123@mail.gmail.com>',
       from: 'carrier@example.com',
       subject: 'Load #4521 availability',
       body: 'Is load 4521 still available?',
       receivedAt: new Date(1735689600000),
     });
+  });
+
+  test('sets messageIdHeader to null when the Message-ID header is absent', async () => {
+    googleapis.__mockGmailClient.users.messages.get.mockResolvedValue({
+      data: {
+        id: 'm1',
+        threadId: 't1',
+        internalDate: '1735689600000',
+        payload: {
+          mimeType: 'text/plain',
+          headers: [{ name: 'From', value: 'carrier@example.com' }],
+          body: { data: Buffer.from('No Message-ID header').toString('base64url') },
+        },
+      },
+    });
+
+    const message = await getMessage('token', 'm1');
+    expect(message.messageIdHeader).toBeNull();
   });
 
   test('returns an empty string for a header that is missing entirely', async () => {
@@ -175,5 +198,76 @@ describe('getMessage', () => {
 
     const message = await getMessage('token', 'm1');
     expect(message.from).toBe('carrier@example.com');
+  });
+});
+
+describe('sendReply', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('sends a base64url-encoded RFC 2822 message with To/Subject/body', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+
+    await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'Yes, still available.' });
+
+    const callArgs = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0];
+    expect(callArgs.userId).toBe('me');
+    const decoded = Buffer.from(callArgs.requestBody.raw, 'base64url').toString('utf8');
+    expect(decoded).toContain('To: carrier@example.com');
+    expect(decoded).toContain('Subject: Re: Load #4521');
+    expect(decoded).toContain('Yes, still available.');
+  });
+
+  test('includes threadId in the request when provided, to keep the reply in the same Gmail thread', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+
+    await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'body', threadId: 't1' });
+
+    const callArgs = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0];
+    expect(callArgs.requestBody.threadId).toBe('t1');
+  });
+
+  test('omits threadId from the request when not provided', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+
+    await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'body' });
+
+    const callArgs = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0];
+    expect(callArgs.requestBody.threadId).toBeUndefined();
+  });
+
+  test('sets In-Reply-To and References headers when inReplyToMessageId is provided', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+
+    await sendReply('token', {
+      to: 'carrier@example.com',
+      subject: 'Re: Load #4521',
+      body: 'body',
+      inReplyToMessageId: '<abc123@mail.gmail.com>',
+    });
+
+    const callArgs = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0];
+    const decoded = Buffer.from(callArgs.requestBody.raw, 'base64url').toString('utf8');
+    expect(decoded).toContain('In-Reply-To: <abc123@mail.gmail.com>');
+    expect(decoded).toContain('References: <abc123@mail.gmail.com>');
+  });
+
+  test('omits In-Reply-To/References headers when inReplyToMessageId is not provided', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+
+    await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'body' });
+
+    const callArgs = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0];
+    const decoded = Buffer.from(callArgs.requestBody.raw, 'base64url').toString('utf8');
+    expect(decoded).not.toContain('In-Reply-To');
+    expect(decoded).not.toContain('References');
+  });
+
+  test('resolves with the Gmail API response data', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1', threadId: 't1' } });
+
+    const result = await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'body' });
+    expect(result).toEqual({ id: 'sent1', threadId: 't1' });
   });
 });
