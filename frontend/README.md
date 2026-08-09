@@ -4,14 +4,20 @@ A React/Vite frontend for the BulkPosting backend — the tool freight brokers
 use to bulk-manage loads (CSV upload, a loads table, rate editing, DAT
 export, and a "blast" email/notification flow).
 
-**This is Phase 1/2: auth shell plus CSV upload, the loads table, and rate
-editing.** It implements session-based login and self-service registration,
-a logged-in/logged-out state machine, uploading a McLeod CSV export,
-viewing/filtering the resulting loads table, and editing a load's target
-pay and status. DAT export and the blast modal are **not implemented yet**
-— those land in Phase 3, which builds on top of this. See
-`docs/superpowers/specs/2026-08-04-backend-foundation-design.md` in the repo
-root for the full design.
+**This is Phase 1/2 of the loads UI, plus the full email auto-reply
+dashboard (sub-project 4 of the email roadmap).** It implements
+session-based login and self-service registration, a logged-in/logged-out
+state machine, uploading a McLeod CSV export, viewing/filtering the
+resulting loads table, editing a load's target pay and status, connecting
+a Gmail account, reviewing/editing/sending or rejecting queued auto-reply
+drafts, and a log of every processed inquiry. DAT export, load
+lookup/search, and the blast modal are **not implemented yet** — those are
+frontend Phase 3, ported from the original tool, and land after this. See
+`docs/superpowers/specs/2026-08-04-backend-foundation-design.md`,
+`docs/superpowers/specs/2026-08-08-email-matching-engine-design.md`,
+`docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`, and
+`docs/superpowers/specs/2026-08-09-live-dashboard-design.md` in the repo
+root for the full design history.
 
 ## Prerequisites
 
@@ -62,13 +68,15 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 90 tests across 11 suites
+Runs the Vitest suite (`vitest run`) — 121 tests across 16 suites
 (`src/App.jsx`, `src/api/client.js`, `src/api/auth.js`, `src/api/loads.js`,
-`src/lib/mcleodParser.js`, `src/pages/LoginPage.jsx`,
-`src/pages/RegisterPage.jsx`, `src/pages/MainToolPage.jsx`,
-`src/components/UploadPanel.jsx`, `src/components/LoadsTable.jsx`,
-`src/components/RateModal.jsx`). All API calls are mocked, so **no backend
-is required** to run tests.
+`src/api/gmail.js`, `src/api/inquiries.js`, `src/lib/mcleodParser.js`,
+`src/pages/LoginPage.jsx`, `src/pages/RegisterPage.jsx`,
+`src/pages/MainToolPage.jsx`, `src/components/UploadPanel.jsx`,
+`src/components/LoadsTable.jsx`, `src/components/RateModal.jsx`,
+`src/components/GmailConnectionPanel.jsx`,
+`src/components/ReviewQueue.jsx`, `src/components/InquiriesLog.jsx`). All
+API calls are mocked, so **no backend is required** to run tests.
 
 ## Uploading loads
 
@@ -105,6 +113,45 @@ and can only see/edit loads it uploads itself. There's no way to
 self-register as `role: 'admin'`; see the backend README's "Accounts and
 roles" section for how the one admin account is seeded and what admins can
 see that regular users can't.
+
+## Inquiries tab
+
+The header has two tabs: **Loads** (the default, everything above) and
+**Inquiries** — the email auto-reply dashboard. Switching to it renders
+three independent panels, each with its own loading/error state (one
+panel's failure doesn't block the others):
+
+- **Gmail connection** — shows whether the logged-in user has connected a
+  Gmail account. If not, a "Connect Gmail" button navigates the browser
+  (a real page load, not a fetch — `GET /api/gmail/connect` is a redirect
+  to Google's consent screen, so it can't go through the JSON API client)
+  to start the OAuth flow. If connected, shows the address and a
+  "Disconnect" button, which requires an explicit confirm step first since
+  disconnecting stops auto-replies going out until reconnected.
+- **Review queue** — every inquiry waiting on a human
+  (`reply_status: 'pending_review'`): who asked, what they asked, and an
+  editable textarea pre-filled with the composed reply. **Send** posts the
+  (possibly-edited) textarea content and removes the row from the queue on
+  success; **Reject** dismisses it (no email sent) and does the same. See
+  `backend/README.md`'s "Gmail integration" section for exactly which
+  inquiries land here versus getting auto-sent without review.
+- **Inquiry log** — a read-only table of every inquiry the backend poller
+  has ever processed, with a colored status badge (Auto-sent / Sent /
+  Pending review / Rejected / No match).
+
+A "Refresh" button above the panels manually re-fetches the review queue
+and inquiry log (there's no live/websocket update — this is a small
+internal tool, a manual refresh is enough). The Gmail connection panel
+re-checks on every tab switch since it remounts each time.
+
+**None of this works meaningfully without real Google OAuth credentials
+configured on the backend** (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`/
+`GOOGLE_REDIRECT_URI` in `backend/.env` — see `backend/README.md`'s
+"Setting up real Gmail access"). Without them, "Connect Gmail" will
+redirect to a Google error page instead of a real consent screen. The
+panels themselves (status/queue/log) work and render correctly either
+way — they just show "not connected" and empty lists until a real
+connection exists.
 
 ## Manual end-to-end verification walkthrough
 
@@ -195,3 +242,20 @@ If any step fails, the most likely causes are:
   request from `frontend/src/api/client.js` aborts after 10 seconds
   rather than hanging indefinitely; check the backend's own logs and that
   `bulkposting-mysql` (or your local MySQL server) is actually up.
+
+**Verification status for the Inquiries tab specifically:** every
+component's behavior is covered by the Vitest suite above (loading/error
+states, the confirm-before-disconnect step, editable reply drafts,
+send/reject removing a row, the refresh button). The exact JSON shapes
+these components expect were also verified against a real running backend
+and MySQL database (not mocks) — registering a user, checking
+`GET /api/gmail/status` returns `{"connected": false}`, seeding a real
+`pending_review` row and confirming `GET /api/inquiries?reply_status=...`
+returns it with every field these components read, and confirming
+`POST /api/inquiries/:id/reject` actually updates the row and removes it
+from that filtered list. What was **not** done: an actual browser
+click-through of the rendered UI — no browser automation tool was
+available in the environment this was built in. If you're picking this up
+next, a manual click-through (steps 1-2 above to start both servers, then
+log in and click the Inquiries tab) is the one verification step still
+worth doing before considering this fully done.
