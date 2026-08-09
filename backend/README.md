@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 142 tests across 13 suites: `tests/health.test.js`,
+There are 146 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -429,6 +429,17 @@ to match each one against **that same user's own active loads** — the same
 per-user data isolation enforced everywhere else in this backend. Every
 processed message is logged to `email_inquiries` (see "Inquiries" above)
 whether or not it matched anything, so nothing is silently dropped.
+
+**The first poll after connecting never processes anything — it only
+establishes a "from now on" baseline.** `email_accounts.last_polled_at`
+starts `NULL` on connect; `pollAccount` checks for that specifically and,
+if so, just stamps `last_polled_at = NOW()` and returns, without calling
+Gmail at all. This matters because `listNewMessageIds(token, null)` (a
+`null` since-date) queries Gmail with no date filter, returning up to the
+50 most recent inbox messages regardless of age — treating a newly
+connected account's entire recent inbox history (old carrier threads,
+internal team mail, anything) as fresh inquiries needing a reply. Only
+messages that arrive *after* that first poll are ever processed.
 
 **Auto-send and review queue.** Only an exact **load number** match
 (`match_tier: 'load_number'`) is confident enough to reply without a human

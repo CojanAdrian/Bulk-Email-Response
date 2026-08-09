@@ -9,8 +9,19 @@ function replySubject(originalSubject) {
 }
 
 async function pollAccount(pool, account, wsHub) {
+  if (!account.last_polled_at) {
+    // First-ever poll for this account: listNewMessageIds(token, null) queries
+    // Gmail with no date filter at all, returning the 50 most recent inbox
+    // messages regardless of age -- processing that backlog as "new inquiries"
+    // would sweep in old carrier threads and unrelated mail alike. Only
+    // establish a "from now on" baseline; the next poll picks up anything
+    // that arrives after this point.
+    await pool.query('UPDATE email_accounts SET last_polled_at = NOW() WHERE id = ?', [account.id]);
+    return;
+  }
+
   const accessToken = await getAccessToken(account.refresh_token);
-  const sinceDate = account.last_polled_at ? new Date(account.last_polled_at) : null;
+  const sinceDate = new Date(account.last_polled_at);
   const messageIds = await listNewMessageIds(accessToken, sinceDate);
 
   const [loads] = await pool.query('SELECT * FROM loads WHERE user_id = ? AND status = ?', [account.user_id, 'active']);

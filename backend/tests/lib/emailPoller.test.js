@@ -29,8 +29,11 @@ describe('emailPoller', () => {
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     const [userResult] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')", ['testuser', passwordHash]);
     userId = userResult.insertId;
+    // Seeded with a past last_polled_at so these tests represent an account
+    // that has already been through its first poll -- the dedicated "first
+    // poll" tests below cover the null/never-polled case separately.
     const [accountResult] = await pool.query(
-      'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+      "INSERT INTO email_accounts (user_id, gmail_address, refresh_token, last_polled_at) VALUES (?, ?, ?, '2020-01-01 00:00:00')",
       [userId, 'testuser@example.com', 'refresh-token-abc']
     );
     accountId = accountResult.insertId;
@@ -228,11 +231,93 @@ describe('emailPoller', () => {
     await expect(pollAccount(pool, accountRows[0])).resolves.not.toThrow();
   });
 
+  describe('first poll for a newly-connected account', () => {
+    let freshAccountId;
+
+    beforeEach(async () => {
+      // email_accounts.user_id is UNIQUE (one Gmail account per user), and
+      // the outer beforeEach already gave `userId` its own account, so this
+      // needs a separate user.
+      const passwordHash = await bcrypt.hash('freshpw', 10);
+      const [freshUserResult] = await pool.query(
+        "INSERT INTO users (username, password_hash, role) VALUES ('freshuser', ?, 'user')",
+        [passwordHash]
+      );
+      // No last_polled_at -- simulates an account that was just connected
+      // and has never been polled.
+      const [freshAccountResult] = await pool.query(
+        'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+        [freshUserResult.insertId, 'freshuser@example.com', 'fresh-refresh-token']
+      );
+      freshAccountId = freshAccountResult.insertId;
+    });
+
+    test('does not fetch or process any messages, and never fetches an access token', async () => {
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [freshAccountId]);
+      expect(accountRows[0].last_polled_at).toBeNull();
+
+      await pollAccount(pool, accountRows[0]);
+
+      // Regression guard for the real bug this fixes: on a never-polled
+      // account, gmailClient.listNewMessageIds(accessToken, null) queried
+      // Gmail with no date filter at all, returning the 50 most recent
+      // inbox messages regardless of age -- including old carrier threads
+      // and unrelated internal mail -- and processed every one of them as
+      // a fresh inquiry. A first poll must only establish a "from now on"
+      // baseline, never backfill.
+      expect(googleOAuth.getAccessToken).not.toHaveBeenCalled();
+      expect(gmailClient.listNewMessageIds).not.toHaveBeenCalled();
+      expect(gmailClient.getMessage).not.toHaveBeenCalled();
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [freshAccountId]);
+      expect(inquiries).toHaveLength(0);
+    });
+
+    test('still stamps last_polled_at, so the next poll only looks forward from here', async () => {
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [freshAccountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [updated] = await pool.query('SELECT last_polled_at FROM email_accounts WHERE id = ?', [freshAccountId]);
+      expect(updated[0].last_polled_at).not.toBeNull();
+    });
+
+    test('does not emit anything even when a wsHub is given', async () => {
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [freshAccountId]);
+      const wsHub = { emitToUser: jest.fn() };
+
+      await pollAccount(pool, accountRows[0], wsHub);
+
+      expect(wsHub.emitToUser).not.toHaveBeenCalled();
+    });
+
+    test('a later poll (after the baseline is established) processes messages normally', async () => {
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [freshAccountId]);
+      await pollAccount(pool, accountRows[0]); // first poll: establishes baseline, processes nothing
+
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', from: 'carrier@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const [reFetchedAccount] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [freshAccountId]);
+      await pollAccount(pool, reFetchedAccount[0]); // second poll: normal processing
+
+      expect(gmailClient.listNewMessageIds).toHaveBeenCalledTimes(1);
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [freshAccountId]);
+      expect(inquiries).toHaveLength(1);
+      expect(inquiries[0].gmail_message_id).toBe('m1');
+    });
+  });
+
   test('pollAllAccounts continues polling other accounts if one account fails', async () => {
     const passwordHash = await bcrypt.hash('otherpw', 10);
     const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
     await pool.query(
-      'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+      "INSERT INTO email_accounts (user_id, gmail_address, refresh_token, last_polled_at) VALUES (?, ?, ?, '2020-01-01 00:00:00')",
       [otherUser.insertId, 'other@example.com', 'other-refresh-token']
     );
 
