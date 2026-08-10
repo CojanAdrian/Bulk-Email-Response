@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listInquiries, sendInquiryReply, rejectInquiry } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
+import { detectMultiStop } from '../lib/lookupMessage';
 import { useMotionPreset } from '../lib/motionConfig';
+import Badge from './Badge';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
@@ -126,7 +128,12 @@ function ReviewQueue() {
       {status === 'ready' && inquiries.length > 0 && (
         <ul className="space-y-4">
           <AnimatePresence initial={false}>
-            {inquiries.map((inquiry, index) => (
+            {inquiries.map((inquiry, index) => {
+              const multiStopFlag = detectMultiStop({
+                comment: inquiry.matched_load_comment,
+                stops: inquiry.matched_load_stops,
+              });
+              return (
               <motion.li
                 key={inquiry.id}
                 layout
@@ -134,8 +141,11 @@ function ReviewQueue() {
                 transition={{ ...preset.popIn.transition, delay: index * preset.stagger }}
                 className="rounded-xl border border-border bg-surface-alt p-4"
               >
-                <div className="mb-2 text-sm text-text">
+                <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-text">
                   <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
+                  {multiStopFlag && (
+                    <Badge variant="error">{multiStopFlag} — add extra stops manually</Badge>
+                  )}
                 </div>
                 <label className="mb-1 block text-xs text-text-muted" htmlFor={`reply-${inquiry.id}`}>
                   Reply
@@ -156,7 +166,8 @@ function ReviewQueue() {
                   </PrimaryButton>
                 </div>
               </motion.li>
-            ))}
+              );
+            })}
           </AnimatePresence>
         </ul>
       )}

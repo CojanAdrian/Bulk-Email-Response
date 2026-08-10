@@ -13,16 +13,42 @@ describe('matchInquiry', () => {
     expect(result.matchedLoad.id).toBe(1);
   });
 
-  test('matches on a city+state pair when no load number is mentioned', () => {
-    const result = matchInquiry('Do you have anything from Dallas, TX this week?', LOADS);
+  test('matches on a city+state pair only when BOTH origin and destination are confirmed', () => {
+    const result = matchInquiry('Do you have the Dallas, TX to Chicago, IL load available?', LOADS);
     expect(result.tier).toBe('city_state');
+    expect(result.matchedLoad.id).toBe(1);
+  });
+
+  test('falls back to the weaker "city" tier when only one end of the route is mentioned, even with a state', () => {
+    // "Anything from Dallas, TX?" names only an origin -- there's no destination
+    // in the text to confirm against, so this can't earn the higher-confidence
+    // city_state tier even though a state is present.
+    const result = matchInquiry('Do you have anything from Dallas, TX this week?', LOADS);
+    expect(result.tier).toBe('city');
     expect(result.matchedLoad.id).toBe(1); // two Dallas,TX loads (1 and 3) -- tie-break picks earliest pickup
   });
 
-  test('narrows a city+state tie using a date mentioned in the email', () => {
+  test('narrows a one-ended tie using a date mentioned in the email', () => {
     const result = matchInquiry('Looking for a Dallas, TX load picking up 8/12', LOADS);
-    expect(result.tier).toBe('city_state');
+    expect(result.tier).toBe('city');
     expect(result.matchedLoad.id).toBe(3);
+  });
+
+  test('does not confidently match on a coincidental one-ended overlap when the other end is a real, different place', () => {
+    // Regression test for the real bug this fixes: a carrier replied quoting
+    // a subject naming a load ("0084137") that doesn't exist in this user's
+    // loads, with an origin ("Red Deer County, AB, Canada") that doesn't
+    // belong to any load either -- but the destination "Billings, MT" happens
+    // to match a completely different, unrelated load. That coincidental
+    // overlap must not earn the high-confidence city_state tier.
+    const loadsWithBillingsDestination = [
+      { id: 20, load_number: '9099', origin_city: 'Kennesaw', origin_state: 'GA', dest_city: 'Billings', dest_state: 'MT', early_pu: '2026-06-29 06:00:00' },
+    ];
+    const result = matchInquiry(
+      'Re: 0084137 // Red Deer County, AB, Canada - Billings, MT 59106 // PRO 632628',
+      loadsWithBillingsDestination
+    );
+    expect(result.tier).not.toBe('city_state');
   });
 
   test('matches on city alone when state is not mentioned', () => {

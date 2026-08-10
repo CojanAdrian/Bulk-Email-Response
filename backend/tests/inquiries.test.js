@@ -94,6 +94,51 @@ describe('inquiries routes', () => {
     expect(res.body[0].subject).toBe('Needs review one');
   });
 
+  test('includes the matched load\'s stops count, so the frontend can flag multi-stop loads', async () => {
+    const [loadResult] = await pool.query(
+      "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, stops, user_id, status) VALUES ('L1', 'Dallas', 'TX', 'Chicago', 'IL', 2, ?, 'active')",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Multi-stop load inquiry', '2026-08-01 08:00:00', ?, 'load_number', 'matched')`,
+      [userId, accountId, loadResult.insertId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].matched_load_stops).toBe(2);
+  });
+
+  test('includes the matched load\'s planning comment, so the frontend can detect a multi-pick/multi-drop mention', async () => {
+    const [loadResult] = await pool.query(
+      "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, comment, user_id, status) VALUES ('L1', 'Dallas', 'TX', 'Chicago', 'IL', '2nd pickup in Fort Worth', ?, 'active')",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Multi-pick load inquiry', '2026-08-01 08:00:00', ?, 'load_number', 'matched')`,
+      [userId, accountId, loadResult.insertId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].matched_load_comment).toBe('2nd pickup in Fort Worth');
+  });
+
+  test('matched_load_stops and matched_load_comment are null when there is no matched load', async () => {
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Unmatched inquiry', '2026-08-01 08:00:00', 'none', 'needs_review')`,
+      [userId, accountId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].matched_load_stops).toBeNull();
+    expect(res.body[0].matched_load_comment).toBeNull();
+  });
+
   describe('POST /:id/send', () => {
     let inquiryId;
 

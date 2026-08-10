@@ -56,6 +56,32 @@ describe('InquiriesLog', () => {
     expect(screen.getByText('other@carrier.com')).toBeInTheDocument();
   });
 
+  test('shows a red "Multi-stop" badge when the matched load has extra stops', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      {
+        id: 1, from_address: 'dispatch@carrierco.com', subject: 'Load #4521', match_tier: 'load_number',
+        reply_status: 'auto_sent', received_at: '2026-08-08T14:02:00.000Z', matched_load_stops: 2,
+      },
+    ]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/multi-stop/i)).toBeInTheDocument();
+  });
+
+  test('does not show the "Multi-stop" badge for a direct, no-extra-stop load', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      {
+        id: 1, from_address: 'dispatch@carrierco.com', subject: 'Load #4521', match_tier: 'load_number',
+        reply_status: 'auto_sent', received_at: '2026-08-08T14:02:00.000Z', matched_load_stops: 0,
+      },
+    ]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.queryByText(/multi-stop/i)).not.toBeInTheDocument();
+  });
+
   test('re-fetches when refreshKey changes', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([]);
     const { rerender } = render(<InquiriesLog refreshKey={0} />);

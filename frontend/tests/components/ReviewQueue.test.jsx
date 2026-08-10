@@ -53,6 +53,42 @@ describe('ReviewQueue', () => {
     expect(screen.getByLabelText(/reply/i)).toHaveValue(INQUIRY.reply_body);
   });
 
+  test('shows a red multi-stop badge when the matched load has extra stops', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_stops: 1 }]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/multi-stop/i)).toBeInTheDocument();
+  });
+
+  test('does not show the multi-stop badge when the matched load has no extra stops', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_stops: 0 }]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.queryByText(/multi-stop/i)).not.toBeInTheDocument();
+  });
+
+  test('labels the badge MULTI-PICK when the matched load\'s comment mentions a second pickup', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { ...INQUIRY, matched_load_stops: 1, matched_load_comment: '2nd pickup in Fort Worth' },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/multi-pick/i)).toBeInTheDocument();
+  });
+
+  test('labels the badge MULTI-DROP when the matched load\'s comment mentions a second delivery', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { ...INQUIRY, matched_load_stops: 1, matched_load_comment: '2nd delivery in Joliet' },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/multi-drop/i)).toBeInTheDocument();
+  });
+
   test('sends the edited textarea content, not the original draft, when Send is clicked', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
     inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });

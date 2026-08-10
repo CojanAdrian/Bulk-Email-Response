@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 165 tests across 13 suites: `tests/health.test.js`,
+There are 186 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -381,12 +381,14 @@ An inquiry row has this shape:
   "body_snippet": "Hi, is load TEST-001 still available for pickup...",
   "received_at": "2026-08-08T14:02:00.000Z",
   "matched_load_id": 1,
+  "matched_load_stops": 0,
+  "matched_load_comment": null,
   "match_tier": "load_number",
   "status": "matched",
   "gmail_thread_id": "18abc...",
   "gmail_in_reply_to": "<CAF...@mail.gmail.com>",
   "reply_status": "auto_sent",
-  "reply_body": "Hi,\n\nYes, load #TEST-001 is still available:\n...",
+  "reply_body": "PU: CHICAGO, IL – 08/10/2026 8am\nDEL: DALLAS, TX – 08/11/2026 2pm\nWeight: 43,500 lbs\nRate: $1,500",
   "reply_sent_at": "2026-08-08T14:04:02.000Z",
   "created_at": "2026-08-08T14:04:00.000Z"
 }
@@ -394,13 +396,20 @@ An inquiry row has this shape:
 
 `match_tier` is one of `load_number`, `city_state`, `city`, `state`, `none`;
 `status` is `matched` or `needs_review`; `matched_load_id` is `null` when
-`status` is `needs_review`. `reply_status` is one of `none` (no load
-matched, nothing to reply with), `pending_review` (a reply was composed but
-is waiting for a human, via `/send` or `/reject`), `auto_sent` (sent
-automatically at poll time), `sent` (a human approved it via `/send`), or
-`rejected` (a human dismissed it via `/reject`, no email sent). See "Gmail
-integration" below for the full policy on which tier gets auto-sent versus
-queued.
+`status` is `needs_review`. `matched_load_stops` and `matched_load_comment` are the matched load's
+`stops` and `comment` columns (letting the frontend run the same
+`detectMultiStop` heuristic from `frontend/src/lib/lookupMessage.js` used
+elsewhere in the app — a nonzero `stops` count, or a comment mentioning a
+second pickup/delivery, flags the inquiry as multi-pick/multi-drop so the
+user knows to add the extra stop manually) — both are joined in from
+`loads` at read time, not stored on the inquiry row itself, and are `null`
+whenever there's no matched load.
+`reply_status` is one of `none` (no load matched, nothing to reply with),
+`pending_review` (a reply was composed but is waiting for a human, via
+`/send` or `/reject`), `auto_sent` (sent automatically at poll time),
+`sent` (a human approved it via `/send`), or `rejected` (a human dismissed
+it via `/reject`, no email sent). See "Gmail integration" below for the
+full policy on which tier gets a composed reply and which gets auto-sent.
 
 ## Accounts and roles
 
@@ -456,12 +465,33 @@ connected account's entire recent inbox history (old carrier threads,
 internal team mail, anything) as fresh inquiries needing a reply. Only
 messages that arrive *after* that first poll are ever processed.
 
-**Auto-send and review queue.** Only an exact **load number** match
-(`match_tier: 'load_number'`) is confident enough to reply without a human
-looking at it — the carrier gave a unique, unambiguous identifier, so
-there's no risk of answering about the wrong load. Even then, sending
-still requires the user to have explicitly opted in via
-`email_accounts.auto_send_enabled` (`PATCH /api/gmail/auto-send`,
+**Recipient filtering — only direct, single-recipient messages count as
+inquiries.** Before a message is matched against anything, `pollAccount`
+checks its `To`/`Cc` headers (`isAddressedOnlyToAccount` in
+`src/lib/emailPoller.js`, using `gmailClient.extractEmailAddresses` to pull
+bare addresses out of `"Name <addr>"`-formatted headers). If any recipient
+besides the connected account's own address is present — a team alias
+Cc'd on the thread, another rep also To'd — the message is skipped
+entirely: no `email_inquiries` row is created, nothing is matched, nothing
+is composed. It's simply not treated as a direct inquiry to this user. A
+skipped message is not retried on the next poll either, since the date-
+filtered Gmail query naturally moves past it once `last_polled_at`
+advances.
+
+**Auto-send and review queue.** Two tiers are confident enough to have a
+specific reply *composed* for them at all — everything else still creates
+a review-queue entry (so the inquiry isn't lost, and its `match_tier` still
+gives a human a head start on what it's about) but leaves `reply_body`
+`null` rather than risk suggesting a possibly-wrong load's details:
+
+- `load_number` — an exact, unambiguous load-number match.
+- `city_state` — **both** the origin and destination are confirmed by
+  city+state text in the email (see "Matching pipeline" below; this tier
+  no longer fires on a match against just one end of the route).
+
+Only `load_number` can additionally *auto-send* without a human looking at
+it — even then, sending still requires the user to have explicitly opted
+in via `email_accounts.auto_send_enabled` (`PATCH /api/gmail/auto-send`,
 `{"enabled": boolean}` — see "Gmail" in the API reference; toggled from
 the frontend's Gmail connection panel). **Every account starts with this
 off** — a newly connected account, or one that hasn't touched the
@@ -470,13 +500,13 @@ user turns it on. When both the tier and the toggle line up, the poller
 composes a reply from the matched load's fields (see
 `src/lib/replyComposer.js`) and sends it immediately via Gmail, as a proper
 threaded reply (`In-Reply-To`/`References` headers, same `threadId`, `Re:`
-subject) — `reply_status` becomes `auto_sent`. Every other matched tier
-(`city_state`, `city`, `state` — ambiguous enough that multiple candidate
-loads existed and were tie-broken by heuristics) still gets a reply
-composed and ready, but waits as `reply_status: 'pending_review'` for a
+subject) — `reply_status` becomes `auto_sent`. A `city_state` match still
+gets its composed reply queued as `reply_status: 'pending_review'` for a
 human to approve (`POST /api/inquiries/:id/send`, optionally editing the
 body first) or dismiss (`POST /api/inquiries/:id/reject`) — see
-"Inquiries" above. Unmatched inquiries (`match_tier: 'none'`) get no
+"Inquiries" above; it never auto-sends. `city`/`state` tier matches are
+also `pending_review`, but with `reply_body: null` — the human writes the
+reply from scratch. Unmatched inquiries (`match_tier: 'none'`) get no
 composed reply at all (`reply_status` stays `none`); nothing to send until
 a human works out what to do the old-fashioned way. If an auto-send
 attempt itself fails (e.g. a transient Gmail API error), the inquiry
@@ -485,16 +515,40 @@ the poller — the same per-item resilience pattern used everywhere else in
 the poller. Reply content is a fixed template, not AI-generated — see the
 design spec for why (`docs/superpowers/specs/2026-08-09-auto-reply-review-queue-design.md`).
 
+**Reply format** (`src/lib/replyComposer.js`) is a fixed four-line
+template, one field per line, any field the load lacks simply omitted:
+
+```
+PU: CHICAGO, IL – 08/10/2026 8am
+DEL: DALLAS, TX – 08/11/2026 2pm
+Weight: 43,500 lbs
+Rate: $1,500
+```
+
+`PU`/`DEL` use the load's `early_pu`/`late_del` columns; the time is
+omitted from a line if that column is `null` (leaving just `PU: CHICAGO,
+IL`). The composer has no way to represent an appointment-vs-FCFS
+distinction (e.g. "6pm appt") since that isn't tracked as a separate field
+on `loads` yet — pickup/delivery times are shown plainly, without an
+`appt` qualifier.
+
 **Matching pipeline** (`src/lib/matchingEngine.js`), tried in this order,
 first match wins:
 
 1. **Load number** — the email mentions a load number that matches one of
    the user's own loads exactly. Unambiguous; always wins outright even if
    city/state text is also present.
-2. **City + state** — a city and its matching state (either the origin or
-   destination of a load) are both mentioned, e.g. "Dallas, TX" or "a load
-   from Dallas going to Texas."
-3. **City alone** — just a city name, no state.
+2. **City + state (both ends)** — the origin's city+state AND the
+   destination's city+state are both mentioned, e.g. "the Dallas, TX to
+   Chicago, IL load." A match against only one end of the route (say, the
+   email names a destination that happens to coincide with a load whose
+   origin is nowhere close to what was actually asked about) is
+   deliberately **not** enough for this tier — see the regression test in
+   `tests/lib/matchingEngine.test.js` for the real false-positive this
+   fixes. An email that only names one end of a route (no destination
+   mentioned at all, e.g. "anything from Dallas, TX?") falls through to
+   the weaker "city" tier below instead.
+3. **City alone** — just a city name (either end), no state confirmation.
 4. **State alone** — just a state, matched by 2-letter abbreviation
    (**must be written in capitals**, e.g. "TX" — lowercase abbreviations
    are deliberately not matched, since abbreviations like `hi`/`in`/`or`/

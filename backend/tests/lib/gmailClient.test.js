@@ -22,7 +22,7 @@ jest.mock('googleapis', () => {
 });
 
 const googleapis = require('googleapis');
-const { listNewMessageIds, getMessage, extractPlainTextBody, sendReply } = require('../../src/lib/gmailClient');
+const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, sendReply } = require('../../src/lib/gmailClient');
 
 describe('listNewMessageIds', () => {
   beforeEach(() => {
@@ -111,6 +111,8 @@ describe('getMessage', () => {
           mimeType: 'text/plain',
           headers: [
             { name: 'From', value: 'carrier@example.com' },
+            { name: 'To', value: 'broker@example.com' },
+            { name: 'Cc', value: 'dispatch@carrier.com' },
             { name: 'Subject', value: 'Load #4521 availability' },
             { name: 'Message-ID', value: '<abc123@mail.gmail.com>' },
           ],
@@ -125,6 +127,8 @@ describe('getMessage', () => {
       threadId: 't1',
       messageIdHeader: '<abc123@mail.gmail.com>',
       from: 'carrier@example.com',
+      to: 'broker@example.com',
+      cc: 'dispatch@carrier.com',
       subject: 'Load #4521 availability',
       body: 'Is load 4521 still available?',
       receivedAt: new Date(1735689600000),
@@ -198,6 +202,33 @@ describe('getMessage', () => {
 
     const message = await getMessage('token', 'm1');
     expect(message.from).toBe('carrier@example.com');
+  });
+});
+
+describe('extractEmailAddresses', () => {
+  test('extracts a bare address', () => {
+    expect(extractEmailAddresses('carrier@example.com')).toEqual(['carrier@example.com']);
+  });
+
+  test('extracts the address out of a "Name <addr>" formatted entry', () => {
+    expect(extractEmailAddresses('Justin Ionita <justin@igtfreight.com>')).toEqual(['justin@igtfreight.com']);
+  });
+
+  test('splits and extracts multiple comma-separated recipients', () => {
+    expect(extractEmailAddresses('Justin Ionita <justin@igtfreight.com>, team@igtfreight.com')).toEqual([
+      'justin@igtfreight.com',
+      'team@igtfreight.com',
+    ]);
+  });
+
+  test('lowercases every extracted address', () => {
+    expect(extractEmailAddresses('Justin@IGTFreight.com')).toEqual(['justin@igtfreight.com']);
+  });
+
+  test('returns an empty array for a missing header', () => {
+    expect(extractEmailAddresses('')).toEqual([]);
+    expect(extractEmailAddresses(null)).toEqual([]);
+    expect(extractEmailAddresses(undefined)).toEqual([]);
   });
 });
 

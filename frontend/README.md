@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 367 tests across 40 suites, covering
+Runs the Vitest suite (`vitest run`) — 373 tests across 40 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -311,14 +311,23 @@ panel's failure doesn't block the others):
   review queue regardless of this setting.
 - **Review queue** — every inquiry waiting on a human
   (`reply_status: 'pending_review'`): who asked, what they asked, and an
-  editable textarea pre-filled with the composed reply. **Send** posts the
-  (possibly-edited) textarea content and removes the row from the queue on
-  success; **Reject** dismisses it (no email sent) and does the same. See
-  `backend/README.md`'s "Gmail integration" section for exactly which
-  inquiries land here versus getting auto-sent without review.
+  editable textarea pre-filled with the composed reply — pre-filled only
+  for a `load_number` or `city_state` (full-route) match; a weaker
+  `city`/`state` match still shows up here but with a blank textarea, since
+  the app isn't confident enough to suggest a specific load's details.
+  **Send** posts the (possibly-edited) textarea content and removes the row
+  from the queue on success; **Reject** dismisses it (no email sent) and
+  does the same. See `backend/README.md`'s "Gmail integration" section for
+  exactly which inquiries land here versus getting auto-sent without
+  review. If the matched load is multi-pick/multi-drop (detected the same
+  way as the Load Detail Lookup panel's warning, via
+  `src/lib/lookupMessage.js`'s `detectMultiStop`), a red badge next to the
+  subject line calls it out, since those extra stops need to be added to
+  the reply manually.
 - **Inquiry log** — a read-only table of every inquiry the backend poller
   has ever processed, with a colored status badge (Auto-sent / Sent /
-  Pending review / Rejected / No match).
+  Pending review / Rejected / No match) and the same red multi-pick/
+  multi-drop badge next to the match tier when applicable.
 
 A "Refresh" button above the panels manually re-fetches the review queue
 and inquiry log — redundant now that both panels also update live (see

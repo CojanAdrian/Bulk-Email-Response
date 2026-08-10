@@ -21,6 +21,20 @@ function decodeBase64Url(data) {
   return Buffer.from(data, 'base64url').toString('utf8');
 }
 
+// Parses a To/Cc header ("Name <a@x.com>, b@y.com") into lowercased bare
+// addresses, for comparing against a connected account's own address.
+function extractEmailAddresses(headerValue) {
+  if (!headerValue) return [];
+  return headerValue
+    .split(',')
+    .map((part) => {
+      const angleMatch = part.match(/<([^>]+)>/);
+      const address = angleMatch ? angleMatch[1] : part.trim();
+      return address.trim().toLowerCase();
+    })
+    .filter(Boolean);
+}
+
 function extractPlainTextBody(payload) {
   if (payload.mimeType === 'text/plain' && payload.body && payload.body.data) {
     return decodeBase64Url(payload.body.data);
@@ -44,6 +58,8 @@ async function getMessage(accessToken, messageId) {
     threadId: res.data.threadId,
     messageIdHeader: getHeader('Message-ID') || null,
     from: getHeader('From'),
+    to: getHeader('To'),
+    cc: getHeader('Cc'),
     subject: getHeader('Subject'),
     body: extractPlainTextBody(res.data.payload),
     receivedAt: new Date(Number(res.data.internalDate)),
@@ -74,4 +90,4 @@ async function sendReply(accessToken, { to, subject, body, threadId, inReplyToMe
   return res.data;
 }
 
-module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, sendReply };
+module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, sendReply };

@@ -37,6 +37,12 @@ function findLoadNumberMatch(text, loads) {
   return loads.find((load) => load.load_number && normalized.includes(String(load.load_number).toLowerCase()));
 }
 
+// Requires BOTH ends of the route to be confirmed in the text -- an inquiry
+// that names one specific origin and one specific destination must match a
+// load on both, not just one. A destination-only match against a load whose
+// origin is nowhere close to (or outright contradicted by) the text mentioned
+// is not the same load, even if the two happen to share a city/state on one
+// end -- see the matchingEngine tests for the real example that motivated this.
 function findCityStateMatches(text, loads) {
   const normalized = normalizeText(text);
   return loads.filter((load) => {
@@ -46,7 +52,7 @@ function findCityStateMatches(text, loads) {
     const destMatch = load.dest_city && load.dest_state &&
       normalized.includes(String(load.dest_city).toLowerCase()) &&
       textMentionsState(text, load.dest_state);
-    return originMatch || destMatch;
+    return originMatch && destMatch;
   });
 }
 

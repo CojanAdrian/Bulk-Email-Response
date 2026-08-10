@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listInquiries } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
+import { detectMultiStop } from '../lib/lookupMessage';
 import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import Badge from './Badge';
@@ -87,7 +88,12 @@ function InquiriesLog({ refreshKey }) {
           </thead>
           <tbody>
             <AnimatePresence initial={false}>
-              {inquiries.map((inquiry) => (
+              {inquiries.map((inquiry) => {
+                const multiStopFlag = detectMultiStop({
+                  comment: inquiry.matched_load_comment,
+                  stops: inquiry.matched_load_stops,
+                });
+                return (
                 <motion.tr
                   key={inquiry.id}
                   layout
@@ -100,14 +106,20 @@ function InquiriesLog({ refreshKey }) {
                   <td className="py-2 pr-4">{new Date(inquiry.received_at).toLocaleString()}</td>
                   <td className="py-2 pr-4">{inquiry.from_address}</td>
                   <td className="py-2 pr-4">{inquiry.subject}</td>
-                  <td className="py-2 pr-4">{inquiry.match_tier}</td>
+                  <td className="py-2 pr-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span>{inquiry.match_tier}</span>
+                      {multiStopFlag && <Badge variant="error">{multiStopFlag}</Badge>}
+                    </div>
+                  </td>
                   <td className="py-2">
                     <Badge variant={REPLY_STATUS_VARIANTS[inquiry.reply_status] || 'default'}>
                       {REPLY_STATUS_LABELS[inquiry.reply_status] || inquiry.reply_status}
                     </Badge>
                   </td>
                 </motion.tr>
-              ))}
+                );
+              })}
             </AnimatePresence>
           </tbody>
         </table>

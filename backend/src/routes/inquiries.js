@@ -14,12 +14,16 @@ function createInquiriesRouter(pool, wsHub) {
   router.get('/', asyncHandler(async (req, res) => {
     const { reply_status } = req.query;
     const params = [req.session.userId];
-    let sql = 'SELECT * FROM email_inquiries WHERE user_id = ?';
+    let sql = `
+      SELECT ei.*, l.stops AS matched_load_stops, l.comment AS matched_load_comment
+      FROM email_inquiries ei
+      LEFT JOIN loads l ON l.id = ei.matched_load_id
+      WHERE ei.user_id = ?`;
     if (reply_status) {
-      sql += ' AND reply_status = ?';
+      sql += ' AND ei.reply_status = ?';
       params.push(reply_status);
     }
-    sql += ' ORDER BY received_at DESC';
+    sql += ' ORDER BY ei.received_at DESC';
     const [rows] = await pool.query(sql, params);
     res.json(rows);
   }));

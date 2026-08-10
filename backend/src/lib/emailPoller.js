@@ -1,11 +1,27 @@
 const { getAccessToken } = require('./googleOAuth');
-const { listNewMessageIds, getMessage, sendReply } = require('./gmailClient');
+const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses } = require('./gmailClient');
 const { matchInquiry } = require('./matchingEngine');
 const { composeReply } = require('./replyComposer');
+
+// Only these tiers confirm enough of the route (both ends, or an exact load
+// number) to safely pre-fill a specific load's PU/DEL/rate details into a
+// suggested reply -- weaker tiers ('city', 'state') still surface the
+// inquiry for a human to handle, but never suggest text that could be about
+// the wrong load.
+const CONFIDENT_TIERS = new Set(['load_number', 'city_state']);
 
 function replySubject(originalSubject) {
   const subject = originalSubject || '';
   return subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`;
+}
+
+// A message copied to anyone besides the connected account itself (a team
+// alias, another rep, etc.) is not treated as a direct inquiry at all -- it
+// is skipped entirely, not even logged to email_inquiries.
+function isAddressedOnlyToAccount(message, accountEmail) {
+  const recipients = [...extractEmailAddresses(message.to), ...extractEmailAddresses(message.cc)];
+  const ownEmail = String(accountEmail || '').toLowerCase();
+  return recipients.length > 0 && recipients.every((address) => address === ownEmail);
 }
 
 async function pollAccount(pool, account, wsHub) {
@@ -34,6 +50,11 @@ async function pollAccount(pool, account, wsHub) {
     if (existing.length > 0) continue;
 
     const message = await getMessage(accessToken, messageId);
+
+    if (!isAddressedOnlyToAccount(message, account.gmail_address)) {
+      continue;
+    }
+
     const { matchedLoad, tier } = matchInquiry(`${message.subject} ${message.body}`, loads);
     const status = matchedLoad ? 'matched' : 'needs_review';
 
@@ -48,7 +69,9 @@ async function pollAccount(pool, account, wsHub) {
     let replySentAt = null;
 
     if (matchedLoad) {
-      replyBody = composeReply(matchedLoad);
+      if (CONFIDENT_TIERS.has(tier)) {
+        replyBody = composeReply(matchedLoad);
+      }
       if (tier === 'load_number' && account.auto_send_enabled) {
         try {
           await sendReply(accessToken, {
