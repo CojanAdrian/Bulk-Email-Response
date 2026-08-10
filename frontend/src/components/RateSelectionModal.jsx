@@ -38,7 +38,7 @@ function RateSelectionModal({ loads, onCancel, onConfirm }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="rate-selection-title"
-      className="fixed inset-0 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
       <MotionCard className="max-h-[80vh] w-full max-w-2xl overflow-y-auto" {...preset.modal.card}>

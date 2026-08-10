@@ -27,7 +27,7 @@ function ContactMethodModal({ onCancel, onConfirm }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="contact-modal-title"
-      className="fixed inset-0 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
       <MotionCard className="w-full max-w-md" {...preset.modal.card}>

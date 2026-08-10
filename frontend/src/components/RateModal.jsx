@@ -113,7 +113,7 @@ function RateModal({ load, onClose, onSaved }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="rate-modal-title"
-      className="fixed inset-0 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
       <MotionCard className="max-h-[85vh] w-full max-w-lg overflow-y-auto" {...preset.modal.card}>
