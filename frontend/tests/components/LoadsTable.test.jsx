@@ -41,6 +41,22 @@ describe('LoadsTable', () => {
     expect(loadsApi.listLoads).toHaveBeenCalledWith('active');
   });
 
+  test('shows a yellow "Modified" badge for a load with a custom_reply_body', async () => {
+    loadsApi.listLoads.mockResolvedValue([{ ...SAMPLE_LOAD, custom_reply_body: 'Custom text' }]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    expect(screen.getByText('Modified')).toBeInTheDocument();
+  });
+
+  test('does not show the "Modified" badge for a load with no custom_reply_body', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    expect(screen.queryByText('Modified')).not.toBeInTheDocument();
+  });
+
   test('shows an empty state when there are no loads', async () => {
     loadsApi.listLoads.mockResolvedValue([]);
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);

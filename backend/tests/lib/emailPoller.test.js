@@ -104,6 +104,45 @@ describe('emailPoller', () => {
     expect(inquiries[0].ref_mismatch).toBe(0);
   });
 
+  test('uses the load\'s custom_reply_body verbatim instead of the auto-composed reply when set', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      subject: 'Load 4521', body: 'Is load 4521 still available?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    const matchedLoad = {
+      id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL',
+      custom_reply_body: 'PU: DALLAS, TX\n2nd PU: FORT WORTH, TX\nDEL: CHICAGO, IL\nRate: $1,500',
+    };
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad, tier: 'load_number', refMismatch: false });
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, accountRows[0]);
+
+    const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(inquiries[0].reply_body).toBe('PU: DALLAS, TX\n2nd PU: FORT WORTH, TX\nDEL: CHICAGO, IL\nRate: $1,500');
+  });
+
+  test('uses custom_reply_body even for a low-confidence (city) tier match, unlike the auto-composed reply', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      subject: 'Dallas load?', body: 'Anything from Dallas?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    const matchedLoad = { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', custom_reply_body: 'Custom multi-drop text' };
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad, tier: 'city', refMismatch: false });
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, accountRows[0]);
+
+    const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(inquiries[0].reply_body).toBe('Custom multi-drop text');
+  });
+
   test('auto-sends a reply and marks it auto_sent for a confident (load_number) match', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);

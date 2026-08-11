@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listLoads, getLoad, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus } from '../../src/api/loads';
+import { listLoads, getLoad, previewLoadReply, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus } from '../../src/api/loads';
 
 describe('loads api', () => {
   beforeEach(() => {
@@ -26,6 +26,13 @@ describe('loads api', () => {
     await getLoad(1);
     const [url] = global.fetch.mock.calls[0];
     expect(url).toContain('/api/loads/1');
+  });
+
+  test('previewLoadReply gets /api/loads/:id/preview-reply', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ body: 'PU: DALLAS, TX' }) });
+    await previewLoadReply(1);
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/1/preview-reply');
   });
 
   test('updateLoad patches /api/loads/:id with the given data', async () => {

@@ -121,6 +121,14 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE loads MODIFY COLUMN status ENUM('active','booked','covered','expired') NOT NULL DEFAULT 'active'`);
   }
 
+  const [customReplyCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'custom_reply_body'`,
+    [databaseName]
+  );
+  if (customReplyCol[0].count === 0) {
+    await conn.query(`ALTER TABLE loads ADD COLUMN custom_reply_body TEXT NULL`);
+  }
+
   const [indexRows] = await conn.query(`SHOW INDEX FROM loads WHERE Key_name != 'PRIMARY'`);
   const indexMap = {};
   indexRows.forEach((row) => {

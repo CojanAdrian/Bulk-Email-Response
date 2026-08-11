@@ -12,7 +12,7 @@ const BLANK_EXTRA_FIELDS = {
   origin_city: null, origin_state: null, origin_zip: null,
   dest_city: null, dest_state: null, dest_zip: null,
   equipment: null, weight: null, commodity: null, temperature: null, comment: null,
-  stops: null,
+  stops: null, custom_reply_body: null,
 };
 
 describe('RateModal', () => {
@@ -55,7 +55,69 @@ describe('RateModal', () => {
         origin_city: 'Dallas', origin_state: 'TX', origin_zip: '75201',
         dest_city: 'Milwaukee', dest_state: 'IL', dest_zip: '60601',
         equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead',
-        stops: 0, target_pay: 1500, status: 'covered',
+        stops: 0, target_pay: 1500, status: 'covered', custom_reply_body: null,
+      });
+    });
+  });
+
+  test('toggling "Use a custom reply" on prefills the textarea from the preview-reply endpoint', async () => {
+    loadsApi.previewLoadReply.mockResolvedValue({ body: 'PU: DALLAS, TX\nDEL: CHICAGO, IL\nRate: $1,500' });
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText(/use a custom reply/i));
+
+    await waitFor(() => {
+      expect(loadsApi.previewLoadReply).toHaveBeenCalledWith(1);
+      expect(screen.getByLabelText(/custom reply text/i)).toHaveValue('PU: DALLAS, TX\nDEL: CHICAGO, IL\nRate: $1,500');
+    });
+  });
+
+  test('does not fetch a preview when the load already has a custom_reply_body', async () => {
+    const loadWithCustomReply = { ...LOAD, custom_reply_body: 'Already customized text' };
+    render(<RateModal load={loadWithCustomReply} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByLabelText(/use a custom reply/i)).toBeChecked();
+    expect(screen.getByLabelText(/custom reply text/i)).toHaveValue('Already customized text');
+    expect(loadsApi.previewLoadReply).not.toHaveBeenCalled();
+  });
+
+  test('saves the edited custom reply text as custom_reply_body', async () => {
+    loadsApi.previewLoadReply.mockResolvedValue({ body: 'PU: DALLAS, TX' });
+    loadsApi.updateLoad.mockResolvedValue({ ...LOAD, custom_reply_body: 'PU: DALLAS, TX\n2nd PU: FORT WORTH, TX' });
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText(/use a custom reply/i));
+    await waitFor(() => screen.getByDisplayValue('PU: DALLAS, TX'));
+
+    fireEvent.change(screen.getByLabelText(/custom reply text/i), {
+      target: { value: 'PU: DALLAS, TX\n2nd PU: FORT WORTH, TX' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, {
+        ...BLANK_EXTRA_FIELDS,
+        target_pay: 1500,
+        status: 'active',
+        custom_reply_body: 'PU: DALLAS, TX\n2nd PU: FORT WORTH, TX',
+      });
+    });
+  });
+
+  test('unchecking "Use a custom reply" clears custom_reply_body on save', async () => {
+    const loadWithCustomReply = { ...LOAD, custom_reply_body: 'Old custom text' };
+    loadsApi.updateLoad.mockResolvedValue({ ...loadWithCustomReply, custom_reply_body: null });
+    render(<RateModal load={loadWithCustomReply} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByLabelText(/use a custom reply/i));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, {
+        ...BLANK_EXTRA_FIELDS,
+        target_pay: 1500,
+        status: 'active',
+        custom_reply_body: null,
       });
     });
   });

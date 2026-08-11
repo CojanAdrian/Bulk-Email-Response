@@ -108,7 +108,7 @@ post-run grace check even after every store used in a test is properly
 sign of a real leak (every test that constructs a store does close it).
 Don't run `npx jest` directly; use `npm test`.
 
-There are 241 tests across 15 suites: `tests/health.test.js`,
+There are 248 tests across 15 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -306,11 +306,17 @@ don't own.
 
 `status` is one of `active`, `booked`, `covered`, or `expired`.
 
+**`custom_reply_body`** (`loads.custom_reply_body`, `TEXT NULL`) lets a
+user override what gets sent for a specific load, instead of the
+auto-composed PU/DEL/Weight/Rate reply — see "Custom load replies" under
+"Gmail integration" below for how the poller uses it.
+
 | Method | Path | Request body | Response |
 |---|---|---|---|
 | GET | `/api/loads` | — (optional query `?status=active\|booked\|covered\|expired`) | `200` array of load rows the caller owns (all users' rows if admin), newest (`created_at`) first |
 | GET | `/api/loads/:id` | — | `200` load row, if it belongs to the caller (or the caller is admin); `404 {"error": "Load not found"}` if no such id, or it exists but belongs to a different, non-admin caller |
-| PATCH | `/api/loads/:id` | Any of `origin_city`, `origin_state`, `origin_zip`, `dest_city`, `dest_state`, `dest_zip`, `equipment`, `weight`, `target_pay`, `early_pu`, `late_pu`, `late_del`, `stops`, `commodity`, `temperature`, `comment`, `status` (at least one). `load_number` and `raw_equipment` are deliberately not editable — see the code comment in `src/routes/loads.js` | `200` updated load row; `400 {"error": "No valid fields to update"}` if no editable field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
+| GET | `/api/loads/:id/preview-reply` | — | `200 {"body": string}` — the auto-composed PU/DEL/Weight/Rate reply for this load, via the same `composeReply` the poller uses. Same ownership/404 rules as `GET /:id`. Used to prefill a custom-reply textarea with a sensible starting point rather than duplicating the formatting logic client-side |
+| PATCH | `/api/loads/:id` | Any of `origin_city`, `origin_state`, `origin_zip`, `dest_city`, `dest_state`, `dest_zip`, `equipment`, `weight`, `target_pay`, `early_pu`, `late_pu`, `late_del`, `stops`, `commodity`, `temperature`, `comment`, `status`, `custom_reply_body` (at least one). `load_number` and `raw_equipment` are deliberately not editable — see the code comment in `src/routes/loads.js` | `200` updated load row; `400 {"error": "No valid fields to update"}` if no editable field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
 | DELETE | `/api/loads/:id` | — | `200 {"ok": true}`; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
 | POST | `/api/loads/bulk-delete` | `{"ids": [number, ...]}` (non-empty) | `200 {"deleted": number}` — only the ids owned by the caller are actually deleted (silently skips any others, admin-bypassed like the single-item routes); `400 {"error": "ids must be a non-empty array"}` if `ids` is missing/empty |
 | POST | `/api/loads/bulk-status` | `{"ids": [number, ...], "status": "active"\|"booked"\|"covered"\|"expired"}` | `200 {"updated": number}` — same ownership scoping as bulk-delete; `400` if `ids` is missing/empty or `status` isn't a recognized value |
@@ -631,6 +637,23 @@ IL`). The composer has no way to represent an appointment-vs-FCFS
 distinction (e.g. "6pm appt") since that isn't tracked as a separate field
 on `loads` yet — pickup/delivery times are shown plainly, without an
 `appt` qualifier.
+
+**Custom load replies.** If `loads.custom_reply_body` is set for the
+matched load, `pollAccount` uses that text **verbatim** instead of calling
+`composeReply` — and unlike the auto-composed reply, this applies
+regardless of match tier (even `city`/`state`, which otherwise never get a
+composed body at all; see "Auto-send and review queue" below). The
+rationale: a custom reply is deliberately user-authored content, not a
+guess, so there's no confidence tier to gate it behind. This is the
+mechanism behind the frontend's "Use a custom reply for this load" toggle
+in the load edit modal — most useful for multi-pick/multi-drop loads,
+where the auto-composed reply has no way to include the extra stop info
+from the load's `comment`. `GET /api/loads/:id/preview-reply` (see the API
+reference above) lets the frontend prefill that custom-reply textarea with
+the auto-composed text as a starting point, so customizing is additive
+rather than starting from a blank box. A load with a non-null
+`custom_reply_body` is exactly what the frontend's yellow "Modified" badge
+in the loads table reflects.
 
 **Matching pipeline** (`src/lib/matchingEngine.js`), tried in this order,
 first match wins:

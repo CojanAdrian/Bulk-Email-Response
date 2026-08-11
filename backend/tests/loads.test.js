@@ -184,6 +184,54 @@ describe('loads routes', () => {
     expect(res.body.status).toBe('covered');
   });
 
+  test('PATCH can set a custom_reply_body', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({
+      custom_reply_body: 'PU: DALLAS, TX\n2nd PU: FORT WORTH, TX\nDEL: CHICAGO, IL\nRate: $1,500',
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.custom_reply_body).toBe('PU: DALLAS, TX\n2nd PU: FORT WORTH, TX\nDEL: CHICAGO, IL\nRate: $1,500');
+  });
+
+  test('PATCH can clear a custom_reply_body by setting it to null', async () => {
+    const [result] = await pool.query(
+      'INSERT INTO loads (load_number, origin_city, user_id, custom_reply_body) VALUES (?, ?, ?, ?)',
+      ['L1001', 'Dallas', userId, 'Some custom text']
+    );
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ custom_reply_body: null });
+    expect(res.status).toBe(200);
+    expect(res.body.custom_reply_body).toBeNull();
+  });
+
+  describe('GET /:id/preview-reply', () => {
+    test('rejects unauthenticated requests', async () => {
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const res = await request(app).get(`/api/loads/${result.insertId}/preview-reply`);
+      expect(res.status).toBe(401);
+    });
+
+    test('returns the auto-composed reply for an owned load', async () => {
+      const [result] = await pool.query(
+        'INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, target_pay, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['L1001', 'Dallas', 'TX', 'Chicago', 'IL', 1500, userId]
+      );
+      const res = await agent.get(`/api/loads/${result.insertId}/preview-reply`);
+      expect(res.status).toBe(200);
+      expect(res.body.body).toContain('PU: DALLAS, TX');
+      expect(res.body.body).toContain('DEL: CHICAGO, IL');
+      expect(res.body.body).toContain('Rate: $1,500');
+    });
+
+    test('returns 404 for a load owned by a different user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L9999', 'Someone Elses', otherUser.insertId]);
+
+      const res = await agent.get(`/api/loads/${result.insertId}/preview-reply`);
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('DELETE /:id', () => {
     test('rejects unauthenticated requests', async () => {
       const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);

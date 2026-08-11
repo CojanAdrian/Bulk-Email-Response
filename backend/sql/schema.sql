@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS loads (
   temperature VARCHAR(50),
   comment TEXT,
   status ENUM('active','booked','covered','expired') NOT NULL DEFAULT 'active',
+  custom_reply_body TEXT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

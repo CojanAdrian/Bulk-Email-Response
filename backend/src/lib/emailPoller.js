@@ -99,7 +99,14 @@ async function pollAccount(pool, account, wsHub) {
     let replySentAt = null;
 
     if (matchedLoad) {
-      if (CONFIDENT_TIERS.has(tier)) {
+      // A user-written custom reply (set via the load's edit modal -- see
+      // "Custom load replies" in the README) always wins over the
+      // auto-composed one, regardless of match tier: it's deliberately
+      // authored content, not a guess, and is exactly how a multi-pick/
+      // multi-drop load gets its extra stop info included in the reply.
+      if (matchedLoad.custom_reply_body) {
+        replyBody = matchedLoad.custom_reply_body;
+      } else if (CONFIDENT_TIERS.has(tier)) {
         replyBody = composeReply(matchedLoad);
       }
       if (tier === 'load_number' && account.auto_send_enabled) {

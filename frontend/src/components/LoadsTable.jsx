@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
+import Badge from './Badge';
 import Card from './Card';
 import Skeleton from './Skeleton';
 
@@ -292,7 +293,12 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                     onChange={() => toggleSelectOne(load.id)}
                   />
                 </td>
-                <td className="py-2 pr-4">{load.load_number}</td>
+                <td className="py-2 pr-4">
+                  <div className="flex items-center gap-1.5">
+                    <span>{load.load_number}</span>
+                    {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
+                  </div>
+                </td>
                 <td className="py-2 pr-4">
                   {load.origin_city}, {load.origin_state}
                 </td>

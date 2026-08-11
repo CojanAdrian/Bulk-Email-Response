@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 391 tests across 40 suites, covering
+Runs the Vitest suite (`vitest run`) — 398 tests across 40 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -203,13 +203,32 @@ Each row in the loads table (`LoadsTable.jsx`) has:
   so it never silently refers to rows no longer on screen.
 - An **"Edit" button**, which opens `RateModal.jsx` — a full edit form for
   origin/destination, equipment, weight, commodity, temperature, stops,
-  comment, target pay, and status. It does **not** yet expose the
-  pickup/delivery datetime fields (`early_pu`, `late_pu`, `late_del`) —
-  those are editable via the API but not wired into this form yet.
+  comment, target pay, status, and a **custom reply** (see below). It does
+  **not** yet expose the pickup/delivery datetime fields (`early_pu`,
+  `late_pu`, `late_del`) — those are editable via the API but not wired
+  into this form yet.
 - A **per-row status dropdown** for quickly marking a load
   active/booked/covered/expired without opening the full edit modal.
 - A **"Delete" button**, which asks for inline confirmation ("Confirm" /
   "Cancel") before permanently removing the load.
+- A yellow **"Modified" badge** next to the load number when that load has
+  a custom reply set (`custom_reply_body` is non-null) — see below.
+
+**Custom load replies.** Inside "Edit", check "Use a custom reply for this
+load" to write your own reply text for that load instead of the
+auto-generated PU/DEL/Weight/Rate one — most useful for a multi-pick/
+multi-drop load, since the auto-generated reply has no way to include the
+extra stop info. Checking the box for the first time prefills the textarea
+with the auto-generated text (fetched via
+`GET /api/loads/:id/preview-reply`) as a starting point, so you're
+typically adding to it (e.g. a "2nd PU: ..." line) rather than typing a
+reply from scratch. Saving with the box checked stores your text as
+`custom_reply_body`; the Gmail poller then sends that exact text for any
+inquiry that matches this load, at **any** match tier — unlike the
+auto-generated reply, which only gets used for `load_number`/`city_state`
+matches. Unchecking the box and saving clears `custom_reply_body`,
+reverting to the auto-generated reply. A load with a custom reply set
+shows the yellow "Modified" badge in the loads table as a reminder.
 
 **Sortable column headers.** Click "Load #", "Origin", "Destination",
 "Equipment", or "Target Pay" to sort the currently-visible rows by that

@@ -1,5 +1,6 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
+const { composeReply } = require('../lib/replyComposer');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -16,7 +17,7 @@ const EDITABLE_FIELDS = [
   'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
-  'commodity', 'temperature', 'comment', 'status',
+  'commodity', 'temperature', 'comment', 'status', 'custom_reply_body',
 ];
 
 const STATUS_VALUES = ['active', 'booked', 'covered', 'expired'];
@@ -50,6 +51,21 @@ function createLoadsRouter(pool, wsHub) {
       return res.status(404).json({ error: 'Load not found' });
     }
     res.json(load);
+  }));
+
+  // Previews the auto-generated PU/DEL/Weight/Rate reply for a load, using
+  // the exact same composer the poller uses -- so the frontend can prefill
+  // a custom-reply textarea with a sensible starting point (e.g. to then
+  // add the extra stop lines for a multi-pick/multi-drop load) instead of
+  // duplicating the formatting logic client-side.
+  router.get('/:id/preview-reply', asyncHandler(async (req, res) => {
+    const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
+    const load = rows[0];
+    const isAdmin = req.session.role === 'admin';
+    if (!load || (!isAdmin && load.user_id !== req.session.userId)) {
+      return res.status(404).json({ error: 'Load not found' });
+    }
+    res.json({ body: composeReply(load) });
   }));
 
   router.patch('/:id', asyncHandler(async (req, res) => {
