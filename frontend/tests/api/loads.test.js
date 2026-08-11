@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listLoads, getLoad, updateLoad, deleteLoad, uploadLoads } from '../../src/api/loads';
+import { listLoads, getLoad, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus } from '../../src/api/loads';
 
 describe('loads api', () => {
   beforeEach(() => {
@@ -52,5 +52,23 @@ describe('loads api', () => {
     expect(url).toContain('/api/loads/upload');
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ loads: [{ load_number: 'L1' }] });
+  });
+
+  test('bulkDeleteLoads posts /api/loads/bulk-delete with the given ids', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ deleted: 2 }) });
+    await bulkDeleteLoads([1, 2]);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/bulk-delete');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ ids: [1, 2] });
+  });
+
+  test('bulkUpdateLoadStatus posts /api/loads/bulk-status with ids and status', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ updated: 2 }) });
+    await bulkUpdateLoadStatus([1, 2], 'covered');
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/bulk-status');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ ids: [1, 2], status: 'covered' });
   });
 });

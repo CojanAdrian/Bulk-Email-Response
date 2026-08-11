@@ -143,6 +143,9 @@ function ReviewQueue() {
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-text">
                   <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
+                  {Boolean(inquiry.ref_mismatch) && (
+                    <Badge variant="warning">Different load? — reference # didn't match, verify</Badge>
+                  )}
                   {multiStopFlag && (
                     <Badge variant="error">{multiStopFlag} — add extra stops manually</Badge>
                   )}

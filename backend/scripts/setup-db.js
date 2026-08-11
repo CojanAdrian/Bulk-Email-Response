@@ -163,6 +163,7 @@ async function migrateSchema(databaseName) {
     ['reply_sent_at', `ALTER TABLE email_inquiries ADD COLUMN reply_sent_at DATETIME NULL`],
     ['gmail_thread_id', `ALTER TABLE email_inquiries ADD COLUMN gmail_thread_id VARCHAR(255) NULL`],
     ['gmail_in_reply_to', `ALTER TABLE email_inquiries ADD COLUMN gmail_in_reply_to VARCHAR(255) NULL`],
+    ['ref_mismatch', `ALTER TABLE email_inquiries ADD COLUMN ref_mismatch TINYINT(1) NOT NULL DEFAULT 0`],
   ];
   for (const [columnName, alterSql] of replyColumns) {
     const [col] = await conn.query(

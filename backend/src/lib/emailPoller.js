@@ -85,7 +85,7 @@ async function pollAccount(pool, account, wsHub) {
       if (alreadyAnswered) continue;
     }
 
-    const { matchedLoad, tier } = matchInquiry(`${message.subject} ${message.body}`, loads);
+    const { matchedLoad, tier, refMismatch } = matchInquiry(`${message.subject} ${message.body}`, loads);
     const status = matchedLoad ? 'matched' : 'needs_review';
 
     // Only an exact load-number match is confident enough to auto-send without a
@@ -126,13 +126,13 @@ async function pollAccount(pool, account, wsHub) {
       `INSERT INTO email_inquiries
        (user_id, email_account_id, gmail_message_id, from_address, subject, body_snippet, received_at,
         matched_load_id, match_tier, status, gmail_thread_id, gmail_in_reply_to,
-        reply_status, reply_body, reply_sent_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        reply_status, reply_body, reply_sent_at, ref_mismatch)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         account.user_id, account.id, message.id, message.from, message.subject,
         message.body.slice(0, 500), message.receivedAt, matchedLoad ? matchedLoad.id : null, tier, status,
         message.threadId || null, message.messageIdHeader || null,
-        replyStatus, replyBody, replySentAt,
+        replyStatus, replyBody, replySentAt, refMismatch ? 1 : 0,
       ]
     );
 

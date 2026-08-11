@@ -139,6 +139,22 @@ describe('inquiries routes', () => {
     expect(res.body[0].matched_load_comment).toBeNull();
   });
 
+  test('surfaces ref_mismatch, so the frontend can flag a possibly-wrong match', async () => {
+    const [loadResult] = await pool.query(
+      "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id, status) VALUES ('L1', 'Goodyear', 'AZ', 'Los Angeles', 'CA', ?, 'active')",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, ref_mismatch)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Goodyear, AZ Los Angeles, CA REF 0084341', '2026-08-01 08:00:00', ?, 'city_state', 'matched', 1)`,
+      [userId, accountId, loadResult.insertId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].ref_mismatch).toBe(1);
+  });
+
   describe('POST /:id/send', () => {
     let inquiryId;
 

@@ -56,6 +56,32 @@ describe('InquiriesLog', () => {
     expect(screen.getByText('other@carrier.com')).toBeInTheDocument();
   });
 
+  test('shows a "Different load?" badge when ref_mismatch is set', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      {
+        id: 1, from_address: 'dispatch@carrierco.com', subject: 'Load #4521', match_tier: 'city_state',
+        reply_status: 'pending_review', received_at: '2026-08-08T14:02:00.000Z', ref_mismatch: 1,
+      },
+    ]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/different load\?/i)).toBeInTheDocument();
+  });
+
+  test('does not show the "Different load?" badge when ref_mismatch is 0', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      {
+        id: 1, from_address: 'dispatch@carrierco.com', subject: 'Load #4521', match_tier: 'load_number',
+        reply_status: 'auto_sent', received_at: '2026-08-08T14:02:00.000Z', ref_mismatch: 0,
+      },
+    ]);
+    render(<InquiriesLog />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.queryByText(/different load\?/i)).not.toBeInTheDocument();
+  });
+
   test('shows a red "Multi-stop" badge when the matched load has extra stops', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([
       {

@@ -109,6 +109,7 @@ function InquiriesLog({ refreshKey }) {
                   <td className="py-2 pr-4">
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span>{inquiry.match_tier}</span>
+                      {Boolean(inquiry.ref_mismatch) && <Badge variant="warning">Different load?</Badge>}
                       {multiStopFlag && <Badge variant="error">{multiStopFlag}</Badge>}
                     </div>
                   </td>

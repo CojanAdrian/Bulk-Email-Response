@@ -19,6 +19,8 @@ const EDITABLE_FIELDS = [
   'commodity', 'temperature', 'comment', 'status',
 ];
 
+const STATUS_VALUES = ['active', 'booked', 'covered', 'expired'];
+
 function createLoadsRouter(pool, wsHub) {
   const router = express.Router();
 
@@ -89,6 +91,41 @@ function createLoadsRouter(pool, wsHub) {
     res.json({ ok: true });
   }));
 
+  router.post('/bulk-delete', asyncHandler(async (req, res) => {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+    const isAdmin = req.session.role === 'admin';
+    const placeholders = ids.map(() => '?').join(', ');
+    const sql = isAdmin
+      ? `DELETE FROM loads WHERE id IN (${placeholders})`
+      : `DELETE FROM loads WHERE id IN (${placeholders}) AND user_id = ?`;
+    const params = isAdmin ? ids : [...ids, req.session.userId];
+    const [result] = await pool.query(sql, params);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', {});
+    res.json({ deleted: result.affectedRows });
+  }));
+
+  router.post('/bulk-status', asyncHandler(async (req, res) => {
+    const { ids, status } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+    if (!STATUS_VALUES.includes(status)) {
+      return res.status(400).json({ error: `status must be one of: ${STATUS_VALUES.join(', ')}` });
+    }
+    const isAdmin = req.session.role === 'admin';
+    const placeholders = ids.map(() => '?').join(', ');
+    const sql = isAdmin
+      ? `UPDATE loads SET status = ? WHERE id IN (${placeholders})`
+      : `UPDATE loads SET status = ? WHERE id IN (${placeholders}) AND user_id = ?`;
+    const params = isAdmin ? [status, ...ids] : [status, ...ids, req.session.userId];
+    const [result] = await pool.query(sql, params);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', {});
+    res.json({ updated: result.affectedRows });
+  }));
+
   router.post('/upload', asyncHandler(async (req, res) => {
     const { loads } = req.body;
     if (!Array.isArray(loads)) {
@@ -151,28 +188,9 @@ function createLoadsRouter(pool, wsHub) {
         }
       }
 
-      // A re-upload represents the current full board -- any of this user's
-      // loads that were 'active' before but aren't in THIS upload are no
-      // longer posted, so they're retired automatically. 'booked'/'covered'/
-      // already-'expired' loads are left alone: those record a real outcome
-      // the user set deliberately, not something a re-upload should silently
-      // overwrite just because the load number wasn't in today's file.
-      // Guarded on a non-empty loadNumbers set so an empty/malformed upload
-      // can't wipe out the entire active board.
-      let expired = 0;
-      if (loadNumbers.length) {
-        const placeholders = loadNumbers.map(() => '?').join(', ');
-        const [expireResult] = await connection.query(
-          `UPDATE loads SET status = 'expired'
-           WHERE user_id = ? AND status = 'active' AND load_number NOT IN (${placeholders})`,
-          [userId, ...loadNumbers]
-        );
-        expired = expireResult.affectedRows;
-      }
-
       await connection.commit();
       if (wsHub) wsHub.emitToUser(userId, 'load:changed', {});
-      res.json({ inserted, updated, expired });
+      res.json({ inserted, updated });
     } catch (err) {
       await connection.rollback();
       throw err;

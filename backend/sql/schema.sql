@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS email_inquiries (
   reply_sent_at DATETIME NULL,
   gmail_thread_id VARCHAR(255) NULL,
   gmail_in_reply_to VARCHAR(255) NULL,
+  ref_mismatch TINYINT(1) NOT NULL DEFAULT 0,
   UNIQUE KEY uniq_account_message (email_account_id, gmail_message_id),
   KEY idx_user_id (user_id)
 );

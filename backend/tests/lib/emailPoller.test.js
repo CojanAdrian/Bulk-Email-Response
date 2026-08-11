@@ -70,6 +70,40 @@ describe('emailPoller', () => {
     expect(inquiries[0].status).toBe('matched');
   });
 
+  test('stores ref_mismatch = 1 when the matcher flags an unresolvable cited reference number', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      subject: 'Goodyear, AZ Los Angeles, CA REF 0084341', body: 'Is this still available?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'city_state', refMismatch: true });
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, accountRows[0]);
+
+    const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(inquiries[0].ref_mismatch).toBe(1);
+  });
+
+  test('stores ref_mismatch = 0 for an ordinary match with no cited reference number', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      subject: 'Load 4521', body: 'Is load 4521 still available?',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number', refMismatch: false });
+
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, accountRows[0]);
+
+    const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(inquiries[0].ref_mismatch).toBe(0);
+  });
+
   test('auto-sends a reply and marks it auto_sent for a confident (load_number) match', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);

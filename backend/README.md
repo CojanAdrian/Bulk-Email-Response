@@ -108,7 +108,7 @@ post-run grace check even after every store used in a test is properly
 sign of a real leak (every test that constructs a store does close it).
 Don't run `npx jest` directly; use `npm test`.
 
-There are 228 tests across 15 suites: `tests/health.test.js`,
+There are 241 tests across 15 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -312,20 +312,27 @@ don't own.
 | GET | `/api/loads/:id` | — | `200` load row, if it belongs to the caller (or the caller is admin); `404 {"error": "Load not found"}` if no such id, or it exists but belongs to a different, non-admin caller |
 | PATCH | `/api/loads/:id` | Any of `origin_city`, `origin_state`, `origin_zip`, `dest_city`, `dest_state`, `dest_zip`, `equipment`, `weight`, `target_pay`, `early_pu`, `late_pu`, `late_del`, `stops`, `commodity`, `temperature`, `comment`, `status` (at least one). `load_number` and `raw_equipment` are deliberately not editable — see the code comment in `src/routes/loads.js` | `200` updated load row; `400 {"error": "No valid fields to update"}` if no editable field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
 | DELETE | `/api/loads/:id` | — | `200 {"ok": true}`; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
-| POST | `/api/loads/upload` | `{"loads": [{ "load_number": string, ... other load fields }]}` | `200 {"inserted": number, "updated": number, "expired": number}`; `400 {"error": "loads must be an array"}` if `loads` isn't an array. Always upserted into the **uploader's own** set, regardless of role — see above and below for details |
+| POST | `/api/loads/bulk-delete` | `{"ids": [number, ...]}` (non-empty) | `200 {"deleted": number}` — only the ids owned by the caller are actually deleted (silently skips any others, admin-bypassed like the single-item routes); `400 {"error": "ids must be a non-empty array"}` if `ids` is missing/empty |
+| POST | `/api/loads/bulk-status` | `{"ids": [number, ...], "status": "active"\|"booked"\|"covered"\|"expired"}` | `200 {"updated": number}` — same ownership scoping as bulk-delete; `400` if `ids` is missing/empty or `status` isn't a recognized value |
+| POST | `/api/loads/upload` | `{"loads": [{ "load_number": string, ... other load fields }]}` | `200 {"inserted": number, "updated": number}`; `400 {"error": "loads must be an array"}` if `loads` isn't an array. Always upserted into the **uploader's own** set, regardless of role — see above and below for details |
 
-**A re-upload auto-expires loads that dropped off the board.** A CSV
-re-upload represents the current full set of what's posted — so after the
-upsert, any of the caller's own loads that were `status: 'active'` but
-whose `load_number` isn't present in *this* upload get set to
-`status: 'expired'` (the `expired` count in the response). This is what
-keeps stale loads (last week's, last month's) from lingering forever as
-match candidates for the Gmail poller — see "Matching pipeline" below for
-why that mattered. `booked`/`covered`/already-`expired` loads are left
-alone: those record a real outcome the user set deliberately, and a
-re-upload shouldn't silently overwrite that just because the load number
-wasn't in today's file. Guarded so an empty or fully-invalid upload
-(`loadNumbers.length === 0`) can't wipe out the whole active board.
+**Bulk routes silently skip ids the caller doesn't own, rather than
+erroring.** If you select 5 loads to delete and one of them (somehow)
+belongs to someone else, the response reports `{"deleted": 4}` — no error,
+no partial-failure signaling beyond the count. This matches how a
+multi-select UI action should feel: act on everything you're allowed to,
+don't block the whole batch over one row.
+
+**A re-upload never changes `status` on its own.** Loads missing from a
+re-upload (e.g. because they've been posted for a while and simply weren't
+included in today's file) keep whatever status they already had —
+`status` only ever changes via an explicit `PATCH /api/loads/:id` from the
+user (or getting flagged as a possible-mismatch match in the review queue,
+see "Matching pipeline" below). A re-upload is deliberately never treated
+as "this is the complete current board, retire anything missing" — that
+was tried and reverted, since it risked hiding a load that's still
+genuinely available just because a particular day's file happened to omit
+it.
 
 `DELETE /api/loads/:id` emits `load:changed` with `{ loadId, deleted: true }`
 over the caller's WebSocket connection, same as a PATCH, so
@@ -425,6 +432,7 @@ An inquiry row has this shape:
   "matched_load_comment": null,
   "match_tier": "load_number",
   "status": "matched",
+  "ref_mismatch": 0,
   "gmail_thread_id": "18abc...",
   "gmail_in_reply_to": "<CAF...@mail.gmail.com>",
   "reply_status": "auto_sent",
@@ -443,7 +451,11 @@ elsewhere in the app — a nonzero `stops` count, or a comment mentioning a
 second pickup/delivery, flags the inquiry as multi-pick/multi-drop so the
 user knows to add the extra stop manually) — both are joined in from
 `loads` at read time, not stored on the inquiry row itself, and are `null`
-whenever there's no matched load.
+whenever there's no matched load. `ref_mismatch` is `1` when the email
+cited an explicit reference/order/PRO number that didn't resolve to any
+load, so `matched_load_id` (if set) came from a location-based fallback
+tier that could be a different, coincidentally-similar load — see
+"Matching pipeline" below.
 `reply_status` is one of `none` (no load matched, nothing to reply with),
 `pending_review` (a reply was composed but is waiting for a human, via
 `/send` or `/reject`), `auto_sent` (sent automatically at poll time),
@@ -571,6 +583,12 @@ gives a human a head start on what it's about) but leaves `reply_body`
   city+state text in the email (see "Matching pipeline" below; this tier
   no longer fires on a match against just one end of the route).
 
+This still applies even when `refMismatch` is true — a `city_state` match
+with an unresolved cited reference number still gets a composed reply
+(the fail-safe the matching pipeline described above), just flagged with
+`ref_mismatch: 1` so the human reviewing it knows to double-check it
+against the number the carrier actually cited.
+
 Only `load_number` can additionally *auto-send* without a human looking at
 it — even then, sending still requires the user to have explicitly opted
 in via `email_accounts.auto_send_enabled` (`PATCH /api/gmail/auto-send`,
@@ -620,19 +638,24 @@ first match wins:
 1. **Load number** — the email mentions a load number that matches one of
    the user's own loads exactly. Unambiguous; always wins outright even if
    city/state text is also present.
-   - **An explicit but unresolvable reference number suppresses every tier
-     below this one.** `mentionsExplicitReferenceNumber` looks for
-     keyword-prefixed reference patterns — "REF 0084341", "Ref#123456",
-     "Order #123456", "Load# 4521", "PRO 632628" (keyword + optional
-     `#`/`:` + 4-or-more digits). If the email cites one of these and it
-     didn't resolve via load number above, the carrier is clearly asking
-     about one specific, numbered load — a coincidental city/state overlap
-     with a completely different (often stale) load is not good enough to
-     guess with, so the result is `{ matchedLoad: null, tier: 'none' }`
-     rather than falling through to the tiers below. See the regression
-     test in `tests/lib/matchingEngine.test.js` for the real case this
-     fixes (a REF number for a load that was never uploaded happened to
-     share a lane with an unrelated, older load still marked `active`).
+   - **An explicit but unresolvable reference number flags whatever matches
+     below as `refMismatch: true`, rather than blocking the match.**
+     `mentionsExplicitReferenceNumber` looks for keyword-prefixed reference
+     patterns — "REF 0084341", "Ref#123456", "Order #123456", "Load# 4521",
+     "PRO 632628" (keyword + optional `#`/`:` + 4-or-more digits). If the
+     email cites one of these and it didn't resolve via load number above,
+     the carrier is clearly asking about one specific, numbered load that
+     isn't in the system — a match found below via city/state could easily
+     be a different, coincidentally-similar load. Rather than discard that
+     match outright (a genuine fail-safe: a flagged guess is more useful to
+     a human than nothing), `matchInquiry` still returns it, with
+     `refMismatch: true` alongside `matchedLoad`/`tier`. This is stored on
+     `email_inquiries.ref_mismatch` and surfaced in the review queue and
+     inquiry log as an amber "Different load?" badge, distinct from the red
+     multi-stop badge — see "Inquiries" above. See the regression tests in
+     `tests/lib/matchingEngine.test.js` for the real case this covers (a
+     REF number for a load that was never uploaded happened to share a lane
+     with an unrelated, older load still marked `active`).
 2. **City + state (both ends)** — the origin's city+state AND the
    destination's city+state are both mentioned, e.g. "the Dallas, TX to
    Chicago, IL load." A match against only one end of the route (say, the

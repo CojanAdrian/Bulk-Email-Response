@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 375 tests across 40 suites, covering
+Runs the Vitest suite (`vitest run`) — 391 tests across 40 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -187,21 +187,20 @@ The file is parsed entirely in the browser (column names are matched
 flexibly, e.g. "Dest City" or "Destination City" both work) and the
 resulting loads are upserted into the database by load number — a
 re-upload with the same load numbers updates rates/details rather than
-creating duplicates.
-
-**A re-upload also retires anything that dropped off the board.** It
-represents the current full set of what's posted, so any of your loads
-that were `active` but aren't in *this* file get automatically marked
-`expired` — the success message says how many ("Uploaded: 3 new, 12
-updated, 5 no-longer-posted loads retired."). This is what keeps last
-week's/last month's loads from lingering forever as candidates the Gmail
-auto-reply matcher could pick up by mistake. `booked`/`covered` loads are
-never touched by this — those record something you set deliberately, not
-something a re-upload should silently undo. Manually marking a load
-`active`/`booked`/`covered`/`expired` yourself is still done via "Edit" or
-the per-row status dropdown on the loads table, same as before.
+creating duplicates, and never changes a load's
+`active`/`booked`/`covered`/`expired` status on its own — that's
+manual-only, via "Edit" or the per-row status dropdown on the loads table.
 
 Each row in the loads table (`LoadsTable.jsx`) has:
+- A **checkbox**, plus a "select all" checkbox in the header (checks/
+  unchecks every currently-visible row; shows as indeterminate when only
+  some rows are selected). Selecting any row opens a **bulk action bar**
+  above the table: a "Mark as..." dropdown to bulk-change status
+  (`POST /api/loads/bulk-status`), a "Delete selected" button with the
+  same inline confirm/cancel pattern as the per-row delete
+  (`POST /api/loads/bulk-delete`), and "Clear selection". The selection
+  resets whenever the table re-fetches (filter change, live update, etc.)
+  so it never silently refers to rows no longer on screen.
 - An **"Edit" button**, which opens `RateModal.jsx` — a full edit form for
   origin/destination, equipment, weight, commodity, temperature, stops,
   comment, target pay, and status. It does **not** yet expose the
@@ -211,6 +210,15 @@ Each row in the loads table (`LoadsTable.jsx`) has:
   active/booked/covered/expired without opening the full edit modal.
 - A **"Delete" button**, which asks for inline confirmation ("Confirm" /
   "Cancel") before permanently removing the load.
+
+**Sortable column headers.** Click "Load #", "Origin", "Destination",
+"Equipment", or "Target Pay" to sort the currently-visible rows by that
+column (client-side only — it doesn't change what's fetched, just the
+display order); click the same header again to reverse direction. An
+arrow next to the active column shows the current direction. "Target Pay"
+sorts numerically. "Origin"/"Destination" sort by state first, then city
+within each state — a single click covers both "alphabetical" and "by
+state" grouping at once.
 
 Known limitation: if you have "Edit" open for a load and someone
 re-uploads a CSV that updates that same load in the background, saving
@@ -333,11 +341,16 @@ panel's failure doesn't block the others):
   way as the Load Detail Lookup panel's warning, via
   `src/lib/lookupMessage.js`'s `detectMultiStop`), a red badge next to the
   subject line calls it out, since those extra stops need to be added to
-  the reply manually.
+  the reply manually. If the email cited a reference/order/PRO number that
+  didn't match anything (`ref_mismatch`), an amber "Different load?" badge
+  appears too — the suggested reply is still shown (the backend's
+  fail-safe), but this is your cue to double-check it against the number
+  the carrier actually cited before sending.
 - **Inquiry log** — a read-only table of every inquiry the backend poller
   has ever processed, with a colored status badge (Auto-sent / Sent /
   Pending review / Rejected / No match) and the same red multi-pick/
-  multi-drop badge next to the match tier when applicable.
+  multi-drop and amber "Different load?" badges next to the match tier
+  when applicable.
 
 A "Refresh" button above the panels manually re-fetches the review queue
 and inquiry log — redundant now that both panels also update live (see

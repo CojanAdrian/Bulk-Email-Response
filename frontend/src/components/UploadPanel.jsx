@@ -89,8 +89,7 @@ function UploadPanel({ onUploadComplete }) {
       )}
       {result && (
         <p className="mt-3 text-sm text-success">
-          Uploaded: {result.inserted} new, {result.updated} updated
-          {result.expired > 0 ? `, ${result.expired} no-longer-posted loads retired.` : '.'}
+          Uploaded: {result.inserted} new, {result.updated} updated.
         </p>
       )}
     </Card>

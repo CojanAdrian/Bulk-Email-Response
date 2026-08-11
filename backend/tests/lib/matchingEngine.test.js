@@ -34,15 +34,17 @@ describe('matchInquiry', () => {
     expect(result.matchedLoad.id).toBe(3);
   });
 
-  test('does not confidently match on a coincidental one-ended overlap when the other end is a real, different place', () => {
-    // Regression test for the real bug this fixes: a carrier replied quoting
-    // a subject naming a load ("0084137") that doesn't exist in this user's
-    // loads, with an origin ("Red Deer County, AB, Canada") that doesn't
-    // belong to any load either -- but the destination "Billings, MT" happens
-    // to match a completely different, unrelated load. That coincidental
-    // overlap must not earn the high-confidence city_state tier. It also
-    // cites a "PRO 632628" reference number that doesn't resolve to
-    // anything, so it should be fully unmatched, not merely downgraded.
+  test('flags refMismatch on a coincidental one-ended overlap when the email cites an unresolvable reference number', () => {
+    // Real-world case: a carrier replied quoting a subject naming a load
+    // ("0084137") that doesn't exist in this user's loads, with an origin
+    // ("Red Deer County, AB, Canada") that doesn't belong to any load
+    // either -- but the destination "Billings, MT" happens to match a
+    // completely different, unrelated load. That coincidental overlap
+    // doesn't earn the high-confidence city_state tier (only one end
+    // matches) and it also cites a "PRO 632628" reference number that
+    // doesn't resolve to anything -- so the fallback match is still
+    // surfaced (the fail-safe), but flagged as refMismatch so a human
+    // knows to double-check it rather than trust it outright.
     const loadsWithBillingsDestination = [
       { id: 20, load_number: '9099', origin_city: 'Kennesaw', origin_state: 'GA', dest_city: 'Billings', dest_state: 'MT', early_pu: '2026-06-29 06:00:00' },
     ];
@@ -50,29 +52,37 @@ describe('matchInquiry', () => {
       'Re: 0084137 // Red Deer County, AB, Canada - Billings, MT 59106 // PRO 632628',
       loadsWithBillingsDestination
     );
-    expect(result.tier).toBe('none');
-    expect(result.matchedLoad).toBeNull();
+    expect(result.tier).toBe('city');
+    expect(result.matchedLoad.id).toBe(20);
+    expect(result.refMismatch).toBe(true);
   });
 
-  test('does not confidently match a full-route overlap either when the email cites an unresolvable REF number', () => {
-    // Regression test for the exact real-world case this fixes: the carrier's
-    // email cites "REF 0084341" (a load that was never uploaded to this
-    // user's system at all) but happens to name an origin/destination that
-    // fully matches a DIFFERENT, unrelated (stale) load in the system. Even
-    // though the route matches on both ends, the explicit unresolvable
-    // reference number takes priority over the location match.
+  test('flags refMismatch on a full-route overlap too when the email cites an unresolvable REF number', () => {
+    // Real-world case this fixes: the carrier's email cites "REF 0084341"
+    // (a load that was never uploaded to this user's system at all) but
+    // happens to name an origin/destination that fully matches a
+    // DIFFERENT, unrelated (stale) load in the system. The route match is
+    // still returned (the fail-safe) but flagged, since the cited
+    // reference number couldn't be confirmed against it.
     const loadsWithSameLane = [
       { id: 30, load_number: '0078557', origin_city: 'Goodyear', origin_state: 'AZ', dest_city: 'Los Angeles', dest_state: 'CA', early_pu: '2026-06-29 15:00:00' },
     ];
     const result = matchInquiry('Goodyear, AZ Los Angeles, CA REF 0084341', loadsWithSameLane);
-    expect(result.tier).toBe('none');
-    expect(result.matchedLoad).toBeNull();
+    expect(result.tier).toBe('city_state');
+    expect(result.matchedLoad.id).toBe(30);
+    expect(result.refMismatch).toBe(true);
+  });
+
+  test('does not flag refMismatch when there is no explicit reference number in the email', () => {
+    const result = matchInquiry('Do you have the Dallas, TX to Chicago, IL load available?', LOADS);
+    expect(result.refMismatch).toBe(false);
   });
 
   test('still matches by load number when the cited reference number does resolve to a real load', () => {
     const result = matchInquiry('Re: Ref 4521 - is this still available?', LOADS);
     expect(result.tier).toBe('load_number');
     expect(result.matchedLoad.id).toBe(1);
+    expect(result.refMismatch).toBe(false);
   });
 
   test('matches on city alone when state is not mentioned', () => {

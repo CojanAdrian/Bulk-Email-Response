@@ -17,6 +17,14 @@ export function deleteLoad(id) {
   return del(`/api/loads/${id}`);
 }
 
+export function bulkDeleteLoads(ids) {
+  return post('/api/loads/bulk-delete', { ids });
+}
+
+export function bulkUpdateLoadStatus(ids, status) {
+  return post('/api/loads/bulk-status', { ids, status });
+}
+
 export function uploadLoads(loads) {
   return post('/api/loads/upload', { loads }, { timeoutMs: 60000 });
 }

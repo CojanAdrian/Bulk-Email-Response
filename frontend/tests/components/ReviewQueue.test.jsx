@@ -53,6 +53,22 @@ describe('ReviewQueue', () => {
     expect(screen.getByLabelText(/reply/i)).toHaveValue(INQUIRY.reply_body);
   });
 
+  test('shows a "Different load?" badge when ref_mismatch is set', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, ref_mismatch: 1 }]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/different load\?/i)).toBeInTheDocument();
+  });
+
+  test('does not show the "Different load?" badge when ref_mismatch is 0', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, ref_mismatch: 0 }]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.queryByText(/different load\?/i)).not.toBeInTheDocument();
+  });
+
   test('shows a red multi-stop badge when the matched load has extra stops', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_stops: 1 }]);
     render(<ReviewQueue />);

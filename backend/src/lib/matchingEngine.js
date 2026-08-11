@@ -112,39 +112,39 @@ function resolveTie(candidates, text) {
 
 function matchInquiry(emailText, loads) {
   if (!loads || loads.length === 0) {
-    return { matchedLoad: null, tier: 'none' };
+    return { matchedLoad: null, tier: 'none', refMismatch: false };
   }
 
   const loadNumberMatch = findLoadNumberMatch(emailText, loads);
   if (loadNumberMatch) {
-    return { matchedLoad: loadNumberMatch, tier: 'load_number' };
+    return { matchedLoad: loadNumberMatch, tier: 'load_number', refMismatch: false };
   }
 
   // A carrier who cites an explicit reference/order/PRO number is asking
   // about one specific load. If that number doesn't resolve to anything we
-  // have, a coincidental city/state overlap with a DIFFERENT load is not
-  // good enough to guess with -- the referenced load simply isn't in our
-  // system, so this is unmatched, not a location-based fallback match.
-  if (mentionsExplicitReferenceNumber(emailText)) {
-    return { matchedLoad: null, tier: 'none' };
-  }
+  // have, a location-based fallback match below could easily be a
+  // different, coincidentally-similar load -- so it's still surfaced (the
+  // fail-safe: something for a human to look at beats nothing), but flagged
+  // as `refMismatch` so the UI can call it out distinctly rather than
+  // presenting it with the same confidence as an unflagged match.
+  const refMismatch = mentionsExplicitReferenceNumber(emailText);
 
   const cityStateMatches = findCityStateMatches(emailText, loads);
   if (cityStateMatches.length > 0) {
-    return { matchedLoad: resolveTie(cityStateMatches, emailText), tier: 'city_state' };
+    return { matchedLoad: resolveTie(cityStateMatches, emailText), tier: 'city_state', refMismatch };
   }
 
   const cityMatches = findCityMatches(emailText, loads);
   if (cityMatches.length > 0) {
-    return { matchedLoad: resolveTie(cityMatches, emailText), tier: 'city' };
+    return { matchedLoad: resolveTie(cityMatches, emailText), tier: 'city', refMismatch };
   }
 
   const stateMatches = findStateMatches(emailText, loads);
   if (stateMatches.length > 0) {
-    return { matchedLoad: resolveTie(stateMatches, emailText), tier: 'state' };
+    return { matchedLoad: resolveTie(stateMatches, emailText), tier: 'state', refMismatch };
   }
 
-  return { matchedLoad: null, tier: 'none' };
+  return { matchedLoad: null, tier: 'none', refMismatch: false };
 }
 
 module.exports = {

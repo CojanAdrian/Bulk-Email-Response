@@ -1,11 +1,49 @@
-import { useEffect, useState } from 'react';
-import { listLoads, updateLoad, deleteLoad } from '../api/loads';
+import { useEffect, useMemo, useState } from 'react';
+import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
 import Card from './Card';
 import Skeleton from './Skeleton';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered', 'expired'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered', expired: 'Expired' };
+
+const SORT_COLUMNS = [
+  { key: 'load_number', label: 'Load #' },
+  { key: 'origin', label: 'Origin' },
+  { key: 'destination', label: 'Destination' },
+  { key: 'equipment', label: 'Equipment' },
+  { key: 'target_pay', label: 'Target Pay' },
+];
+
+function sortValue(load, key) {
+  switch (key) {
+    case 'load_number':
+      return String(load.load_number ?? '');
+    // Sorted by state first, then city -- groups loads by state (what the
+    // user asked for) while still alphabetizing cities within each state.
+    case 'origin':
+      return `${load.origin_state ?? ''} ${load.origin_city ?? ''}`.trim();
+    case 'destination':
+      return `${load.dest_state ?? ''} ${load.dest_city ?? ''}`.trim();
+    case 'equipment':
+      return String(load.equipment ?? '');
+    case 'target_pay':
+      return Number(load.target_pay ?? 0);
+    default:
+      return '';
+  }
+}
+
+function sortLoads(loads, sort) {
+  if (!sort.key) return loads;
+  const sorted = [...loads].sort((a, b) => {
+    const va = sortValue(a, sort.key);
+    const vb = sortValue(b, sort.key);
+    const cmp = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb));
+    return sort.direction === 'asc' ? cmp : -cmp;
+  });
+  return sorted;
+}
 
 function LoadsTable({ refreshKey, onSelectLoad }) {
   const [loads, setLoads] = useState([]);
@@ -16,6 +54,10 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   const [actionError, setActionError] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [busyLoadId, setBusyLoadId] = useState(null);
+  const [sort, setSort] = useState({ key: null, direction: 'asc' });
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     let ignore = false;
@@ -26,6 +68,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
         if (!ignore) {
           setLoads(data);
           setStatus('ready');
+          setSelectedIds(new Set());
         }
       })
       .catch((err) => {
@@ -42,6 +85,12 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   useEffect(() => {
     return subscribe('load:changed', () => setLiveTick((t) => t + 1));
   }, []);
+
+  const sortedLoads = useMemo(() => sortLoads(loads, sort), [loads, sort]);
+
+  function handleSortClick(key) {
+    setSort((prev) => (prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }));
+  }
 
   function handleStatusChange(load, newStatus) {
     setActionError(null);
@@ -69,6 +118,53 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
         setBusyLoadId(null);
       });
   }
+
+  function toggleSelectOne(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => (prev.size === sortedLoads.length ? new Set() : new Set(sortedLoads.map((l) => l.id))));
+  }
+
+  function handleBulkStatusChange(e) {
+    const newStatus = e.target.value;
+    if (!newStatus) return;
+    setActionError(null);
+    setBulkBusy(true);
+    bulkUpdateLoadStatus(Array.from(selectedIds), newStatus)
+      .then(() => {
+        setSelectedIds(new Set());
+      })
+      .catch((err) => setActionError(err.message || 'Failed to update selected loads.'))
+      .finally(() => {
+        setBulkBusy(false);
+        e.target.value = '';
+      });
+  }
+
+  function handleBulkDelete() {
+    setActionError(null);
+    setBulkBusy(true);
+    bulkDeleteLoads(Array.from(selectedIds))
+      .then(() => {
+        setSelectedIds(new Set());
+        setConfirmingBulkDelete(false);
+      })
+      .catch((err) => setActionError(err.message || 'Failed to delete selected loads.'))
+      .finally(() => setBulkBusy(false));
+  }
+
+  const allSelected = sortedLoads.length > 0 && selectedIds.size === sortedLoads.length;
+  const someSelected = selectedIds.size > 0 && !allSelected;
 
   return (
     <Card>
@@ -98,23 +194,104 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
           {actionError}
         </p>
       )}
+      {selectedIds.size > 0 && (
+        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm">
+          <span className="font-medium text-text">{selectedIds.size} selected</span>
+          <select
+            aria-label="Mark selected as"
+            defaultValue=""
+            onChange={handleBulkStatusChange}
+            disabled={bulkBusy}
+            className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Mark as...
+            </option>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {STATUS_LABELS[option]}
+              </option>
+            ))}
+          </select>
+          {confirmingBulkDelete ? (
+            <>
+              <span className="text-xs text-error">Delete {selectedIds.size}?</span>
+              <button
+                onClick={handleBulkDelete}
+                disabled={bulkBusy}
+                className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+              >
+                {bulkBusy ? 'Deleting...' : 'Confirm'}
+              </button>
+              <button
+                onClick={() => setConfirmingBulkDelete(false)}
+                disabled={bulkBusy}
+                className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setConfirmingBulkDelete(true)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
+            >
+              Delete selected
+            </button>
+          )}
+          <button
+            onClick={() => setSelectedIds(new Set())}
+            disabled={bulkBusy}
+            className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+          >
+            Clear selection
+          </button>
+        </div>
+      )}
       {status === 'ready' && loads.length === 0 && <p className="text-sm text-text-muted">No loads found.</p>}
       {status === 'ready' && loads.length > 0 && (
         <table className="w-full text-left text-sm text-text">
           <thead>
             <tr className="border-b border-border text-text-muted">
-              <th className="py-2 pr-4">Load #</th>
-              <th className="py-2 pr-4">Origin</th>
-              <th className="py-2 pr-4">Destination</th>
-              <th className="py-2 pr-4">Equipment</th>
-              <th className="py-2 pr-4">Target Pay</th>
+              <th className="w-8 py-2 pr-2">
+                <input
+                  type="checkbox"
+                  aria-label="Select all loads"
+                  checked={allSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someSelected;
+                  }}
+                  onChange={toggleSelectAll}
+                />
+              </th>
+              {SORT_COLUMNS.map((col) => (
+                <th key={col.key} className="py-2 pr-4">
+                  <button
+                    type="button"
+                    onClick={() => handleSortClick(col.key)}
+                    className="flex items-center gap-1 font-medium text-text-muted hover:text-text"
+                  >
+                    {col.label}
+                    {sort.key === col.key && <span aria-hidden="true">{sort.direction === 'asc' ? '↑' : '↓'}</span>}
+                  </button>
+                </th>
+              ))}
               <th className="py-2 pr-4">Status</th>
               <th className="py-2"></th>
             </tr>
           </thead>
           <tbody>
-            {loads.map((load) => (
+            {sortedLoads.map((load) => (
               <tr key={load.id} className="border-b border-border/60">
+                <td className="py-2 pr-2">
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${load.load_number}`}
+                    checked={selectedIds.has(load.id)}
+                    onChange={() => toggleSelectOne(load.id)}
+                  />
+                </td>
                 <td className="py-2 pr-4">{load.load_number}</td>
                 <td className="py-2 pr-4">
                   {load.origin_city}, {load.origin_state}
