@@ -18,7 +18,11 @@ const { pollAllAccounts } = require('./lib/emailPoller');
 const pool = createPool(process.env.DB_NAME);
 const wsHub = createWsHub();
 const server = createHttpServer(pool, wsHub, process.env.SESSION_SECRET);
-const port = process.env.PORT || 4000;
+// APPLICATION_PORT is Hyperlift's own convention (it defaults that variable
+// to 8080 and routes to whatever it's set to); PORT is the more common
+// convention elsewhere. Support both so the same image works unmodified on
+// either.
+const port = process.env.PORT || process.env.APPLICATION_PORT || 4000;
 
 // Configurable so this can be tuned without a code change; defaults to 30s
 // (down from an original 2 minutes) -- a single connected account's poll is
