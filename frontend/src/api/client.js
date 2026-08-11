@@ -1,4 +1,8 @@
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000';
+// `??` (not `||`) so an intentionally-empty VITE_API_URL (same-origin
+// requests, e.g. when the backend serves this build itself in production)
+// isn't overridden by the localhost fallback -- only an actually-unset
+// value falls back.
+export const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
 const REQUEST_TIMEOUT_MS = 10000;
 
 async function request(path, options = {}) {

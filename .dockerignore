@@ -1,0 +1,9 @@
+**/node_modules
+**/.env
+.git
+.worktrees
+**/dist
+**/coverage
+*.md
+docs
+client_secret_*.json
