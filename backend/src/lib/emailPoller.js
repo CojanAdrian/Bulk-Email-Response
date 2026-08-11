@@ -55,6 +55,21 @@ async function pollAccount(pool, account, wsHub) {
       continue;
     }
 
+    // A thread already logged once (regardless of what happened to that
+    // first message -- sent, rejected, still pending) has already been
+    // treated as an inquiry. Later messages in the same thread are followups
+    // in an ongoing conversation (carrier confirming, asking for a BOL,
+    // tracking/check-call chatter, etc.), not a new inquiry -- without this,
+    // every reply in a back-and-forth thread re-matches and queues a
+    // duplicate review-queue entry for what is really one inquiry.
+    if (message.threadId) {
+      const [existingThread] = await pool.query(
+        'SELECT id FROM email_inquiries WHERE email_account_id = ? AND gmail_thread_id = ?',
+        [account.id, message.threadId]
+      );
+      if (existingThread.length > 0) continue;
+    }
+
     const { matchedLoad, tier } = matchInquiry(`${message.subject} ${message.body}`, loads);
     const status = matchedLoad ? 'matched' : 'needs_review';
 

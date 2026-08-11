@@ -102,7 +102,7 @@ database (`DB_NAME_TEST`) and reset its tables between tests, so running
 suites in parallel worker processes causes cross-suite races and flaky
 failures. Don't run `npx jest` directly; use `npm test`.
 
-There are 186 tests across 13 suites: `tests/health.test.js`,
+There are 190 tests across 13 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
@@ -477,6 +477,22 @@ is composed. It's simply not treated as a direct inquiry to this user. A
 skipped message is not retried on the next poll either, since the date-
 filtered Gmail query naturally moves past it once `last_polled_at`
 advances.
+
+**Thread-level deduplication — one inquiry per thread, not per message.**
+`pollAccount` also checks `email_inquiries` for an existing row with the
+same `email_account_id` and `gmail_thread_id` before processing a message
+further. If one exists, the message is skipped the same way a group-
+addressed message is (no row, no matching, no composed reply) — regardless
+of what happened to that thread's first inquiry (`sent`, `rejected`, still
+`pending_review`, whatever). This matters because a Gmail thread's *first*
+message and every reply after it (a carrier confirming, asking for a BOL,
+"any update?" tracking chatter, etc.) each get their own unique
+`gmail_message_id` — without this check, every reply in an ongoing
+back-and-forth would re-match and queue a fresh, duplicate review-queue
+entry for what a human would recognize as one already-handled inquiry. A
+message with no `threadId` at all (shouldn't happen with real Gmail
+messages, but the check tolerates it) isn't deduplicated this way — it
+falls back to the ordinary per-`gmail_message_id` dedup above.
 
 **Auto-send and review queue.** Two tiers are confident enough to have a
 specific reply *composed* for them at all — everything else still creates

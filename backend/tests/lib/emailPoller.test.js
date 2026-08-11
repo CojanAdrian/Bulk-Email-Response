@@ -261,6 +261,118 @@ describe('emailPoller', () => {
     });
   });
 
+  describe('thread-level deduplication (one inquiry per thread, not per message)', () => {
+    test('a second poll picking up a follow-up reply in an already-logged thread is skipped entirely', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      // First poll: the original inquiry in the thread.
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      let [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      // Second poll: a followup reply in the SAME thread (a carrier's "any
+      // update?"/tracking chatter, or Gmail assigning a new message id to
+      // each leg of the back-and-forth) -- same threadId, different message id.
+      gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
+        receivedAt: new Date('2026-08-08T09:00:00Z'),
+      });
+      [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(1);
+      expect(inquiries[0].gmail_message_id).toBe('m1');
+    });
+
+    test('a followup reply in an already-logged thread is skipped even within the same poll batch', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1', 'm2']);
+      gmailClient.getMessage.mockImplementation(async (token, messageId) => {
+        if (messageId === 'm1') {
+          return {
+            id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+            subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
+            receivedAt: new Date('2026-08-08T08:00:00Z'),
+          };
+        }
+        return {
+          id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+          subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
+          receivedAt: new Date('2026-08-08T08:05:00Z'),
+        };
+      });
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(1);
+      expect(inquiries[0].gmail_message_id).toBe('m1');
+    });
+
+    test('a message in a genuinely new thread is still processed normally', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier1@example.com', to: 'testuser@example.com',
+        subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      let [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm2', threadId: 't2', from: 'carrier2@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T09:00:00Z'),
+      });
+      [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(2);
+    });
+
+    test('does not skip on thread when the message has no threadId at all', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      let [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm2', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521 again', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T09:00:00Z'),
+      });
+      [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(2);
+    });
+  });
+
   test('falls back to pending_review if the auto-send attempt itself fails', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
