@@ -27,6 +27,7 @@ describe('emailPoller', () => {
   beforeEach(async () => {
     jest.clearAllMocks();
     gmailClient.extractEmailAddresses.mockImplementation(realExtractEmailAddresses);
+    gmailClient.threadHasSentMessage.mockResolvedValue(false);
     await resetTables(pool);
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     const [userResult] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')", ['testuser', passwordHash]);
@@ -370,6 +371,113 @@ describe('emailPoller', () => {
 
       const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
       expect(inquiries).toHaveLength(2);
+    });
+  });
+
+  describe('automated notification filtering', () => {
+    test('skips a message entirely from a noreply@ sender (no inquiry row at all)', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'noreply@truckertools.com', to: 'testuser@example.com',
+        subject: 'Load# 0807261 -  view the real-time location of this load using Load Track', body: 'Track your shipment.',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(matchingEngine.matchInquiry).not.toHaveBeenCalled();
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(0);
+    });
+
+    test('skips a message from a real person\'s address when the subject is a shipment-tendered notification', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'Daisy Carchilan <daisy@igtfreight.com>', to: 'testuser@example.com',
+        subject: 'Re: Shipment 60115349232 Tendered for IGT Logistics Inc', body: 'FYI.',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(0);
+    });
+
+    test('still processes an ordinary carrier inquiry normally', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'dispatch@carrierco.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(1);
+    });
+  });
+
+  describe('threads already answered directly in Gmail', () => {
+    test('skips a brand-new thread entirely when the account has already sent a message in it', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      gmailClient.threadHasSentMessage.mockResolvedValue(true);
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(matchingEngine.matchInquiry).not.toHaveBeenCalled();
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(0);
+    });
+
+    test('processes a brand-new thread normally when the account has not sent anything in it yet', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      gmailClient.threadHasSentMessage.mockResolvedValue(false);
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(1);
+    });
+
+    test('does not call threadHasSentMessage for a message with no threadId', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Load 4521', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      expect(gmailClient.threadHasSentMessage).not.toHaveBeenCalled();
     });
   });
 

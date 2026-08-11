@@ -168,7 +168,7 @@ From the `frontend/` directory:
 npm test
 ```
 
-Runs the Vitest suite (`vitest run`) — 373 tests across 40 suites, covering
+Runs the Vitest suite (`vitest run`) — 375 tests across 40 suites, covering
 every API module, page, and component, including the two pure-function
 pipelines (`src/lib/mcleodParser.js` for CSV column mapping,
 `src/lib/datExport.js` for the DAT export pipeline, and
@@ -187,9 +187,19 @@ The file is parsed entirely in the browser (column names are matched
 flexibly, e.g. "Dest City" or "Destination City" both work) and the
 resulting loads are upserted into the database by load number — a
 re-upload with the same load numbers updates rates/details rather than
-creating duplicates, and never changes a load's `active`/`booked`/`covered`/`expired`
-status (that's manual-only, via "Edit" or the per-row status dropdown on
-the loads table).
+creating duplicates.
+
+**A re-upload also retires anything that dropped off the board.** It
+represents the current full set of what's posted, so any of your loads
+that were `active` but aren't in *this* file get automatically marked
+`expired` — the success message says how many ("Uploaded: 3 new, 12
+updated, 5 no-longer-posted loads retired."). This is what keeps last
+week's/last month's loads from lingering forever as candidates the Gmail
+auto-reply matcher could pick up by mistake. `booked`/`covered` loads are
+never touched by this — those record something you set deliberately, not
+something a re-upload should silently undo. Manually marking a load
+`active`/`booked`/`covered`/`expired` yourself is still done via "Edit" or
+the per-row status dropdown on the loads table, same as before.
 
 Each row in the loads table (`LoadsTable.jsx`) has:
 - An **"Edit" button**, which opens `RateModal.jsx` — a full edit form for

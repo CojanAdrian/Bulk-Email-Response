@@ -96,20 +96,27 @@ check `.env`.
 npm test
 ```
 
-This runs `jest --runInBand`. The `--runInBand` flag is intentional and
-required, not optional — the test suites all share one real MySQL test
-database (`DB_NAME_TEST`) and reset its tables between tests, so running
-suites in parallel worker processes causes cross-suite races and flaky
-failures. Don't run `npx jest` directly; use `npm test`.
+This runs `jest --runInBand --forceExit`. The `--runInBand` flag is
+intentional and required, not optional — the test suites all share one
+real MySQL test database (`DB_NAME_TEST`) and reset its tables between
+tests, so running suites in parallel worker processes causes cross-suite
+races and flaky failures. `--forceExit` is also intentional:
+`express-mysql-session`'s internal expired-session cleanup interval (see
+"Sessions" below) can keep the process alive past Jest's own 1-second
+post-run grace check even after every store used in a test is properly
+`.close()`d — a known, benign quirk of that library under Jest, not a
+sign of a real leak (every test that constructs a store does close it).
+Don't run `npx jest` directly; use `npm test`.
 
-There are 190 tests across 13 suites: `tests/health.test.js`,
+There are 228 tests across 15 suites: `tests/health.test.js`,
 `tests/auth.test.js`, `tests/loads.test.js`, `tests/gmail.test.js`,
 `tests/inquiries.test.js`, `tests/createHttpServer.test.js`,
 `tests/lib/googleOAuth.test.js`, `tests/lib/gmailClient.test.js`,
 `tests/lib/matchingEngine.test.js`, `tests/lib/replyComposer.test.js`,
 `tests/lib/emailPoller.test.js`, `tests/lib/wsHub.test.js`,
-`tests/lib/wsAuth.test.js`. All Gmail API calls are mocked — no real
-Google credentials are needed to run the suite.
+`tests/lib/wsAuth.test.js`, `tests/lib/sessionStore.test.js`,
+`tests/lib/notificationFilter.test.js`. All Gmail API calls are mocked —
+no real Google credentials are needed to run the suite.
 
 ## Manual smoke test (curl)
 
@@ -164,19 +171,39 @@ curl -b cookies.txt http://localhost:4000/api/loads     # -> both loads, plus ad
 All `/api/loads/*` routes require an authenticated session — an unauthenticated
 request to any of them returns `401 {"error":"Unauthorized"}`.
 
+## Sessions
+
+A login lasts 30 days (`cookie.maxAge`, `src/app.js`), and `rolling: true`
+pushes that expiry out on every authenticated request — an active user
+effectively never gets logged out just from time passing.
+
+Sessions are backed by a MySQL table (`sessions`, auto-created by
+`express-mysql-session` on first use), not `express-session`'s default
+in-memory store — so a login survives a backend restart, unlike
+`MemoryStore`, which forgets every session the instant the process
+restarts. `src/lib/sessionStore.js` exports two factories:
+`createMySQLSessionStore(pool)` (what `src/createHttpServer.js` actually
+uses — pass a `mysql2/promise` pool; internally it hands
+`express-mysql-session` the pool's underlying callback-style pool via
+`pool.pool`, since the library expects a callback API, not a promise one)
+and `createMemoryStore()` (the default `createApp(pool, wsHub, store)`
+falls back to when no `store` is passed — most of the route-level test
+suites use this, since they aren't testing session persistence itself).
+
 ## Live updates (WebSocket)
 
 `src/server.js` builds an `http.Server` (`src/createHttpServer.js`) around
 the Express app and handles the `'upgrade'` event manually, since a raw
 WebSocket upgrade happens before Express's middleware chain runs and so
-never gets a `req.session` for free. Connecting to `ws://<host>/ws` is
-authenticated by parsing and unsigning the `connect.sid` cookie off the
-raw upgrade request (`src/lib/wsAuth.js`) and looking up the session in a
-`MemoryStore` now shared between `express-session` and the upgrade
-handler (`src/lib/sessionStore.js` — previously constructed inline inside
-`app.js` and inaccessible outside it). A connection with no cookie, or one
-that doesn't resolve to a session with a `userId`, gets a `401` and the
-socket is closed; anything not at the `/ws` path is rejected outright.
+never gets a `req.session` for free. `createHttpServer` builds one session
+store (see "Sessions" above) and threads it into both `createApp` and the
+upgrade handler, so a session created by an HTTP login is visible to a WS
+connection authenticating with that same cookie. Connecting to
+`ws://<host>/ws` is authenticated by parsing and unsigning the
+`connect.sid` cookie off the raw upgrade request (`src/lib/wsAuth.js`) and
+looking up the session in that shared store. A connection with no cookie,
+or one that doesn't resolve to a session with a `userId`, gets a `401` and
+the socket is closed; anything not at the `/ws` path is rejected outright.
 
 `src/lib/wsHub.js` is an in-process registry (`userId -> Set<WebSocket>`,
 no Redis or external broker — this app has always run as a single Node
@@ -285,7 +312,20 @@ don't own.
 | GET | `/api/loads/:id` | — | `200` load row, if it belongs to the caller (or the caller is admin); `404 {"error": "Load not found"}` if no such id, or it exists but belongs to a different, non-admin caller |
 | PATCH | `/api/loads/:id` | Any of `origin_city`, `origin_state`, `origin_zip`, `dest_city`, `dest_state`, `dest_zip`, `equipment`, `weight`, `target_pay`, `early_pu`, `late_pu`, `late_del`, `stops`, `commodity`, `temperature`, `comment`, `status` (at least one). `load_number` and `raw_equipment` are deliberately not editable — see the code comment in `src/routes/loads.js` | `200` updated load row; `400 {"error": "No valid fields to update"}` if no editable field is present; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
 | DELETE | `/api/loads/:id` | — | `200 {"ok": true}`; `404 {"error": "Load not found"}` if no such id, or it belongs to a different, non-admin caller |
-| POST | `/api/loads/upload` | `{"loads": [{ "load_number": string, ... other load fields }]}` | `200 {"inserted": number, "updated": number}`; `400 {"error": "loads must be an array"}` if `loads` isn't an array. Always upserted into the **uploader's own** set, regardless of role — see above and below for details |
+| POST | `/api/loads/upload` | `{"loads": [{ "load_number": string, ... other load fields }]}` | `200 {"inserted": number, "updated": number, "expired": number}`; `400 {"error": "loads must be an array"}` if `loads` isn't an array. Always upserted into the **uploader's own** set, regardless of role — see above and below for details |
+
+**A re-upload auto-expires loads that dropped off the board.** A CSV
+re-upload represents the current full set of what's posted — so after the
+upsert, any of the caller's own loads that were `status: 'active'` but
+whose `load_number` isn't present in *this* upload get set to
+`status: 'expired'` (the `expired` count in the response). This is what
+keeps stale loads (last week's, last month's) from lingering forever as
+match candidates for the Gmail poller — see "Matching pipeline" below for
+why that mattered. `booked`/`covered`/already-`expired` loads are left
+alone: those record a real outcome the user set deliberately, and a
+re-upload shouldn't silently overwrite that just because the load number
+wasn't in today's file. Guarded so an empty or fully-invalid upload
+(`loadNumbers.length === 0`) can't wipe out the whole active board.
 
 `DELETE /api/loads/:id` emits `load:changed` with `{ loadId, deleted: true }`
 over the caller's WebSocket connection, same as a PATCH, so
@@ -494,6 +534,32 @@ message with no `threadId` at all (shouldn't happen with real Gmail
 messages, but the check tolerates it) isn't deduplicated this way — it
 falls back to the ordinary per-`gmail_message_id` dedup above.
 
+**Automated-notification filtering.** Not everything that lands in the
+inbox is a carrier asking about a load — tracking notifications, load-lock
+alerts, shipment-tendered confirmations, etc. `looksLikeAutomatedNotification`
+(`src/lib/notificationFilter.js`) is a best-effort denylist checked right
+after the recipient-only filter: a sender whose address local-part is
+itself generic (`noreply@`, `loadlock@`, `tracking@`, etc.), or a subject
+matching known notification phrasing ("real-time location", "Load Lock
+Alert", "Tendered", "Load Track"), gets skipped the same way a
+group-addressed message does — no row, nothing logged. This can never be a
+complete classifier; extend the patterns in that file as new automated
+senders/phrasing show up, rather than trying to enumerate every case up
+front.
+
+**Skipping threads already answered directly in Gmail.** A brand-new
+thread (one with no existing `email_inquiries` row) might still already be
+handled — the user may have replied to the carrier directly in Gmail
+without ever going through this app's review queue. Before logging such a
+thread as a fresh inquiry, `pollAccount` calls
+`gmailClient.threadHasSentMessage(accessToken, threadId)`, which fetches
+the thread and checks whether any message in it carries the `SENT` label
+(i.e. the connected account sent something in that thread, at any point).
+If so, the message is skipped like any other already-handled case. This
+only costs an extra Gmail API call for genuinely new threads — duplicates,
+group-addressed messages, and automated notifications are already filtered
+out before reaching this check.
+
 **Auto-send and review queue.** Two tiers are confident enough to have a
 specific reply *composed* for them at all — everything else still creates
 a review-queue entry (so the inquiry isn't lost, and its `match_tier` still
@@ -554,6 +620,19 @@ first match wins:
 1. **Load number** — the email mentions a load number that matches one of
    the user's own loads exactly. Unambiguous; always wins outright even if
    city/state text is also present.
+   - **An explicit but unresolvable reference number suppresses every tier
+     below this one.** `mentionsExplicitReferenceNumber` looks for
+     keyword-prefixed reference patterns — "REF 0084341", "Ref#123456",
+     "Order #123456", "Load# 4521", "PRO 632628" (keyword + optional
+     `#`/`:` + 4-or-more digits). If the email cites one of these and it
+     didn't resolve via load number above, the carrier is clearly asking
+     about one specific, numbered load — a coincidental city/state overlap
+     with a completely different (often stale) load is not good enough to
+     guess with, so the result is `{ matchedLoad: null, tier: 'none' }`
+     rather than falling through to the tiers below. See the regression
+     test in `tests/lib/matchingEngine.test.js` for the real case this
+     fixes (a REF number for a load that was never uploaded happened to
+     share a lane with an unrelated, older load still marked `active`).
 2. **City + state (both ends)** — the origin's city+state AND the
    destination's city+state are both mentioned, e.g. "the Dallas, TX to
    Chicago, IL load." A match against only one end of the route (say, the

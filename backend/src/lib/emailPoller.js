@@ -1,7 +1,8 @@
 const { getAccessToken } = require('./googleOAuth');
-const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses } = require('./gmailClient');
+const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadHasSentMessage } = require('./gmailClient');
 const { matchInquiry } = require('./matchingEngine');
 const { composeReply } = require('./replyComposer');
+const { looksLikeAutomatedNotification } = require('./notificationFilter');
 
 // Only these tiers confirm enough of the route (both ends, or an exact load
 // number) to safely pre-fill a specific load's PU/DEL/rate details into a
@@ -55,6 +56,13 @@ async function pollAccount(pool, account, wsHub) {
       continue;
     }
 
+    // Automated tracking/status-update mail (load-lock alerts, shipment-
+    // tendered notifications, etc.) is not a carrier asking about a load --
+    // exclude it the same way a group-addressed message is: no row at all.
+    if (looksLikeAutomatedNotification(message)) {
+      continue;
+    }
+
     // A thread already logged once (regardless of what happened to that
     // first message -- sent, rejected, still pending) has already been
     // treated as an inquiry. Later messages in the same thread are followups
@@ -68,6 +76,13 @@ async function pollAccount(pool, account, wsHub) {
         [account.id, message.threadId]
       );
       if (existingThread.length > 0) continue;
+
+      // A never-before-seen thread might still already be handled -- the
+      // user may have replied to the carrier directly in Gmail without ever
+      // going through this app. If the connected account has already sent
+      // something in this thread, it's not a fresh, unanswered inquiry.
+      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId);
+      if (alreadyAnswered) continue;
     }
 
     const { matchedLoad, tier } = matchInquiry(`${message.subject} ${message.body}`, loads);

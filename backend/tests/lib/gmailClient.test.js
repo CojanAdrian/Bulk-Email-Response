@@ -9,6 +9,9 @@ jest.mock('googleapis', () => {
         get: jest.fn(),
         send: jest.fn(),
       },
+      threads: {
+        get: jest.fn(),
+      },
     },
   };
   return {
@@ -22,7 +25,7 @@ jest.mock('googleapis', () => {
 });
 
 const googleapis = require('googleapis');
-const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, sendReply } = require('../../src/lib/gmailClient');
+const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply } = require('../../src/lib/gmailClient');
 
 describe('listNewMessageIds', () => {
   beforeEach(() => {
@@ -229,6 +232,37 @@ describe('extractEmailAddresses', () => {
     expect(extractEmailAddresses('')).toEqual([]);
     expect(extractEmailAddresses(null)).toEqual([]);
     expect(extractEmailAddresses(undefined)).toEqual([]);
+  });
+});
+
+describe('threadHasSentMessage', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('returns true when a message in the thread has the SENT label', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+      data: { messages: [{ labelIds: ['INBOX'] }, { labelIds: ['SENT'] }] },
+    });
+    const result = await threadHasSentMessage('token', 't1');
+    expect(result).toBe(true);
+    expect(googleapis.__mockGmailClient.users.threads.get).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'me', id: 't1' })
+    );
+  });
+
+  test('returns false when no message in the thread has the SENT label', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+      data: { messages: [{ labelIds: ['INBOX'] }, { labelIds: ['INBOX', 'UNREAD'] }] },
+    });
+    const result = await threadHasSentMessage('token', 't1');
+    expect(result).toBe(false);
+  });
+
+  test('returns false when the thread has no messages at all', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({ data: {} });
+    const result = await threadHasSentMessage('token', 't1');
+    expect(result).toBe(false);
   });
 });
 

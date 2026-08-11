@@ -1,6 +1,5 @@
 const cookie = require('cookie');
 const cookieSignature = require('cookie-signature');
-const { store } = require('./sessionStore');
 
 function extractSessionId(cookieHeader, secret) {
   if (!cookieHeader) return null;
@@ -11,7 +10,7 @@ function extractSessionId(cookieHeader, secret) {
   return unsigned || null;
 }
 
-function authenticateUpgrade(req, secret) {
+function authenticateUpgrade(req, secret, store) {
   return new Promise((resolve) => {
     const sessionId = extractSessionId(req.headers.cookie, secret);
     if (!sessionId) return resolve(null);

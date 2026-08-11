@@ -151,9 +151,28 @@ function createLoadsRouter(pool, wsHub) {
         }
       }
 
+      // A re-upload represents the current full board -- any of this user's
+      // loads that were 'active' before but aren't in THIS upload are no
+      // longer posted, so they're retired automatically. 'booked'/'covered'/
+      // already-'expired' loads are left alone: those record a real outcome
+      // the user set deliberately, not something a re-upload should silently
+      // overwrite just because the load number wasn't in today's file.
+      // Guarded on a non-empty loadNumbers set so an empty/malformed upload
+      // can't wipe out the entire active board.
+      let expired = 0;
+      if (loadNumbers.length) {
+        const placeholders = loadNumbers.map(() => '?').join(', ');
+        const [expireResult] = await connection.query(
+          `UPDATE loads SET status = 'expired'
+           WHERE user_id = ? AND status = 'active' AND load_number NOT IN (${placeholders})`,
+          [userId, ...loadNumbers]
+        );
+        expired = expireResult.affectedRows;
+      }
+
       await connection.commit();
       if (wsHub) wsHub.emitToUser(userId, 'load:changed', {});
-      res.json({ inserted, updated });
+      res.json({ inserted, updated, expired });
     } catch (err) {
       await connection.rollback();
       throw err;

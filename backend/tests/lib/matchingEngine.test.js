@@ -1,4 +1,4 @@
-const { matchInquiry, extractDate } = require('../../src/lib/matchingEngine');
+const { matchInquiry, extractDate, mentionsExplicitReferenceNumber } = require('../../src/lib/matchingEngine');
 
 const LOADS = [
   { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', early_pu: '2026-08-10 08:00:00' },
@@ -40,7 +40,9 @@ describe('matchInquiry', () => {
     // loads, with an origin ("Red Deer County, AB, Canada") that doesn't
     // belong to any load either -- but the destination "Billings, MT" happens
     // to match a completely different, unrelated load. That coincidental
-    // overlap must not earn the high-confidence city_state tier.
+    // overlap must not earn the high-confidence city_state tier. It also
+    // cites a "PRO 632628" reference number that doesn't resolve to
+    // anything, so it should be fully unmatched, not merely downgraded.
     const loadsWithBillingsDestination = [
       { id: 20, load_number: '9099', origin_city: 'Kennesaw', origin_state: 'GA', dest_city: 'Billings', dest_state: 'MT', early_pu: '2026-06-29 06:00:00' },
     ];
@@ -48,7 +50,29 @@ describe('matchInquiry', () => {
       'Re: 0084137 // Red Deer County, AB, Canada - Billings, MT 59106 // PRO 632628',
       loadsWithBillingsDestination
     );
-    expect(result.tier).not.toBe('city_state');
+    expect(result.tier).toBe('none');
+    expect(result.matchedLoad).toBeNull();
+  });
+
+  test('does not confidently match a full-route overlap either when the email cites an unresolvable REF number', () => {
+    // Regression test for the exact real-world case this fixes: the carrier's
+    // email cites "REF 0084341" (a load that was never uploaded to this
+    // user's system at all) but happens to name an origin/destination that
+    // fully matches a DIFFERENT, unrelated (stale) load in the system. Even
+    // though the route matches on both ends, the explicit unresolvable
+    // reference number takes priority over the location match.
+    const loadsWithSameLane = [
+      { id: 30, load_number: '0078557', origin_city: 'Goodyear', origin_state: 'AZ', dest_city: 'Los Angeles', dest_state: 'CA', early_pu: '2026-06-29 15:00:00' },
+    ];
+    const result = matchInquiry('Goodyear, AZ Los Angeles, CA REF 0084341', loadsWithSameLane);
+    expect(result.tier).toBe('none');
+    expect(result.matchedLoad).toBeNull();
+  });
+
+  test('still matches by load number when the cited reference number does resolve to a real load', () => {
+    const result = matchInquiry('Re: Ref 4521 - is this still available?', LOADS);
+    expect(result.tier).toBe('load_number');
+    expect(result.matchedLoad.id).toBe(1);
   });
 
   test('matches on city alone when state is not mentioned', () => {
@@ -108,6 +132,32 @@ describe('matchInquiry', () => {
     const result = matchInquiry('Do you have anything in HI this week?', loadsWithCollidingStates);
     expect(result.tier).toBe('state');
     expect(result.matchedLoad.id).toBe(10);
+  });
+});
+
+describe('mentionsExplicitReferenceNumber', () => {
+  test.each([
+    'REF 0084341',
+    'Ref#0084341',
+    'Ref: 0084341',
+    'Reference 0084341',
+    'Order #123456',
+    'Load# 4521',
+    'PRO 632628',
+  ])('detects %s as an explicit reference number', (text) => {
+    expect(mentionsExplicitReferenceNumber(text)).toBe(true);
+  });
+
+  test('returns false for ordinary text with no reference-style keyword', () => {
+    expect(mentionsExplicitReferenceNumber('Do you have anything from Dallas, TX to Chicago, IL?')).toBe(false);
+  });
+
+  test('returns false for a bare number with no reference keyword', () => {
+    expect(mentionsExplicitReferenceNumber('Call me at 5551234567')).toBe(false);
+  });
+
+  test('returns false for a short number even with a reference keyword (avoids false positives on small counts)', () => {
+    expect(mentionsExplicitReferenceNumber('load #5')).toBe(false);
   });
 });
 

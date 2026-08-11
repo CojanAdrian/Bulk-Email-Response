@@ -61,6 +61,35 @@ describe('UploadPanel', () => {
     expect(onUploadComplete).toHaveBeenCalled();
   });
 
+  test('mentions retired loads when the upload response reports expired > 0', async () => {
+    Papa.parse.mockImplementation((file, options) => {
+      options.complete({ meta: { fields: VALID_FIELDS }, data: [validRow()] });
+    });
+    loadsApi.uploadLoads.mockResolvedValue({ inserted: 0, updated: 1, expired: 3 });
+    render(<UploadPanel onUploadComplete={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [makeFile()] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/3 no-longer-posted loads retired/i)).toBeInTheDocument();
+    });
+  });
+
+  test('does not mention retired loads when expired is 0', async () => {
+    Papa.parse.mockImplementation((file, options) => {
+      options.complete({ meta: { fields: VALID_FIELDS }, data: [validRow()] });
+    });
+    loadsApi.uploadLoads.mockResolvedValue({ inserted: 1, updated: 0, expired: 0 });
+    render(<UploadPanel onUploadComplete={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [makeFile()] } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/uploaded: 1 new, 0 updated/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/retired/i)).not.toBeInTheDocument();
+  });
+
   test('shows an error when required columns are missing, without calling the upload API', async () => {
     Papa.parse.mockImplementation((file, options) => {
       options.complete({ meta: { fields: ['Order'] }, data: [{ Order: '123' }] });

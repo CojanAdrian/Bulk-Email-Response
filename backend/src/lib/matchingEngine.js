@@ -37,6 +37,16 @@ function findLoadNumberMatch(text, loads) {
   return loads.find((load) => load.load_number && normalized.includes(String(load.load_number).toLowerCase()));
 }
 
+// Matches an explicit reference-style number -- "REF 0084341", "Ref#123456",
+// "Order #123456", "Load# 4521", "PRO 632628" -- regardless of whether it
+// resolves to a load we have. Used to detect when a carrier is clearly
+// asking about one specific, numbered load rather than a lane in general.
+const REFERENCE_KEYWORD_PATTERN = /\b(?:ref|reference|order|load|pro)\s*#?\s*:?\s*(\d{4,})\b/i;
+
+function mentionsExplicitReferenceNumber(text) {
+  return REFERENCE_KEYWORD_PATTERN.test(String(text || ''));
+}
+
 // Requires BOTH ends of the route to be confirmed in the text -- an inquiry
 // that names one specific origin and one specific destination must match a
 // load on both, not just one. A destination-only match against a load whose
@@ -110,6 +120,15 @@ function matchInquiry(emailText, loads) {
     return { matchedLoad: loadNumberMatch, tier: 'load_number' };
   }
 
+  // A carrier who cites an explicit reference/order/PRO number is asking
+  // about one specific load. If that number doesn't resolve to anything we
+  // have, a coincidental city/state overlap with a DIFFERENT load is not
+  // good enough to guess with -- the referenced load simply isn't in our
+  // system, so this is unmatched, not a location-based fallback match.
+  if (mentionsExplicitReferenceNumber(emailText)) {
+    return { matchedLoad: null, tier: 'none' };
+  }
+
   const cityStateMatches = findCityStateMatches(emailText, loads);
   if (cityStateMatches.length > 0) {
     return { matchedLoad: resolveTie(cityStateMatches, emailText), tier: 'city_state' };
@@ -132,6 +151,7 @@ module.exports = {
   matchInquiry,
   extractDate,
   findLoadNumberMatch,
+  mentionsExplicitReferenceNumber,
   findCityStateMatches,
   findCityMatches,
   findStateMatches,

@@ -1,8 +1,9 @@
 const cookieSignature = require('cookie-signature');
-const { store } = require('../../src/lib/sessionStore');
+const { createMemoryStore } = require('../../src/lib/sessionStore');
 const { authenticateUpgrade, extractSessionId } = require('../../src/lib/wsAuth');
 
 const SECRET = 'test-secret';
+const store = createMemoryStore();
 
 function seedSession(sessionId, sessionData) {
   return new Promise((resolve, reject) => {
@@ -45,20 +46,20 @@ describe('wsAuth', () => {
       await seedSession('session-1', { userId: 42 });
       const req = { headers: { cookie: signedCookieHeader('session-1') } };
 
-      const userId = await authenticateUpgrade(req, SECRET);
+      const userId = await authenticateUpgrade(req, SECRET, store);
 
       expect(userId).toBe(42);
     });
 
     test('resolves null when there is no cookie header', async () => {
       const req = { headers: {} };
-      const userId = await authenticateUpgrade(req, SECRET);
+      const userId = await authenticateUpgrade(req, SECRET, store);
       expect(userId).toBeNull();
     });
 
     test('resolves null when the session does not exist in the store', async () => {
       const req = { headers: { cookie: signedCookieHeader('nonexistent-session') } };
-      const userId = await authenticateUpgrade(req, SECRET);
+      const userId = await authenticateUpgrade(req, SECRET, store);
       expect(userId).toBeNull();
     });
 
@@ -66,7 +67,7 @@ describe('wsAuth', () => {
       await seedSession('session-2', {});
       const req = { headers: { cookie: signedCookieHeader('session-2') } };
 
-      const userId = await authenticateUpgrade(req, SECRET);
+      const userId = await authenticateUpgrade(req, SECRET, store);
 
       expect(userId).toBeNull();
     });
@@ -75,7 +76,7 @@ describe('wsAuth', () => {
       await seedSession('session-3', { userId: 7 });
       const req = { headers: { cookie: signedCookieHeader('session-3') } };
 
-      const userId = await authenticateUpgrade(req, 'wrong-secret');
+      const userId = await authenticateUpgrade(req, 'wrong-secret', store);
 
       expect(userId).toBeNull();
     });

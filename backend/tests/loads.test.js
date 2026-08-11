@@ -257,13 +257,13 @@ describe('loads routes', () => {
       loads: [{ load_number: 'BARE1' }],
     });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ inserted: 1, updated: 0 });
+    expect(res.body).toEqual({ inserted: 1, updated: 0, expired: 0 });
 
     const reupload = await agent.post('/api/loads/upload').send({
       loads: [{ load_number: 'BARE1' }],
     });
     expect(reupload.status).toBe(200);
-    expect(reupload.body).toEqual({ inserted: 0, updated: 1 });
+    expect(reupload.body).toEqual({ inserted: 0, updated: 1, expired: 0 });
 
     const list = await agent.get('/api/loads');
     expect(list.body).toHaveLength(1);
@@ -317,7 +317,7 @@ describe('loads routes', () => {
       loads: [{ load_number: 'L1001', origin_city: 'Dallas', target_pay: 1800 }],
     });
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ inserted: 0, updated: 1 });
+    expect(res.body).toEqual({ inserted: 0, updated: 1, expired: 0 });
 
     const list = await agent.get('/api/loads');
     expect(list.body).toHaveLength(1);
@@ -336,6 +336,75 @@ describe('loads routes', () => {
     });
     const list2 = await agent.get('/api/loads');
     expect(list2.body[0].status).toBe('booked');
+  });
+
+  test('a re-upload auto-expires previously-active loads that are missing from the new file', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [
+        { load_number: 'STALE1', origin_city: 'Dallas', target_pay: 1500 },
+        { load_number: 'FRESH1', origin_city: 'Atlanta', target_pay: 900 },
+      ],
+    });
+
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'FRESH1', origin_city: 'Atlanta', target_pay: 950 }],
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inserted: 0, updated: 1, expired: 1 });
+
+    const list = await agent.get('/api/loads');
+    const stale = list.body.find((l) => l.load_number === 'STALE1');
+    const fresh = list.body.find((l) => l.load_number === 'FRESH1');
+    expect(stale.status).toBe('expired');
+    expect(fresh.status).toBe('active');
+  });
+
+  test('a re-upload does not expire a booked or covered load that is missing from the new file', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'BOOKED1', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+    const list1 = await agent.get('/api/loads');
+    await agent.patch(`/api/loads/${list1.body[0].id}`).send({ status: 'booked' });
+
+    const res = await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'SOMETHING_ELSE', origin_city: 'Atlanta', target_pay: 900 }],
+    });
+
+    expect(res.body.expired).toBe(0);
+    const list2 = await agent.get('/api/loads');
+    const booked = list2.body.find((l) => l.load_number === 'BOOKED1');
+    expect(booked.status).toBe('booked');
+  });
+
+  test('an empty upload does not expire any existing active loads', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'KEEPME', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+
+    const res = await agent.post('/api/loads/upload').send({ loads: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ inserted: 0, updated: 0, expired: 0 });
+    const list = await agent.get('/api/loads');
+    expect(list.body.find((l) => l.load_number === 'KEEPME').status).toBe('active');
+  });
+
+  test('a re-upload does not expire another user\'s loads', async () => {
+    const passwordHash = await bcrypt.hash('otherpw2', 10);
+    await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser2', ?, 'user')", [passwordHash]);
+    const otherAgent = request.agent(app);
+    await otherAgent.post('/api/auth/login').send({ username: 'otheruser2', password: 'otherpw2' });
+    await otherAgent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'THEIRLOAD', origin_city: 'Houston', target_pay: 2000 }],
+    });
+
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'MYLOAD', origin_city: 'Dallas', target_pay: 1500 }],
+    });
+
+    const theirs = await otherAgent.get('/api/loads');
+    expect(theirs.body.find((l) => l.load_number === 'THEIRLOAD').status).toBe('active');
   });
 
   test('upload with a non-array loads field returns 400', async () => {

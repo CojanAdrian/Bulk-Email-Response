@@ -66,6 +66,17 @@ async function getMessage(accessToken, messageId) {
   };
 }
 
+// Checks whether the connected account has already sent a message in this
+// thread -- i.e. a human already replied to this carrier directly in Gmail,
+// outside the app entirely. Used to avoid surfacing a thread as a fresh,
+// unanswered inquiry when it's actually already been handled.
+async function threadHasSentMessage(accessToken, threadId) {
+  const gmail = buildGmailClient(accessToken);
+  const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'metadata' });
+  const messages = res.data.messages || [];
+  return messages.some((m) => (m.labelIds || []).includes('SENT'));
+}
+
 function buildRawMessage({ to, subject, body, inReplyToMessageId }) {
   const headers = [
     `To: ${to}`,
@@ -90,4 +101,4 @@ async function sendReply(accessToken, { to, subject, body, threadId, inReplyToMe
   return res.data;
 }
 
-module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, sendReply };
+module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply };
