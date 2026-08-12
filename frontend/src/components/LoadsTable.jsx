@@ -6,8 +6,8 @@ import Badge from './Badge';
 import Card from './Card';
 import Skeleton from './Skeleton';
 
-const STATUS_OPTIONS = ['active', 'booked', 'covered', 'expired'];
-const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered', expired: 'Expired' };
+const STATUS_OPTIONS = ['active', 'booked', 'covered'];
+const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
 
 const SORT_COLUMNS = [
   { key: 'load_number', label: 'Load #' },

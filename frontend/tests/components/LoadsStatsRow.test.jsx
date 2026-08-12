@@ -11,7 +11,7 @@ const LOADS = [
   { id: 1, status: 'active' },
   { id: 2, status: 'active' },
   { id: 3, status: 'booked' },
-  { id: 4, status: 'expired' },
+  { id: 4, status: 'covered' },
 ];
 
 describe('LoadsStatsRow', () => {
@@ -37,7 +37,7 @@ describe('LoadsStatsRow', () => {
       expect(screen.getByText('Active')).toBeInTheDocument();
     });
     expect(screen.getByText('2')).toBeInTheDocument();
-    expect(screen.getAllByText('1')).toHaveLength(2); // booked + expired
+    expect(screen.getAllByText('1')).toHaveLength(2); // booked + covered
   });
 
   test('renders nothing while loading or on error', async () => {

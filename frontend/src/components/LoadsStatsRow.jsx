@@ -21,7 +21,7 @@ function LoadsStatsRow({ refreshKey }) {
     listLoads()
       .then((data) => {
         if (ignore) return;
-        const next = { active: 0, booked: 0, expired: 0 };
+        const next = { active: 0, booked: 0, covered: 0 };
         data.forEach((load) => {
           if (next[load.status] !== undefined) next[load.status] += 1;
         });
@@ -45,7 +45,7 @@ function LoadsStatsRow({ refreshKey }) {
     <div className="grid grid-cols-3 gap-4">
       <StatBlock label="Active" value={counts.active} accentClassName="text-success" />
       <StatBlock label="Booked" value={counts.booked} accentClassName="text-tag" />
-      <StatBlock label="Expired" value={counts.expired} accentClassName="text-error" />
+      <StatBlock label="Covered" value={counts.covered} accentClassName="text-tag" />
     </div>
   );
 }

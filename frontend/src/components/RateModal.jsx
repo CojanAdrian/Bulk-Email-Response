@@ -408,7 +408,6 @@ function RateModal({ load, onClose, onSaved }) {
               <option value="active">Active</option>
               <option value="booked">Booked</option>
               <option value="covered">Covered</option>
-              <option value="expired">Expired</option>
             </select>
           </div>
         </div>
