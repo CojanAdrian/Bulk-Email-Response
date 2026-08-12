@@ -44,6 +44,39 @@ function createLoadsRouter(pool, wsHub) {
     res.json(rows);
   }));
 
+  router.post('/', asyncHandler(async (req, res) => {
+    const loadNumber = String(req.body.load_number ?? '').trim();
+    if (loadNumber === '') {
+      return res.status(400).json({ error: 'load_number is required' });
+    }
+
+    const userId = req.session.userId;
+    const columns = ['load_number', 'user_id'];
+    const values = [loadNumber, userId];
+    for (const field of EDITABLE_FIELDS) {
+      if (req.body[field] !== undefined) {
+        columns.push(field);
+        values.push(field === 'extra_stops' ? JSON.stringify(req.body[field]) : req.body[field]);
+      }
+    }
+    const placeholders = columns.map(() => '?').join(', ');
+
+    let insertId;
+    try {
+      const [result] = await pool.query(`INSERT INTO loads (${columns.join(', ')}) VALUES (${placeholders})`, values);
+      insertId = result.insertId;
+    } catch (err) {
+      if (err.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({ error: `A load with number "${loadNumber}" already exists` });
+      }
+      throw err;
+    }
+
+    const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [insertId]);
+    if (wsHub) wsHub.emitToUser(userId, 'load:changed', { loadId: insertId });
+    res.status(201).json(rows[0]);
+  }));
+
   router.get('/:id', asyncHandler(async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
     const load = rows[0];

@@ -630,4 +630,69 @@ describe('loads routes', () => {
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
+
+  describe('POST /', () => {
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post('/api/loads').send({ load_number: 'L1001' });
+      expect(res.status).toBe(401);
+    });
+
+    test('creates a load with only load_number set, defaulting everything else', async () => {
+      const res = await agent.post('/api/loads').send({ load_number: 'L1001' });
+      expect(res.status).toBe(201);
+      expect(res.body.load_number).toBe('L1001');
+      expect(res.body.status).toBe('active');
+      expect(Number(res.body.include_rate)).toBe(1);
+      expect(res.body.target_pay).toBeNull();
+      expect(res.body.comment).toBeNull();
+    });
+
+    test('creates a load with the full set of fields, including extra_stops and include_rate', async () => {
+      const res = await agent.post('/api/loads').send({
+        load_number: 'L2002', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL',
+        equipment: 'V', weight: '42000', target_pay: 1500, comment: 'Call ahead', include_rate: false,
+        extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.origin_city).toBe('Dallas');
+      expect(Number(res.body.target_pay)).toBe(1500);
+      expect(Number(res.body.include_rate)).toBe(0);
+      expect(res.body.extra_stops).toEqual([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }]);
+    });
+
+    test('returns 400 when load_number is missing or blank', async () => {
+      const res1 = await agent.post('/api/loads').send({});
+      expect(res1.status).toBe(400);
+      const res2 = await agent.post('/api/loads').send({ load_number: '   ' });
+      expect(res2.status).toBe(400);
+    });
+
+    test('returns 409 when load_number already exists for this user', async () => {
+      await agent.post('/api/loads').send({ load_number: 'DUPE1' });
+      const res = await agent.post('/api/loads').send({ load_number: 'DUPE1' });
+      expect(res.status).toBe(409);
+    });
+
+    test('two different users can each create a load with the same load_number', async () => {
+      await agent.post('/api/loads').send({ load_number: 'SHARED1' });
+
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const otherAgent = request.agent(app);
+      await otherAgent.post('/api/auth/login').send({ username: 'otheruser', password: 'otherpw' });
+
+      const res = await otherAgent.post('/api/loads').send({ load_number: 'SHARED1' });
+      expect(res.status).toBe(201);
+    });
+
+    test('emits load:changed to the creating user', async () => {
+      const wsHub = { emitToUser: jest.fn() };
+      const hubApp = createApp(pool, wsHub);
+      const hubAgent = request.agent(hubApp);
+      await hubAgent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+
+      const res = await hubAgent.post('/api/loads').send({ load_number: 'L1001' });
+      expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', { loadId: res.body.id });
+    });
+  });
 });
