@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { listInquiries, sendInquiryReply, rejectInquiry } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
-import { detectMultiStop } from '../lib/lookupMessage';
+import { detectMultiStop, multiStopTagVariant } from '../lib/lookupMessage';
 import { useMotionPreset } from '../lib/motionConfig';
 import Badge from './Badge';
 import Card from './Card';
@@ -17,6 +17,7 @@ function ReviewQueue() {
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [error, setError] = useState(null);
   const [actioningId, setActioningId] = useState(null);
+  const [rateOverrides, setRateOverrides] = useState({});
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -69,6 +70,23 @@ function ReviewQueue() {
 
   function handleDraftChange(id, value) {
     setDrafts((prev) => ({ ...prev, [id]: value }));
+  }
+
+  function isRateIncluded(inquiry) {
+    if (inquiry.id in rateOverrides) return rateOverrides[inquiry.id];
+    return Boolean(Number(inquiry.matched_load_include_rate));
+  }
+
+  function handleRateToggle(inquiry, checked) {
+    setRateOverrides((prev) => ({ ...prev, [inquiry.id]: checked }));
+    const targetPay = Number(inquiry.matched_load_target_pay);
+    const rateLine = `Rate: $${targetPay.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+    setDrafts((prev) => {
+      const current = prev[inquiry.id] ?? '';
+      const withoutRate = current.split('\n').filter((line) => !line.startsWith('Rate: ')).join('\n');
+      const next = checked ? (withoutRate ? `${withoutRate}\n${rateLine}` : rateLine) : withoutRate;
+      return { ...prev, [inquiry.id]: next };
+    });
   }
 
   function handleSend(id) {
@@ -133,6 +151,11 @@ function ReviewQueue() {
                 comment: inquiry.matched_load_comment,
                 stops: inquiry.matched_load_stops,
               });
+              const multiStopVariant = multiStopTagVariant({
+                comment: inquiry.matched_load_comment,
+                stops: inquiry.matched_load_stops,
+                extra_stops: inquiry.matched_load_extra_stops,
+              });
               return (
               <motion.li
                 key={inquiry.id}
@@ -146,10 +169,22 @@ function ReviewQueue() {
                   {Boolean(inquiry.ref_mismatch) && (
                     <Badge variant="warning">Different load? — reference # didn't match, verify</Badge>
                   )}
-                  {multiStopFlag && (
+                  {multiStopVariant === 'error' && (
                     <Badge variant="error">{multiStopFlag} — add extra stops manually</Badge>
                   )}
+                  {multiStopVariant === 'info' && <Badge variant="info">Extra stops already added</Badge>}
                 </div>
+                {inquiry.matched_load_target_pay !== null && inquiry.matched_load_target_pay !== undefined && (
+                  <label className="mb-2 flex items-center gap-2 text-xs text-text-muted" htmlFor={`rate-toggle-${inquiry.id}`}>
+                    <input
+                      id={`rate-toggle-${inquiry.id}`}
+                      type="checkbox"
+                      checked={isRateIncluded(inquiry)}
+                      onChange={(e) => handleRateToggle(inquiry, e.target.checked)}
+                    />
+                    Include rate on send
+                  </label>
+                )}
                 <label className="mb-1 block text-xs text-text-muted" htmlFor={`reply-${inquiry.id}`}>
                   Reply
                 </label>

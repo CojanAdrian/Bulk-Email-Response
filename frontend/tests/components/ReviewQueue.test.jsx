@@ -105,6 +105,65 @@ describe('ReviewQueue', () => {
     expect(screen.getByText(/multi-drop/i)).toBeInTheDocument();
   });
 
+  test('shows a blue "extra stops already added" badge instead of the red warning once the matched load has structured extra stops', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      {
+        ...INQUIRY,
+        matched_load_stops: 1,
+        matched_load_comment: '2nd pickup in Fort Worth',
+        matched_load_extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }],
+      },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByText(/extra stops already added/i)).toBeInTheDocument();
+    expect(screen.queryByText(/add extra stops manually/i)).not.toBeInTheDocument();
+  });
+
+  test('shows the rate checkbox, checked by default, when the matched load has a target pay and include_rate is on', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 1, reply_body: 'PU: DALLAS, TX\nRate: $1,500' },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByLabelText(/include rate on send/i)).toBeChecked();
+  });
+
+  test('unchecking the rate checkbox strips the Rate line from the draft without changing the load', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 1, reply_body: 'PU: DALLAS, TX\nRate: $1,500' },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    fireEvent.click(screen.getByLabelText(/include rate on send/i));
+
+    expect(screen.getByLabelText(/reply/i)).toHaveValue('PU: DALLAS, TX');
+  });
+
+  test('checking the rate checkbox appends a Rate line built from the matched load\'s target pay', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([
+      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 0, reply_body: 'PU: DALLAS, TX' },
+    ]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.getByLabelText(/include rate on send/i)).not.toBeChecked();
+    fireEvent.click(screen.getByLabelText(/include rate on send/i));
+
+    expect(screen.getByLabelText(/reply/i)).toHaveValue('PU: DALLAS, TX\nRate: $1,500');
+  });
+
+  test('does not show the rate checkbox when the matched load has no target pay', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_target_pay: null }]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+
+    expect(screen.queryByLabelText(/include rate on send/i)).not.toBeInTheDocument();
+  });
+
   test('sends the edited textarea content, not the original draft, when Send is clicked', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
     inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
