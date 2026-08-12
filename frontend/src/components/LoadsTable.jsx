@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus } from '../api/loads';
+import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
+import { multiStopTagVariant } from '../lib/lookupMessage';
 import Badge from './Badge';
 import Card from './Card';
 import Skeleton from './Skeleton';
@@ -152,6 +153,34 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
       });
   }
 
+  function handleIncludeRateChange(load, checked) {
+    setActionError(null);
+    setBusyLoadId(load.id);
+    updateLoad(load.id, { include_rate: checked })
+      .catch((err) => {
+        setActionError(err.message || 'Failed to update rate.');
+      })
+      .finally(() => {
+        setBusyLoadId(null);
+      });
+  }
+
+  function handleBulkIncludeRate(e) {
+    const value = e.target.value;
+    if (!value) return;
+    setActionError(null);
+    setBulkBusy(true);
+    bulkSetIncludeRate(Array.from(selectedIds), value === 'include')
+      .then(() => {
+        setSelectedIds(new Set());
+      })
+      .catch((err) => setActionError(err.message || 'Failed to update rate for selected loads.'))
+      .finally(() => {
+        setBulkBusy(false);
+        e.target.value = '';
+      });
+  }
+
   function handleBulkDelete() {
     setActionError(null);
     setBulkBusy(true);
@@ -213,6 +242,19 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                 {STATUS_LABELS[option]}
               </option>
             ))}
+          </select>
+          <select
+            aria-label="Rate for selected"
+            defaultValue=""
+            onChange={handleBulkIncludeRate}
+            disabled={bulkBusy}
+            className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+          >
+            <option value="" disabled>
+              Rate...
+            </option>
+            <option value="include">Include rate</option>
+            <option value="exclude">Exclude rate</option>
           </select>
           {confirmingBulkDelete ? (
             <>
@@ -278,6 +320,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                   </button>
                 </th>
               ))}
+              <th className="py-2 pr-4">Rate</th>
               <th className="py-2 pr-4">Status</th>
               <th className="py-2"></th>
             </tr>
@@ -297,6 +340,8 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                   <div className="flex items-center gap-1.5">
                     <span>{load.load_number}</span>
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
+                    {multiStopTagVariant(load) === 'error' && <Badge variant="error">Needs stops added</Badge>}
+                    {multiStopTagVariant(load) === 'info' && <Badge variant="info">Stops added</Badge>}
                   </div>
                 </td>
                 <td className="py-2 pr-4">
@@ -307,6 +352,15 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                 </td>
                 <td className="py-2 pr-4">{load.equipment}</td>
                 <td className="py-2 pr-4">{load.target_pay}</td>
+                <td className="py-2 pr-4">
+                  <input
+                    type="checkbox"
+                    aria-label={`Include rate for ${load.load_number}`}
+                    checked={Boolean(load.include_rate)}
+                    onChange={(e) => handleIncludeRateChange(load, e.target.checked)}
+                    disabled={busyLoadId === load.id}
+                  />
+                </td>
                 <td className="py-2 pr-4">
                   <select
                     aria-label={`Status for ${load.load_number}`}

@@ -9,12 +9,12 @@ vi.mock('../../src/lib/liveSocket');
 
 const SAMPLE_LOAD = {
   id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
-  dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
+  dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active', include_rate: 1,
 };
 
 const SAMPLE_LOAD_2 = {
   id: 2, load_number: 'A2002', origin_city: 'Atlanta', origin_state: 'GA',
-  dest_city: 'Miami', dest_state: 'FL', equipment: 'R', target_pay: '900.00', status: 'active',
+  dest_city: 'Miami', dest_state: 'FL', equipment: 'R', target_pay: '900.00', status: 'active', include_rate: 1,
 };
 
 describe('LoadsTable', () => {
@@ -149,6 +149,56 @@ describe('LoadsTable', () => {
     await waitFor(() => {
       expect(screen.getByText('Delete failed')).toBeInTheDocument();
     });
+  });
+
+  test('shows a checked rate toggle by default and unchecked when include_rate is 0', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, { ...SAMPLE_LOAD_2, include_rate: 0 }]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    expect(screen.getByLabelText(/include rate for l1001/i)).toBeChecked();
+    expect(screen.getByLabelText(/include rate for a2002/i)).not.toBeChecked();
+  });
+
+  test('toggling the rate switch calls updateLoad with the new include_rate value', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, include_rate: 0 });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    fireEvent.click(screen.getByLabelText(/include rate for l1001/i));
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { include_rate: false });
+    });
+  });
+
+  test('shows a red "Needs stops added" tag when the comment suggests multi-stop and there are no structured extra stops', async () => {
+    loadsApi.listLoads.mockResolvedValue([{ ...SAMPLE_LOAD, comment: '2nd pickup required', extra_stops: [] }]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    expect(screen.getByText(/needs stops added/i)).toBeInTheDocument();
+  });
+
+  test('shows a blue "Stops added" tag once structured extra stops exist, instead of the red one', async () => {
+    loadsApi.listLoads.mockResolvedValue([
+      { ...SAMPLE_LOAD, comment: '2nd pickup required', extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }] },
+    ]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    expect(screen.getByText(/^stops added$/i)).toBeInTheDocument();
+    expect(screen.queryByText(/needs stops added/i)).not.toBeInTheDocument();
+  });
+
+  test('shows no multi-stop tag for an ordinary load', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    expect(screen.queryByText(/needs stops added/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^stops added$/i)).not.toBeInTheDocument();
   });
 
   test('refetches with the new filter when the status dropdown changes', async () => {
@@ -317,6 +367,20 @@ describe('LoadsTable', () => {
 
       await waitFor(() => {
         expect(screen.getByText('Bulk delete failed')).toBeInTheDocument();
+      });
+    });
+
+    test('choosing a bulk rate action calls bulkSetIncludeRate with the selected ids', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      loadsApi.bulkSetIncludeRate.mockResolvedValue({ updated: 2 });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByLabelText('Select all loads'));
+      fireEvent.change(screen.getByLabelText(/rate for selected/i), { target: { value: 'exclude' } });
+
+      await waitFor(() => {
+        expect(loadsApi.bulkSetIncludeRate).toHaveBeenCalledWith([1, 2], false);
       });
     });
   });
