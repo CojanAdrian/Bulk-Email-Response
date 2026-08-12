@@ -115,4 +115,98 @@ describe('composeReply', () => {
     expect(reply).not.toContain('null');
     expect(reply).not.toContain('undefined');
   });
+
+  test('omits the Rate line when include_rate is false even though target_pay is set', () => {
+    const load = {
+      origin_city: 'Chicago', origin_state: 'IL',
+      dest_city: 'Dallas', dest_state: 'TX',
+      target_pay: '1500.00',
+      include_rate: 0,
+    };
+    expect(composeReply(load)).not.toContain('Rate:');
+  });
+
+  test('includes the Rate line when include_rate is true, and when it is simply absent (defaults to on)', () => {
+    const load = {
+      origin_city: 'Chicago', origin_state: 'IL',
+      dest_city: 'Dallas', dest_state: 'TX',
+      target_pay: '1500.00',
+      include_rate: 1,
+    };
+    expect(composeReply(load)).toContain('Rate: $1,500');
+    expect(composeReply({ ...load, include_rate: undefined })).toContain('Rate: $1,500');
+  });
+
+  test('inserts extra pickups after the primary PU line, in entry order, labeled 2nd/3rd', () => {
+    const load = {
+      origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL',
+      extra_stops: [
+        { type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: '2026-08-12 13:00:00' },
+        { type: 'pickup', city: 'Waco', state: 'TX', datetime: null },
+      ],
+    };
+    expect(composeReply(load)).toBe(
+      'PU: DALLAS, TX\n' +
+      '2nd PU: FORT WORTH, TX – 08/12/2026 1pm\n' +
+      '3rd PU: WACO, TX\n' +
+      'DEL: CHICAGO, IL'
+    );
+  });
+
+  test('inserts extra deliveries after the primary DEL line, in entry order, labeled 2nd/3rd', () => {
+    const load = {
+      origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL',
+      extra_stops: [
+        { type: 'delivery', city: 'Joliet', state: 'IL', datetime: '2026-08-14 09:00:00' },
+        { type: 'delivery', city: 'Peoria', state: 'IL', datetime: null },
+      ],
+    };
+    expect(composeReply(load)).toBe(
+      'PU: DALLAS, TX\n' +
+      'DEL: CHICAGO, IL\n' +
+      '2nd DEL: JOLIET, IL – 08/14/2026 9am\n' +
+      '3rd DEL: PEORIA, IL'
+    );
+  });
+
+  test('interleaves extra pickups and deliveries correctly around the primary PU/DEL lines, before Rate', () => {
+    const load = {
+      origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL',
+      target_pay: '1500.00',
+      extra_stops: [
+        { type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null },
+        { type: 'delivery', city: 'Joliet', state: 'IL', datetime: null },
+      ],
+    };
+    expect(composeReply(load)).toBe(
+      'PU: DALLAS, TX\n' +
+      '2nd PU: FORT WORTH, TX\n' +
+      'DEL: CHICAGO, IL\n' +
+      '2nd DEL: JOLIET, IL\n' +
+      'Rate: $1,500'
+    );
+  });
+
+  test('ignores an extra stop entry with neither city nor state', () => {
+    const load = {
+      origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL',
+      extra_stops: [{ type: 'pickup', city: null, state: null, datetime: null }],
+    };
+    expect(composeReply(load)).not.toContain('2nd PU');
+  });
+
+  test('treats a null or missing extra_stops as no extra stops', () => {
+    const load = {
+      origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL',
+      extra_stops: null,
+    };
+    expect(() => composeReply(load)).not.toThrow();
+    expect(composeReply(load)).not.toContain('2nd');
+    expect(composeReply({ ...load, extra_stops: undefined })).not.toContain('2nd');
+  });
 });
