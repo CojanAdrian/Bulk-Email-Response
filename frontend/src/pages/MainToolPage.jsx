@@ -4,6 +4,8 @@ import UploadPanel from '../components/UploadPanel';
 import LoadsTable from '../components/LoadsTable';
 import LoadsStatsRow from '../components/LoadsStatsRow';
 import RateModal from '../components/RateModal';
+import AddLoadModal from '../components/AddLoadModal';
+import PrimaryButton from '../components/PrimaryButton';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
@@ -25,11 +27,16 @@ function MainToolPage({ username, onLogout }) {
   const [tab, setTab] = useState('loads'); // 'loads' | 'inquiries'
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedLoad, setSelectedLoad] = useState(null);
+  const [addLoadOpen, setAddLoadOpen] = useState(false);
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
   const { showToast } = useToast();
   const preset = useMotionPreset();
 
   function handleUploadComplete() {
+    setRefreshKey((k) => k + 1);
+  }
+
+  function handleLoadCreated() {
     setRefreshKey((k) => k + 1);
   }
 
@@ -57,7 +64,14 @@ function MainToolPage({ username, onLogout }) {
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-8">
               <LoadsStatsRow refreshKey={refreshKey} />
-              <UploadPanel onUploadComplete={handleUploadComplete} />
+              <div className="flex items-start gap-4">
+                <div className="flex-1">
+                  <UploadPanel onUploadComplete={handleUploadComplete} />
+                </div>
+                <PrimaryButton onClick={() => setAddLoadOpen(true)} className="shrink-0">
+                  + Add Load
+                </PrimaryButton>
+              </div>
               <LoadsTable refreshKey={refreshKey} onSelectLoad={setSelectedLoad} />
               <DatExportSection refreshKey={refreshKey} />
             </motion.main>
@@ -80,6 +94,9 @@ function MainToolPage({ username, onLogout }) {
       <AnimatePresence>
         {selectedLoad && (
           <RateModal load={selectedLoad} onClose={() => setSelectedLoad(null)} onSaved={handleSaved} />
+        )}
+        {addLoadOpen && (
+          <AddLoadModal onClose={() => setAddLoadOpen(false)} onCreated={handleLoadCreated} />
         )}
       </AnimatePresence>
     </div>

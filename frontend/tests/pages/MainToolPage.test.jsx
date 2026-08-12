@@ -151,4 +151,21 @@ describe('MainToolPage', () => {
       expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
     });
   });
+
+  test('opens the Add Load modal and refreshes the table after creating a load', async () => {
+    loadsApi.createLoad.mockResolvedValue({ id: 9, load_number: 'NEW1' });
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    await waitFor(() => screen.getByText(/no loads found/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /\+ add load/i }));
+    expect(screen.getByText(/^add a load$/i)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'NEW1' } });
+    fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
+
+    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
+    await waitFor(() => {
+      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
+    });
+  });
 });
