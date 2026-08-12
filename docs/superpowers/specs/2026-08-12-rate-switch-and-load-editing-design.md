@@ -30,7 +30,7 @@ Two new columns on `loads`:
 | Column | Type | Notes |
 |---|---|---|
 | `include_rate` | `TINYINT(1) NOT NULL DEFAULT 1` | Whether the auto-composed reply includes the `Rate:` line. Never affects `target_pay` itself — turning it off hides the number from output, it doesn't clear it. |
-| `extra_stops` | `JSON NULL` | Ordered list of additional pickup/delivery stops beyond the load's primary origin/destination. Each entry: `{ type: 'pickup'|'delivery', city, state, zip, datetime }`. `null`/`[]` means no extra stops. |
+| `extra_stops` | `JSON NULL` | Ordered list of additional pickup/delivery stops beyond the load's primary origin/destination. Each entry: `{ type: 'pickup'|'delivery', city, state, datetime }`. `null`/`[]` means no extra stops. |
 
 Both are added the same way every other column has been added to this
 table: an `ALTER TABLE ... ADD COLUMN` guarded by an
@@ -104,8 +104,9 @@ fact. `load_number` remains non-editable, unchanged from today.
 ## Structured extra stops
 
 A shared `ExtraStopsEditor` component used by both `AddLoadModal` and
-`RateModal`: a list of stop rows (type: pickup/delivery, city, state,
-date-time), a "Remove" button per row, and an "Add a stop" button that
+`RateModal`: a list of stop rows (type: pickup/delivery, city, state, and a
+date-time — no zip, per what was confirmed), a "Remove" button per row, and
+an "Add a stop" button that
 appends a blank row. Backed by the `extra_stops` JSON column — read back
 already parsed (mysql2 parses JSON columns on read), written via
 `JSON.stringify()` in the loads route before the query (JSON columns are
