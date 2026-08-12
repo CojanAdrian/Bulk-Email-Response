@@ -230,6 +230,19 @@ describe('loads routes', () => {
     expect(Number(res.body.include_rate)).toBe(1);
   });
 
+  test('PATCH can set early_del', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ early_del: '2026-08-14 09:00:00' });
+    expect(res.status).toBe(200);
+    expect(new Date(res.body.early_del).toISOString()).toBe(new Date('2026-08-14 09:00:00').toISOString());
+  });
+
+  test('bulk-status rejects "expired" now that it is no longer a valid status', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.post('/api/loads/bulk-status').send({ ids: [result.insertId], status: 'expired' });
+    expect(res.status).toBe(400);
+  });
+
   describe('GET /:id/preview-reply', () => {
     test('rejects unauthenticated requests', async () => {
       const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);

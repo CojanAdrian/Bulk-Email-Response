@@ -16,12 +16,12 @@ const LOAD_COLUMNS = [
 const EDITABLE_FIELDS = [
   'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
-  'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
+  'target_pay', 'early_pu', 'late_pu', 'early_del', 'late_del', 'stops',
   'commodity', 'temperature', 'comment', 'status', 'custom_reply_body',
   'include_rate', 'extra_stops',
 ];
 
-const STATUS_VALUES = ['active', 'booked', 'covered', 'expired'];
+const STATUS_VALUES = ['active', 'booked', 'covered'];
 
 function createLoadsRouter(pool, wsHub) {
   const router = express.Router();

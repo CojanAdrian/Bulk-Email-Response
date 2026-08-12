@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS loads (
   target_pay DECIMAL(10,2),
   early_pu DATETIME NULL,
   late_pu DATETIME NULL,
+  early_del DATETIME NULL,
   late_del DATETIME NULL,
   stops INT NULL,
   commodity VARCHAR(100),
