@@ -15,7 +15,9 @@ function createInquiriesRouter(pool, wsHub) {
     const { reply_status } = req.query;
     const params = [req.session.userId];
     let sql = `
-      SELECT ei.*, l.stops AS matched_load_stops, l.comment AS matched_load_comment
+      SELECT ei.*, l.stops AS matched_load_stops, l.comment AS matched_load_comment,
+             l.target_pay AS matched_load_target_pay, l.include_rate AS matched_load_include_rate,
+             l.extra_stops AS matched_load_extra_stops
       FROM email_inquiries ei
       LEFT JOIN loads l ON l.id = ei.matched_load_id
       WHERE ei.user_id = ?`;
