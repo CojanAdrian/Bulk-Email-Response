@@ -18,6 +18,7 @@ const EDITABLE_FIELDS = [
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
   'commodity', 'temperature', 'comment', 'status', 'custom_reply_body',
+  'include_rate', 'extra_stops',
 ];
 
 const STATUS_VALUES = ['active', 'booked', 'covered', 'expired'];
@@ -81,7 +82,7 @@ function createLoadsRouter(pool, wsHub) {
     for (const field of EDITABLE_FIELDS) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(req.body[field]);
+        values.push(field === 'extra_stops' ? JSON.stringify(req.body[field]) : req.body[field]);
       }
     }
     if (updates.length === 0) {

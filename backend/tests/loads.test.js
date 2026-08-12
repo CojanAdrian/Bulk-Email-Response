@@ -203,6 +203,33 @@ describe('loads routes', () => {
     expect(res.body.custom_reply_body).toBeNull();
   });
 
+  test('PATCH can set include_rate to false and extra_stops as a JSON array', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({
+      include_rate: false,
+      extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: '2026-08-12 13:00:00' }],
+    });
+    expect(res.status).toBe(200);
+    expect(Number(res.body.include_rate)).toBe(0);
+    expect(res.body.extra_stops).toEqual([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: '2026-08-12 13:00:00' }]);
+  });
+
+  test('PATCH can clear extra_stops by setting it to an empty array', async () => {
+    const [result] = await pool.query(
+      'INSERT INTO loads (load_number, origin_city, user_id, extra_stops) VALUES (?, ?, ?, ?)',
+      ['L1001', 'Dallas', userId, JSON.stringify([{ type: 'pickup', city: 'X', state: 'TX', datetime: null }])]
+    );
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({ extra_stops: [] });
+    expect(res.status).toBe(200);
+    expect(res.body.extra_stops).toEqual([]);
+  });
+
+  test('a newly inserted load defaults to include_rate = 1', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.get(`/api/loads/${result.insertId}`);
+    expect(Number(res.body.include_rate)).toBe(1);
+  });
+
   describe('GET /:id/preview-reply', () => {
     test('rejects unauthenticated requests', async () => {
       const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
