@@ -219,7 +219,7 @@ export function countAnomalies(a) {
 }
 
 function buildExpandedRows(loads, options, anomalies) {
-  const { commentContact, rateChoice, rateOverrides } = options;
+  const { commentContact } = options;
   const expandedRows = [];
 
   loads.forEach((load) => {
@@ -288,16 +288,14 @@ function buildExpandedRows(loads, options, anomalies) {
     const pickupEarliest = formatDateOnly(load.early_pu);
     const pickupLatest = formatDateOnly(load.late_pu);
 
-    const includeRate =
-      rateChoice === 'all' ? true : rateChoice === 'some' ? Boolean(rateOverrides[load.id] && rateOverrides[load.id].include) : false;
-    const rateOverrideValue = rateOverrides[load.id] && rateOverrides[load.id].value;
+    const includeRate = Boolean(load.include_rate);
 
     const baseRow = {
       order,
       origCity: finalOrigCity, origState: finalOrigState, destCity: finalDestCity, destState: finalDestState,
       equipment,
       weightNum,
-      targetPayNum: rateOverrideValue !== undefined && rateOverrideValue !== null && rateOverrideValue !== '' ? Number(rateOverrideValue) : targetPayNum,
+      targetPayNum,
       pickupEarliest, pickupLatest,
       rawComment,
       comment,
@@ -372,13 +370,14 @@ function dedupExpandedRows(expandedRows, anomalies) {
   return finalRows;
 }
 
-// options: { contactMethod: 'phone'|'email', commentContact: string, rateChoice: 'all'|'some'|'none',
-//            rateOverrides: { [loadId]: { include: boolean, value: number|string|null } } }
+// options: { contactMethod: 'phone'|'email', commentContact: string }
+// Each load's own include_rate switch (persisted on the load, not chosen
+// per export) controls whether its DAT Loadboard Rate is populated.
 export function processLoadsForExport(loads, options) {
-  const { contactMethod = 'phone', commentContact = '', rateChoice = 'none', rateOverrides = {} } = options || {};
+  const { contactMethod = 'phone', commentContact = '' } = options || {};
   const anomalies = makeEmptyAnomalies();
 
-  const expandedRows = buildExpandedRows(loads, { commentContact, rateChoice, rateOverrides }, anomalies);
+  const expandedRows = buildExpandedRows(loads, { commentContact }, anomalies);
   const finalRows = dedupExpandedRows(expandedRows, anomalies);
   const exportRows = finalRows.map((row) => buildDatRow(row, contactMethod));
 

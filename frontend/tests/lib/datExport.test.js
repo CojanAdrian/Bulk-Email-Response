@@ -428,29 +428,13 @@ describe('processLoadsForExport', () => {
     expect(finalRows[0].isTeam).toBe(true);
   });
 
-  test('rate choice "all" includes the rate on every row', () => {
-    const { exportRows } = processLoadsForExport([load({ target_pay: 1500 })], { rateChoice: 'all' });
+  test('includes the rate when the load\'s include_rate switch is on', () => {
+    const { exportRows } = processLoadsForExport([load({ target_pay: 1500, include_rate: 1 })], {});
     expect(exportRows[0]['DAT Loadboard Rate']).toBe(1500);
   });
 
-  test('rate choice "none" omits the rate from every row', () => {
-    const { exportRows } = processLoadsForExport([load({ target_pay: 1500 })], { rateChoice: 'none' });
-    expect(exportRows[0]['DAT Loadboard Rate']).toBe('');
-  });
-
-  test('rate choice "some" uses the per-load override map, including an edited rate value', () => {
-    const { exportRows } = processLoadsForExport(
-      [load({ id: 1, target_pay: 1500 })],
-      { rateChoice: 'some', rateOverrides: { 1: { include: true, value: 1800 } } }
-    );
-    expect(exportRows[0]['DAT Loadboard Rate']).toBe(1800);
-  });
-
-  test('rate choice "some" with include: false omits the rate for that load', () => {
-    const { exportRows } = processLoadsForExport(
-      [load({ id: 1, target_pay: 1500 })],
-      { rateChoice: 'some', rateOverrides: { 1: { include: false, value: null } } }
-    );
+  test('omits the rate when the load\'s include_rate switch is off', () => {
+    const { exportRows } = processLoadsForExport([load({ target_pay: 1500, include_rate: 0 })], {});
     expect(exportRows[0]['DAT Loadboard Rate']).toBe('');
   });
 
@@ -472,7 +456,7 @@ describe('countAnomalies', () => {
 
 describe('buildDatCsv', () => {
   test('produces a CSV with the DAT_HEADERS as the header row', () => {
-    const { exportRows } = processLoadsForExport([load()], { rateChoice: 'all' });
+    const { exportRows } = processLoadsForExport([load()], {});
     const csv = buildDatCsv(exportRows);
     expect(csv.split('\r\n')[0]).toBe(DAT_HEADERS.map((h) => (h.includes(',') ? `"${h}"` : h)).join(','));
     expect(csv).toContain('Chicago');
