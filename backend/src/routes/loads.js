@@ -176,6 +176,22 @@ function createLoadsRouter(pool, wsHub) {
     res.json({ updated: result.affectedRows });
   }));
 
+  router.post('/bulk-include-rate', asyncHandler(async (req, res) => {
+    const { ids, includeRate } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: 'ids must be a non-empty array' });
+    }
+    const isAdmin = req.session.role === 'admin';
+    const placeholders = ids.map(() => '?').join(', ');
+    const sql = isAdmin
+      ? `UPDATE loads SET include_rate = ? WHERE id IN (${placeholders})`
+      : `UPDATE loads SET include_rate = ? WHERE id IN (${placeholders}) AND user_id = ?`;
+    const params = isAdmin ? [includeRate ? 1 : 0, ...ids] : [includeRate ? 1 : 0, ...ids, req.session.userId];
+    const [result] = await pool.query(sql, params);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', {});
+    res.json({ updated: result.affectedRows });
+  }));
+
   router.post('/upload', asyncHandler(async (req, res) => {
     const { loads } = req.body;
     if (!Array.isArray(loads)) {

@@ -406,6 +406,58 @@ describe('loads routes', () => {
     });
   });
 
+  describe('POST /bulk-include-rate', () => {
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post('/api/loads/bulk-include-rate').send({ ids: [1], includeRate: false });
+      expect(res.status).toBe(401);
+    });
+
+    test('updates include_rate for multiple owned loads in one request', async () => {
+      const [l1] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const [l2] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1002', 'Atlanta', userId]);
+
+      const res = await agent.post('/api/loads/bulk-include-rate').send({ ids: [l1.insertId, l2.insertId], includeRate: false });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: 2 });
+
+      const list = await agent.get('/api/loads');
+      expect(list.body.every((l) => Number(l.include_rate) === 0)).toBe(true);
+    });
+
+    test('does not update a load owned by a different user, even if its id is included', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [mine] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+      const [theirs] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L9999', 'Someone Elses', otherUser.insertId]);
+
+      const res = await agent.post('/api/loads/bulk-include-rate').send({ ids: [mine.insertId, theirs.insertId], includeRate: false });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: 1 });
+
+      const [rows] = await pool.query('SELECT include_rate FROM loads WHERE id = ?', [theirs.insertId]);
+      expect(Number(rows[0].include_rate)).toBe(1);
+    });
+
+    test('an admin can bulk-set include_rate across different users', async () => {
+      const passwordHash = await bcrypt.hash('adminpw', 10);
+      await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
+      const adminAgent = request.agent(app);
+      await adminAgent.post('/api/auth/login').send({ username: 'admintest', password: 'adminpw' });
+      const [mine] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+
+      const res = await adminAgent.post('/api/loads/bulk-include-rate').send({ ids: [mine.insertId], includeRate: false });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ updated: 1 });
+    });
+
+    test('returns 400 when ids is missing or empty', async () => {
+      const res1 = await agent.post('/api/loads/bulk-include-rate').send({ includeRate: true });
+      expect(res1.status).toBe(400);
+      const res2 = await agent.post('/api/loads/bulk-include-rate').send({ ids: [], includeRate: true });
+      expect(res2.status).toBe(400);
+    });
+  });
+
   test('an admin\'s own upload is tagged with the admin\'s own user_id, not shared/ownerless', async () => {
     const passwordHash = await bcrypt.hash('adminpw', 10);
     const [adminUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('admintest', ?, 'admin')", [passwordHash]);
