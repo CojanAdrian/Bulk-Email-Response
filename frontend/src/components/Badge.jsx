@@ -3,6 +3,7 @@ const VARIANT_CLASSES = {
   success: 'bg-success-bg text-success',
   error: 'bg-error-bg text-error',
   warning: 'bg-warning-bg text-warning',
+  info: 'bg-info-bg text-info',
 };
 
 function Badge({ children, variant = 'default', className = '' }) {

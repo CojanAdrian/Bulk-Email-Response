@@ -26,6 +26,8 @@ export default {
         'warning-bg': 'var(--color-warning-bg)',
         tag: 'var(--color-tag)',
         'tag-bg': 'var(--color-tag-bg)',
+        info: 'var(--color-info)',
+        'info-bg': 'var(--color-info-bg)',
       },
       borderRadius: {
         '4xl': '2rem',

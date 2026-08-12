@@ -17,6 +17,7 @@ describe('Badge', () => {
     ['success', 'bg-success-bg'],
     ['error', 'bg-error-bg'],
     ['warning', 'bg-warning-bg'],
+    ['info', 'bg-info-bg'],
   ])('applies the %s variant styling', (variant, expectedClass) => {
     render(<Badge variant={variant}>Status</Badge>);
     expect(screen.getByText('Status').className).toContain(expectedClass);
