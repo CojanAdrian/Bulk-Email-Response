@@ -32,3 +32,11 @@ export function bulkUpdateLoadStatus(ids, status) {
 export function uploadLoads(loads) {
   return post('/api/loads/upload', { loads }, { timeoutMs: 60000 });
 }
+
+export function createLoad(data) {
+  return post('/api/loads', data);
+}
+
+export function bulkSetIncludeRate(ids, includeRate) {
+  return post('/api/loads/bulk-include-rate', { ids, includeRate });
+}

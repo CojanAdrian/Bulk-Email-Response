@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listLoads, getLoad, previewLoadReply, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus } from '../../src/api/loads';
+import { listLoads, getLoad, previewLoadReply, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus, createLoad, bulkSetIncludeRate } from '../../src/api/loads';
 
 describe('loads api', () => {
   beforeEach(() => {
@@ -77,5 +77,23 @@ describe('loads api', () => {
     expect(url).toContain('/api/loads/bulk-status');
     expect(options.method).toBe('POST');
     expect(JSON.parse(options.body)).toEqual({ ids: [1, 2], status: 'covered' });
+  });
+
+  test('createLoad posts /api/loads with the given data', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1, load_number: 'L1' }) });
+    await createLoad({ load_number: 'L1' });
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ load_number: 'L1' });
+  });
+
+  test('bulkSetIncludeRate posts /api/loads/bulk-include-rate with ids and includeRate', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ updated: 2 }) });
+    await bulkSetIncludeRate([1, 2], false);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/bulk-include-rate');
+    expect(options.method).toBe('POST');
+    expect(JSON.parse(options.body)).toEqual({ ids: [1, 2], includeRate: false });
   });
 });
