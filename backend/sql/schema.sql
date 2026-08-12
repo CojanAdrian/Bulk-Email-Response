@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS loads (
   comment TEXT,
   status ENUM('active','booked','covered','expired') NOT NULL DEFAULT 'active',
   custom_reply_body TEXT NULL,
+  include_rate TINYINT(1) NOT NULL DEFAULT 1,
+  extra_stops JSON NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );

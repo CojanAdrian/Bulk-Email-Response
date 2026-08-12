@@ -129,6 +129,22 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE loads ADD COLUMN custom_reply_body TEXT NULL`);
   }
 
+  const [includeRateCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'include_rate'`,
+    [databaseName]
+  );
+  if (includeRateCol[0].count === 0) {
+    await conn.query(`ALTER TABLE loads ADD COLUMN include_rate TINYINT(1) NOT NULL DEFAULT 1`);
+  }
+
+  const [extraStopsCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'extra_stops'`,
+    [databaseName]
+  );
+  if (extraStopsCol[0].count === 0) {
+    await conn.query(`ALTER TABLE loads ADD COLUMN extra_stops JSON NULL`);
+  }
+
   const [indexRows] = await conn.query(`SHOW INDEX FROM loads WHERE Key_name != 'PRIMARY'`);
   const indexMap = {};
   indexRows.forEach((row) => {
