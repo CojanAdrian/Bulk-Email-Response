@@ -99,6 +99,16 @@ export function detectMultiStop(load) {
   return null;
 }
 
+// Red until structured extra stops exist, then blue -- once real stops are
+// entered, that's the definitive resolved state, regardless of whether the
+// comment-text heuristic would also have triggered.
+export function multiStopTagVariant(load) {
+  const extraStops = Array.isArray(load.extra_stops) ? load.extra_stops : [];
+  if (extraStops.length > 0) return 'info';
+  if (detectMultiStop(load)) return 'error';
+  return null;
+}
+
 export function buildLookupMessage(load, showRate) {
   const lines = [];
   const comment = load.comment || '';

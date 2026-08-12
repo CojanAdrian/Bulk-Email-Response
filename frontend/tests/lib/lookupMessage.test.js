@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { searchLoads, extractSched, detectMultiStop, buildLookupMessage } from '../../src/lib/lookupMessage';
+import { searchLoads, extractSched, detectMultiStop, multiStopTagVariant, buildLookupMessage } from '../../src/lib/lookupMessage';
 
 function iso(y, mo, d, h = 0, min = 0) {
   return new Date(y, mo - 1, d, h, min, 0).toISOString();
@@ -113,6 +113,28 @@ describe('detectMultiStop', () => {
 
   test('returns null when there is nothing to warn about', () => {
     expect(detectMultiStop(load({ comment: 'standard load', stops: 0 }))).toBeNull();
+  });
+});
+
+describe('multiStopTagVariant', () => {
+  test('returns "error" (red) when multi-stop language is detected and there are no structured extra stops', () => {
+    expect(multiStopTagVariant(load({ comment: '2nd pickup required', extra_stops: [] }))).toBe('error');
+  });
+
+  test('returns "info" (blue) when structured extra stops exist, regardless of comment language', () => {
+    expect(multiStopTagVariant(load({ comment: 'standard load', extra_stops: [{ type: 'pickup', city: 'X', state: 'TX' }] }))).toBe('info');
+  });
+
+  test('returns "info" even when multi-stop language is also detected', () => {
+    expect(multiStopTagVariant(load({ comment: '2nd pickup required', extra_stops: [{ type: 'pickup', city: 'X', state: 'TX' }] }))).toBe('info');
+  });
+
+  test('returns null when nothing suggests extra stops', () => {
+    expect(multiStopTagVariant(load({ comment: 'standard load', stops: 0, extra_stops: [] }))).toBeNull();
+  });
+
+  test('treats a missing extra_stops field as no structured stops', () => {
+    expect(multiStopTagVariant(load({ comment: '2nd pickup required', extra_stops: undefined }))).toBe('error');
   });
 });
 
