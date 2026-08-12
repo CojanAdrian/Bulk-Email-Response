@@ -2,9 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { updateLoad, previewLoadReply } from '../api/loads';
 import { useMotionPreset } from '../lib/motionConfig';
+import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
+import ExtraStopsEditor from './ExtraStopsEditor';
 
 const MotionCard = motion(Card);
 
@@ -26,6 +28,14 @@ function RateModal({ load, onClose, onSaved }) {
   );
   const [stops, setStops] = useState(load.stops ?? '');
   const [targetPay, setTargetPay] = useState(load.target_pay ?? '');
+  const [earlyPu, setEarlyPu] = useState(isoToDatetimeLocal(load.early_pu));
+  const [latePu, setLatePu] = useState(isoToDatetimeLocal(load.late_pu));
+  const [lateDel, setLateDel] = useState(isoToDatetimeLocal(load.late_del));
+  const [extraStops, setExtraStops] = useState(() =>
+    Array.isArray(load.extra_stops)
+      ? load.extra_stops.map((s) => ({ type: s.type, city: s.city ?? '', state: s.state ?? '', datetime: isoToDatetimeLocal(s.datetime) }))
+      : []
+  );
   const [status, setStatus] = useState(load.status);
   const [useCustomReply, setUseCustomReply] = useState(Boolean(load.custom_reply_body));
   const [customReplyText, setCustomReplyText] = useState(load.custom_reply_body ?? '');
@@ -114,6 +124,12 @@ function RateModal({ load, onClose, onSaved }) {
       ...Object.fromEntries(TEXT_FIELDS.map((field) => [field, blankToNull(fields[field])])),
       stops: normalizedStops,
       target_pay: normalizedTargetPay,
+      early_pu: datetimeLocalToMysql(earlyPu),
+      late_pu: datetimeLocalToMysql(latePu),
+      late_del: datetimeLocalToMysql(lateDel),
+      extra_stops: extraStops
+        .filter((s) => s.city.trim() !== '' || s.state.trim() !== '')
+        .map((s) => ({ type: s.type, city: blankToNull(s.city), state: blankToNull(s.state), datetime: datetimeLocalToMysql(s.datetime) })),
       status,
       custom_reply_body: useCustomReply ? blankToNull(customReplyText) : null,
     };
@@ -223,6 +239,45 @@ function RateModal({ load, onClose, onSaved }) {
           </div>
         </div>
 
+        <div className="mb-4 grid grid-cols-3 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyPu">
+              Early pickup
+            </label>
+            <input
+              id="earlyPu"
+              type="datetime-local"
+              value={earlyPu}
+              onChange={(e) => setEarlyPu(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="latePu">
+              Late pickup
+            </label>
+            <input
+              id="latePu"
+              type="datetime-local"
+              value={latePu}
+              onChange={(e) => setLatePu(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="lateDel">
+              Late delivery
+            </label>
+            <input
+              id="lateDel"
+              type="datetime-local"
+              value={lateDel}
+              onChange={(e) => setLateDel(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+        </div>
+
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
@@ -294,6 +349,8 @@ function RateModal({ load, onClose, onSaved }) {
           rows={2}
           className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
         />
+
+        <ExtraStopsEditor stops={extraStops} onChange={setExtraStops} />
 
         <div className="mb-4">
           <label className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="useCustomReply">

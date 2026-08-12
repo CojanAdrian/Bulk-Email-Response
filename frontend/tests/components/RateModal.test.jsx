@@ -13,6 +13,7 @@ const BLANK_EXTRA_FIELDS = {
   dest_city: null, dest_state: null, dest_zip: null,
   equipment: null, weight: null, commodity: null, temperature: null, comment: null,
   stops: null, custom_reply_body: null,
+  early_pu: null, late_pu: null, late_del: null, extra_stops: [],
 };
 
 describe('RateModal', () => {
@@ -56,6 +57,7 @@ describe('RateModal', () => {
         dest_city: 'Milwaukee', dest_state: 'IL', dest_zip: '60601',
         equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead',
         stops: 0, target_pay: 1500, status: 'covered', custom_reply_body: null,
+        early_pu: null, late_pu: null, late_del: null, extra_stops: [],
       });
     });
   });
@@ -233,6 +235,63 @@ describe('RateModal', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  test('prefills date fields from the load\'s early_pu/late_pu/late_del and saves them back as MySQL datetimes', async () => {
+    const loadWithDates = {
+      ...LOAD,
+      early_pu: new Date(2026, 7, 12, 9, 0).toISOString(),
+      late_pu: new Date(2026, 7, 12, 9, 0).toISOString(),
+      late_del: new Date(2026, 7, 14, 8, 0).toISOString(),
+    };
+    loadsApi.updateLoad.mockResolvedValue(loadWithDates);
+    render(<RateModal load={loadWithDates} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByLabelText(/early pickup/i)).toHaveValue('2026-08-12T09:00');
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.early_pu).toBe('2026-08-12 09:00:00');
+      expect(payload.late_pu).toBe('2026-08-12 09:00:00');
+      expect(payload.late_del).toBe('2026-08-14 08:00:00');
+    });
+  });
+
+  test('adding an extra stop and saving includes it in extra_stops, converted to a MySQL datetime', async () => {
+    loadsApi.updateLoad.mockResolvedValue(LOAD);
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /add a stop/i }));
+    fireEvent.change(screen.getByLabelText(/stop 1 city/i), { target: { value: 'Fort Worth' } });
+    fireEvent.change(screen.getByLabelText(/stop 1 state/i), { target: { value: 'TX' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.extra_stops).toEqual([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }]);
+    });
+  });
+
+  test('discards a blank extra-stop row (no city or state) instead of saving it', async () => {
+    loadsApi.updateLoad.mockResolvedValue(LOAD);
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /add a stop/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.extra_stops).toEqual([]);
+    });
+  });
+
+  test('prefills the extra-stops editor from the load\'s existing extra_stops', () => {
+    const loadWithStops = { ...LOAD, extra_stops: [{ type: 'delivery', city: 'Joliet', state: 'IL', datetime: null }] };
+    render(<RateModal load={loadWithStops} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    expect(screen.getByLabelText(/stop 1 city/i)).toHaveValue('Joliet');
+    expect(screen.getByLabelText(/stop 1 type/i)).toHaveValue('delivery');
   });
 
   // Regression test: see GmailConnectionPanel.test.jsx's StrictMode test for
