@@ -6,7 +6,7 @@ import { useMotionPreset } from '../lib/motionConfig';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
-import ExtraStopsEditor from './ExtraStopsEditor';
+import EquipmentPicker from './EquipmentPicker';
 
 const MotionCard = motion(Card);
 
@@ -24,13 +24,12 @@ function blankToNull(value) {
 function AddLoadModal({ onClose, onCreated }) {
   const preset = useMotionPreset();
   const [fields, setFields] = useState(() => Object.fromEntries(TEXT_FIELDS.map((f) => [f, ''])));
-  const [stops, setStops] = useState('');
   const [targetPay, setTargetPay] = useState('');
   const [earlyPu, setEarlyPu] = useState('');
   const [latePu, setLatePu] = useState('');
+  const [earlyDel, setEarlyDel] = useState('');
   const [lateDel, setLateDel] = useState('');
   const [includeRate, setIncludeRate] = useState(true);
-  const [extraStops, setExtraStops] = useState([]);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
 
@@ -58,29 +57,15 @@ function AddLoadModal({ onClose, onCreated }) {
       normalizedTargetPay = parsed;
     }
 
-    const trimmedStops = String(stops).trim();
-    let normalizedStops = null;
-    if (trimmedStops !== '') {
-      const parsed = Number(trimmedStops);
-      if (Number.isNaN(parsed) || !Number.isInteger(parsed)) {
-        setError('Stops must be a whole number.');
-        return;
-      }
-      normalizedStops = parsed;
-    }
-
     const payload = {
       load_number: loadNumber,
       ...Object.fromEntries(TEXT_FIELDS.filter((f) => f !== 'load_number').map((field) => [field, blankToNull(fields[field])])),
-      stops: normalizedStops,
       target_pay: normalizedTargetPay,
       early_pu: datetimeLocalToMysql(earlyPu),
       late_pu: datetimeLocalToMysql(latePu),
+      early_del: datetimeLocalToMysql(earlyDel),
       late_del: datetimeLocalToMysql(lateDel),
       include_rate: includeRate,
-      extra_stops: extraStops
-        .filter((s) => s.city.trim() !== '' || s.state.trim() !== '')
-        .map((s) => ({ type: s.type, city: blankToNull(s.city), state: blankToNull(s.state), datetime: datetimeLocalToMysql(s.datetime) })),
     };
 
     setSaving(true);
@@ -170,7 +155,7 @@ function AddLoadModal({ onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyPu">
               Early pickup
@@ -183,6 +168,16 @@ function AddLoadModal({ onClose, onCreated }) {
               Late pickup
             </label>
             <input id="latePu" type="datetime-local" value={latePu} onChange={(e) => setLatePu(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+          </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyDel">
+              Early delivery
+            </label>
+            <input id="earlyDel" type="datetime-local" value={earlyDel} onChange={(e) => setEarlyDel(e.target.value)}
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
           </div>
           <div>
@@ -199,8 +194,7 @@ function AddLoadModal({ onClose, onCreated }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
               Equipment
             </label>
-            <input id="equipment" value={fields.equipment} onChange={(e) => handleFieldChange('equipment', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            <EquipmentPicker id="equipment" value={fields.equipment} onChange={(code) => handleFieldChange('equipment', code)} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
@@ -211,7 +205,7 @@ function AddLoadModal({ onClose, onCreated }) {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="commodity">
               Commodity
@@ -226,13 +220,6 @@ function AddLoadModal({ onClose, onCreated }) {
             <input id="temperature" value={fields.temperature} onChange={(e) => handleFieldChange('temperature', e.target.value)}
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
           </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="stops">
-              Stops
-            </label>
-            <input id="stops" value={stops} onChange={(e) => setStops(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
         </div>
 
         <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="comment">
@@ -240,8 +227,6 @@ function AddLoadModal({ onClose, onCreated }) {
         </label>
         <textarea id="comment" value={fields.comment} onChange={(e) => handleFieldChange('comment', e.target.value)} rows={2}
           className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-
-        <ExtraStopsEditor stops={extraStops} onChange={setExtraStops} />
 
         <div className="mb-4 grid grid-cols-2 gap-2">
           <div>

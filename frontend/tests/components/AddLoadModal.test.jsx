@@ -30,14 +30,14 @@ describe('AddLoadModal', () => {
 
     await waitFor(() => {
       expect(loadsApi.createLoad).toHaveBeenCalledWith(expect.objectContaining({
-        load_number: 'L1001', target_pay: null, comment: null, include_rate: true, extra_stops: [],
+        load_number: 'L1001', target_pay: null, comment: null, include_rate: true,
       }));
       expect(onCreated).toHaveBeenCalledWith({ id: 1, load_number: 'L1001' });
       expect(onClose).toHaveBeenCalled();
     });
   });
 
-  test('creates a load with the full set of fields, including an extra stop', async () => {
+  test('creates a load with the full set of fields, including early/late delivery and a picked equipment type', async () => {
     loadsApi.createLoad.mockResolvedValue({ id: 2, load_number: 'L2002' });
     render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
 
@@ -47,18 +47,23 @@ describe('AddLoadModal', () => {
     fireEvent.change(originState, { target: { value: 'TX' } });
     fireEvent.change(screen.getByLabelText(/dest city/i), { target: { value: 'Chicago' } });
     fireEvent.change(destState, { target: { value: 'IL' } });
+    fireEvent.change(screen.getByLabelText(/early delivery/i), { target: { value: '2026-08-14T08:00' } });
+    fireEvent.change(screen.getByLabelText(/late delivery/i), { target: { value: '2026-08-14T16:00' } });
     fireEvent.change(screen.getByLabelText(/target pay/i), { target: { value: '1500' } });
     fireEvent.click(screen.getByLabelText(/include rate in replies/i));
-    fireEvent.click(screen.getByRole('button', { name: /add a stop/i }));
-    fireEvent.change(screen.getByLabelText(/stop 1 city/i), { target: { value: 'Fort Worth' } });
-    fireEvent.change(screen.getByLabelText(/stop 1 state/i), { target: { value: 'TX' } });
+
+    const equipmentInput = screen.getByLabelText(/equipment/i);
+    fireEvent.focus(equipmentInput);
+    fireEvent.change(equipmentInput, { target: { value: 'reefer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'R — Reefer' }));
+
     fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
 
     await waitFor(() => {
       expect(loadsApi.createLoad).toHaveBeenCalledWith(expect.objectContaining({
         load_number: 'L2002', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL',
-        target_pay: 1500, include_rate: false,
-        extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }],
+        early_del: '2026-08-14 08:00:00', late_del: '2026-08-14 16:00:00',
+        target_pay: 1500, include_rate: false, equipment: 'R',
       }));
     });
   });
@@ -85,15 +90,10 @@ describe('AddLoadModal', () => {
     expect(loadsApi.createLoad).not.toHaveBeenCalled();
   });
 
-  test('rejects a non-integer stops value without calling the API', async () => {
+  test('has no Stops or Extra Stops controls', () => {
     render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'L1001' } });
-    fireEvent.change(screen.getByLabelText(/^stops$/i), { target: { value: '1.5' } });
-    fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByText(/stops must be a whole number/i)).toBeInTheDocument();
-    });
-    expect(loadsApi.createLoad).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText(/^stops$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/extra stops/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /add a stop/i })).not.toBeInTheDocument();
   });
 });
