@@ -67,13 +67,12 @@ describe('DatExportSection', () => {
     expect(screen.getByText(/dat contact method/i)).toBeInTheDocument();
   });
 
-  test('confirming with rate choice "all" downloads a CSV immediately and shows the anomaly report', async () => {
-    loadsApi.listLoads.mockResolvedValue(LOADS);
+  test('confirming the contact method downloads a CSV immediately, using each load\'s rate switch', async () => {
+    loadsApi.listLoads.mockResolvedValue([{ ...LOADS[0], include_rate: 1 }]);
     render(<DatExportSection refreshKey={0} />);
     await waitFor(() => screen.getByRole('button', { name: /generate dat export/i }));
 
     fireEvent.click(screen.getByRole('button', { name: /generate dat export/i }));
-    fireEvent.click(screen.getByRole('radio', { name: /include for all loads/i }));
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
 
     expect(global.URL.createObjectURL).toHaveBeenCalledTimes(1);
@@ -83,23 +82,6 @@ describe('DatExportSection', () => {
     await waitFor(() => {
       expect(screen.queryByText(/dat contact method/i)).not.toBeInTheDocument();
     });
-  });
-
-  test('confirming with rate choice "some" opens the per-load rate selection modal instead of exporting immediately', async () => {
-    loadsApi.listLoads.mockResolvedValue(LOADS);
-    render(<DatExportSection refreshKey={0} />);
-    await waitFor(() => screen.getByRole('button', { name: /generate dat export/i }));
-
-    fireEvent.click(screen.getByRole('button', { name: /generate dat export/i }));
-    fireEvent.click(screen.getByRole('radio', { name: /choose per load/i }));
-    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
-
-    expect(global.URL.createObjectURL).not.toHaveBeenCalled();
-    expect(screen.getByText(/choose loads to include a rate on/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /generate export/i }));
-    expect(global.URL.createObjectURL).toHaveBeenCalledTimes(1);
-    expect(screen.getByText(/downloaded a dat csv with 1 row/i)).toBeInTheDocument();
   });
 
   test('renders the load lookup panel once loads are ready, and opens the blast modal from it', async () => {

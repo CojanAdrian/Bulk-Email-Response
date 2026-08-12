@@ -4,7 +4,6 @@ import { listLoads } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
 import { processLoadsForExport, buildDatCsv, buildDatExportFilename, countAnomalies } from '../lib/datExport';
 import ContactMethodModal from './ContactMethodModal';
-import RateSelectionModal from './RateSelectionModal';
 import AnomalyReport from './AnomalyReport';
 import LoadLookupPanel from './LoadLookupPanel';
 import BlastModal from './BlastModal';
@@ -28,8 +27,7 @@ function DatExportSection({ refreshKey }) {
   const [loads, setLoads] = useState([]);
   const [fetchStatus, setFetchStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [fetchError, setFetchError] = useState(null);
-  const [step, setStep] = useState('idle'); // 'idle' | 'contactMethod' | 'rateSelection'
-  const [contactOptions, setContactOptions] = useState(null);
+  const [step, setStep] = useState('idle'); // 'idle' | 'contactMethod'
   const [result, setResult] = useState(null);
   const [blastTarget, setBlastTarget] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
@@ -60,26 +58,12 @@ function DatExportSection({ refreshKey }) {
     return subscribe('load:changed', () => setLiveTick((t) => t + 1));
   }, []);
 
-  function runExport(options, rateOverrides) {
-    const { exportRows, anomalies } = processLoadsForExport(loads, { ...options, rateOverrides: rateOverrides || {} });
+  function handleContactConfirm(options) {
+    const { exportRows, anomalies } = processLoadsForExport(loads, options);
     const csv = buildDatCsv(exportRows);
     downloadCsv(csv, buildDatExportFilename());
     setResult({ anomalies, exportedCount: exportRows.length });
     setStep('idle');
-    setContactOptions(null);
-  }
-
-  function handleContactConfirm(options) {
-    if (options.rateChoice === 'some') {
-      setContactOptions(options);
-      setStep('rateSelection');
-    } else {
-      runExport(options);
-    }
-  }
-
-  function handleRateConfirm(rateOverrides) {
-    runExport(contactOptions, rateOverrides);
   }
 
   return (
@@ -115,9 +99,6 @@ function DatExportSection({ refreshKey }) {
 
       <AnimatePresence>
         {step === 'contactMethod' && <ContactMethodModal onCancel={() => setStep('idle')} onConfirm={handleContactConfirm} />}
-        {step === 'rateSelection' && (
-          <RateSelectionModal loads={loads} onCancel={() => setStep('idle')} onConfirm={handleRateConfirm} />
-        )}
       </AnimatePresence>
       <AnimatePresence>
         {blastTarget && (
