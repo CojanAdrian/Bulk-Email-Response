@@ -13,7 +13,7 @@ const BLANK_EXTRA_FIELDS = {
   dest_city: null, dest_state: null, dest_zip: null,
   equipment: null, weight: null, commodity: null, temperature: null, comment: null,
   stops: null, custom_reply_body: null,
-  early_pu: null, late_pu: null, late_del: null, extra_stops: [],
+  early_pu: null, late_pu: null, early_del: null, late_del: null, extra_stops: [],
 };
 
 describe('RateModal', () => {
@@ -57,7 +57,7 @@ describe('RateModal', () => {
         dest_city: 'Milwaukee', dest_state: 'IL', dest_zip: '60601',
         equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead',
         stops: 0, target_pay: 1500, status: 'covered', custom_reply_body: null,
-        early_pu: null, late_pu: null, late_del: null, extra_stops: [],
+        early_pu: null, late_pu: null, early_del: null, late_del: null, extra_stops: [],
       });
     });
   });
@@ -237,12 +237,13 @@ describe('RateModal', () => {
     expect(onSaved).not.toHaveBeenCalled();
   });
 
-  test('prefills date fields from the load\'s early_pu/late_pu/late_del and saves them back as MySQL datetimes', async () => {
+  test('prefills date fields from the load\'s early_pu/late_pu/early_del/late_del and saves them back as MySQL datetimes', async () => {
     const loadWithDates = {
       ...LOAD,
       early_pu: new Date(2026, 7, 12, 9, 0).toISOString(),
       late_pu: new Date(2026, 7, 12, 9, 0).toISOString(),
-      late_del: new Date(2026, 7, 14, 8, 0).toISOString(),
+      early_del: new Date(2026, 7, 14, 8, 0).toISOString(),
+      late_del: new Date(2026, 7, 14, 16, 0).toISOString(),
     };
     loadsApi.updateLoad.mockResolvedValue(loadWithDates);
     render(<RateModal load={loadWithDates} onClose={vi.fn()} onSaved={vi.fn()} />);
@@ -254,7 +255,26 @@ describe('RateModal', () => {
       const payload = loadsApi.updateLoad.mock.calls[0][1];
       expect(payload.early_pu).toBe('2026-08-12 09:00:00');
       expect(payload.late_pu).toBe('2026-08-12 09:00:00');
-      expect(payload.late_del).toBe('2026-08-14 08:00:00');
+      expect(payload.early_del).toBe('2026-08-14 08:00:00');
+      expect(payload.late_del).toBe('2026-08-14 16:00:00');
+    });
+  });
+
+  test('picking a new equipment type from the search dropdown saves its code', async () => {
+    const loadWithEquipment = { ...LOAD, equipment: 'V' };
+    loadsApi.updateLoad.mockResolvedValue(loadWithEquipment);
+    render(<RateModal load={loadWithEquipment} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    const equipmentInput = screen.getByLabelText(/equipment/i);
+    expect(equipmentInput).toHaveValue('V');
+    fireEvent.focus(equipmentInput);
+    fireEvent.change(equipmentInput, { target: { value: 'reefer' } });
+    fireEvent.click(screen.getByRole('button', { name: 'R — Reefer' }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.equipment).toBe('R');
     });
   });
 

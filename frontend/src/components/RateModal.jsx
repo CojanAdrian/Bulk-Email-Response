@@ -7,6 +7,7 @@ import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
+import EquipmentPicker from './EquipmentPicker';
 
 const MotionCard = motion(Card);
 
@@ -30,6 +31,7 @@ function RateModal({ load, onClose, onSaved }) {
   const [targetPay, setTargetPay] = useState(load.target_pay ?? '');
   const [earlyPu, setEarlyPu] = useState(isoToDatetimeLocal(load.early_pu));
   const [latePu, setLatePu] = useState(isoToDatetimeLocal(load.late_pu));
+  const [earlyDel, setEarlyDel] = useState(isoToDatetimeLocal(load.early_del));
   const [lateDel, setLateDel] = useState(isoToDatetimeLocal(load.late_del));
   const [extraStops, setExtraStops] = useState(() =>
     Array.isArray(load.extra_stops)
@@ -126,6 +128,7 @@ function RateModal({ load, onClose, onSaved }) {
       target_pay: normalizedTargetPay,
       early_pu: datetimeLocalToMysql(earlyPu),
       late_pu: datetimeLocalToMysql(latePu),
+      early_del: datetimeLocalToMysql(earlyDel),
       late_del: datetimeLocalToMysql(lateDel),
       extra_stops: extraStops
         .filter((s) => s.city.trim() !== '' || s.state.trim() !== '')
@@ -239,7 +242,7 @@ function RateModal({ load, onClose, onSaved }) {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 gap-2">
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyPu">
               Early pickup
@@ -264,6 +267,21 @@ function RateModal({ load, onClose, onSaved }) {
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>
+        </div>
+
+        <div className="mb-4 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyDel">
+              Early delivery
+            </label>
+            <input
+              id="earlyDel"
+              type="datetime-local"
+              value={earlyDel}
+              onChange={(e) => setEarlyDel(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="lateDel">
               Late delivery
@@ -283,12 +301,7 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
               Equipment
             </label>
-            <input
-              id="equipment"
-              value={fields.equipment}
-              onChange={(e) => handleFieldChange('equipment', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
+            <EquipmentPicker id="equipment" value={fields.equipment} onChange={(code) => handleFieldChange('equipment', code)} />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
