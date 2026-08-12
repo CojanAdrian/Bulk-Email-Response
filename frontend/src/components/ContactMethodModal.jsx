@@ -12,13 +12,11 @@ function ContactMethodModal({ onCancel, onConfirm }) {
   const [contactMethod, setContactMethod] = useState('phone');
   const [includeContactLine, setIncludeContactLine] = useState(false);
   const [commentContact, setCommentContact] = useState('');
-  const [rateChoice, setRateChoice] = useState('none');
 
   function handleConfirm() {
     onConfirm({
       contactMethod,
       commentContact: includeContactLine ? commentContact.trim() : '',
-      rateChoice,
     });
   }
 
@@ -64,24 +62,6 @@ function ContactMethodModal({ onCancel, onConfirm }) {
             />
           )}
         </fieldset>
-
-        <fieldset className="mb-6">
-          <legend className="mb-2 text-sm text-text-muted">DAT Loadboard Rate</legend>
-          <label className="mb-1 flex items-center gap-2 text-sm text-text">
-            <input type="radio" name="rateChoice" value="all" checked={rateChoice === 'all'} onChange={() => setRateChoice('all')} />
-            Include for all loads
-          </label>
-          <label className="mb-1 flex items-center gap-2 text-sm text-text">
-            <input type="radio" name="rateChoice" value="some" checked={rateChoice === 'some'} onChange={() => setRateChoice('some')} />
-            Choose per load
-          </label>
-          <label className="flex items-center gap-2 text-sm text-text">
-            <input type="radio" name="rateChoice" value="none" checked={rateChoice === 'none'} onChange={() => setRateChoice('none')} />
-            Don&apos;t include rate
-          </label>
-        </fieldset>
-
-        <p className="mb-4 text-xs text-text-muted">Controls whether the Target Pay value is included as the DAT Loadboard Rate.</p>
 
         <div className="flex justify-end gap-2">
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>

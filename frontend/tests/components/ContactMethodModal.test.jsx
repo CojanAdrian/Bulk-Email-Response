@@ -3,11 +3,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import ContactMethodModal from '../../src/components/ContactMethodModal';
 
 describe('ContactMethodModal', () => {
-  test('defaults to phone contact, no contact line, and no rate', () => {
+  test('defaults to phone contact and no contact line', () => {
     const onConfirm = vi.fn();
     render(<ContactMethodModal onCancel={vi.fn()} onConfirm={onConfirm} />);
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
-    expect(onConfirm).toHaveBeenCalledWith({ contactMethod: 'phone', commentContact: '', rateChoice: 'none' });
+    expect(onConfirm).toHaveBeenCalledWith({ contactMethod: 'phone', commentContact: '' });
   });
 
   test('reports the chosen contact method', () => {
@@ -35,14 +35,6 @@ describe('ContactMethodModal', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /include a contact line/i }));
     fireEvent.click(screen.getByRole('button', { name: /continue/i }));
     expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ commentContact: '' }));
-  });
-
-  test('reports the chosen rate choice', () => {
-    const onConfirm = vi.fn();
-    render(<ContactMethodModal onCancel={vi.fn()} onConfirm={onConfirm} />);
-    fireEvent.click(screen.getByRole('radio', { name: /include for all loads/i }));
-    fireEvent.click(screen.getByRole('button', { name: /continue/i }));
-    expect(onConfirm).toHaveBeenCalledWith(expect.objectContaining({ rateChoice: 'all' }));
   });
 
   test('calls onCancel when Cancel is clicked', () => {
