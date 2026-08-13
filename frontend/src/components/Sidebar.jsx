@@ -34,7 +34,7 @@ function Sidebar({ tab, onTabChange, username, onLogout }) {
   const gmailConnected = useGmailConnected();
 
   return (
-    <aside className="relative z-10 flex w-64 shrink-0 flex-col gap-6 border-r border-shell-border bg-shell-surface/70 px-4 py-6 backdrop-blur-xl">
+    <aside className="sticky top-0 z-10 flex h-screen w-64 shrink-0 flex-col gap-6 overflow-y-auto border-r border-shell-border bg-shell-surface/70 px-4 py-6 backdrop-blur-xl">
       <div className="flex items-center gap-3 px-2">
         <img src={logoIcon} alt="" className="h-10 w-10 shrink-0 drop-shadow-[0_2px_6px_rgba(0,0,0,0.25)]" />
         <span className="text-lg font-extrabold tracking-wide text-shell-text">BulkPosting</span>

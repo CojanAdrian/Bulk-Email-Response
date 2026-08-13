@@ -87,7 +87,12 @@ function composeReply(load) {
     if (rate) lines.push(`Rate: ${rate}`);
   }
 
-  return lines.join('\n');
+  // A load with none of PU/DEL/weight/rate filled in (e.g. added via the
+  // quick-entry Add Load form, which only requires a load number) has
+  // nothing to compose a reply from -- returning null rather than '' lets
+  // callers tell "no data yet" apart from a deliberately blank line, instead
+  // of silently queuing or auto-sending an empty email.
+  return lines.length > 0 ? lines.join('\n') : null;
 }
 
 module.exports = { composeReply };

@@ -1,7 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { getAccessToken } = require('../lib/googleOAuth');
-const { sendReply } = require('../lib/gmailClient');
+const { sendReply, markMessageRead } = require('../lib/gmailClient');
 
 function replySubject(originalSubject) {
   const subject = originalSubject || '';
@@ -46,6 +46,9 @@ function createInquiriesRouter(pool, wsHub) {
     }
 
     const body = (req.body && req.body.body) || inquiry.reply_body;
+    if (!body || !body.trim()) {
+      return res.status(400).json({ error: 'Reply body cannot be empty.' });
+    }
     const accessToken = await getAccessToken(accountRows[0].refresh_token);
     await sendReply(accessToken, {
       to: inquiry.from_address,
@@ -54,6 +57,15 @@ function createInquiriesRouter(pool, wsHub) {
       threadId: inquiry.gmail_thread_id,
       inReplyToMessageId: inquiry.gmail_in_reply_to,
     });
+
+    // Best-effort -- the reply itself already went out, so a failure here
+    // (e.g. a transient Gmail API error) shouldn't roll that back or block
+    // the response. It just means the inbox keeps showing it as unread.
+    try {
+      await markMessageRead(accessToken, inquiry.gmail_message_id);
+    } catch (err) {
+      console.error(`Failed to mark message ${inquiry.gmail_message_id} as read:`, err);
+    }
 
     await pool.query(
       "UPDATE email_inquiries SET reply_status = 'sent', reply_body = ?, reply_sent_at = NOW() WHERE id = ?",

@@ -70,11 +70,31 @@ async function getMessage(accessToken, messageId) {
 // thread -- i.e. a human already replied to this carrier directly in Gmail,
 // outside the app entirely. Used to avoid surfacing a thread as a fresh,
 // unanswered inquiry when it's actually already been handled.
-async function threadHasSentMessage(accessToken, threadId) {
+//
+// When recipientAddress is given, only a SENT message actually addressed to
+// that recipient counts. This matters because Gmail can assign the SAME
+// threadId to multiple carriers' replies to one BCC'd Blast Email (they all
+// share the References chain back to that one sent message) -- without the
+// recipient check, the blast itself (or a reply already sent to a different
+// carrier) would make every other carrier's fresh reply in that thread look
+// pre-answered.
+async function threadHasSentMessage(accessToken, threadId, recipientAddress) {
   const gmail = buildGmailClient(accessToken);
-  const res = await gmail.users.threads.get({ userId: 'me', id: threadId, format: 'metadata' });
+  const wantedAddress = String(recipientAddress || '').toLowerCase();
+  const res = await gmail.users.threads.get({
+    userId: 'me',
+    id: threadId,
+    format: 'metadata',
+    ...(wantedAddress ? { metadataHeaders: ['To'] } : {}),
+  });
   const messages = res.data.messages || [];
-  return messages.some((m) => (m.labelIds || []).includes('SENT'));
+  return messages.some((m) => {
+    if (!(m.labelIds || []).includes('SENT')) return false;
+    if (!wantedAddress) return true;
+    const headers = (m.payload && m.payload.headers) || [];
+    const toHeader = (headers.find((h) => h.name && h.name.toLowerCase() === 'to') || {}).value || '';
+    return extractEmailAddresses(toHeader).includes(wantedAddress);
+  });
 }
 
 function buildRawMessage({ to, subject, body, inReplyToMessageId }) {
@@ -101,4 +121,25 @@ async function sendReply(accessToken, { to, subject, body, threadId, inReplyToMe
   return res.data;
 }
 
-module.exports = { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply };
+// Clears the UNREAD label on the original inquiry message once a reply has
+// gone out for it -- otherwise the thread stays sitting in the inbox marked
+// unread even though it's been answered.
+async function markMessageRead(accessToken, messageId) {
+  const gmail = buildGmailClient(accessToken);
+  const res = await gmail.users.messages.modify({
+    userId: 'me',
+    id: messageId,
+    requestBody: { removeLabelIds: ['UNREAD'] },
+  });
+  return res.data;
+}
+
+module.exports = {
+  listNewMessageIds,
+  getMessage,
+  extractPlainTextBody,
+  extractEmailAddresses,
+  threadHasSentMessage,
+  sendReply,
+  markMessageRead,
+};

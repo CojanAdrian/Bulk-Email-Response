@@ -260,6 +260,42 @@ describe('inquiries routes', () => {
       expect(res.status).toBe(400);
       expect(gmailClient.sendReply).not.toHaveBeenCalled();
     });
+
+    // Regression coverage for the reported bug: replying through the review
+    // queue left the original message sitting in the inbox marked unread.
+    test('marks the original message read after sending the reply', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(200);
+      expect(gmailClient.markMessageRead).toHaveBeenCalledWith('fresh-access-token', 'm1');
+    });
+
+    // Regression coverage for the reported bug: "sometimes the reply
+    // message is empty." A blank/whitespace-only body -- whether it's an
+    // edited draft or a load with nothing composed yet -- must never
+    // actually go out to the carrier.
+    test('returns 400 and does not send when the body is blank', async () => {
+      await pool.query("UPDATE email_inquiries SET reply_body = NULL WHERE id = ?", [inquiryId]);
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`).send({ body: '   ' });
+      expect(res.status).toBe(400);
+      expect(gmailClient.sendReply).not.toHaveBeenCalled();
+    });
+
+    test('still returns success and sent status even if marking the message read fails', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+      gmailClient.markMessageRead.mockRejectedValue(new Error('Gmail API error'));
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      consoleErrorSpy.mockRestore();
+
+      expect(res.status).toBe(200);
+      expect(res.body.reply_status).toBe('sent');
+    });
   });
 
   describe('POST /:id/reject', () => {

@@ -8,6 +8,7 @@ jest.mock('googleapis', () => {
         list: jest.fn(),
         get: jest.fn(),
         send: jest.fn(),
+        modify: jest.fn(),
       },
       threads: {
         get: jest.fn(),
@@ -25,7 +26,7 @@ jest.mock('googleapis', () => {
 });
 
 const googleapis = require('googleapis');
-const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply } = require('../../src/lib/gmailClient');
+const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply, markMessageRead } = require('../../src/lib/gmailClient');
 
 describe('listNewMessageIds', () => {
   beforeEach(() => {
@@ -264,6 +265,46 @@ describe('threadHasSentMessage', () => {
     const result = await threadHasSentMessage('token', 't1');
     expect(result).toBe(false);
   });
+
+  // Regression coverage: a Blast Email is BCC'd to many carriers from one
+  // outbound message, and Gmail can assign every carrier's reply the SAME
+  // threadId (they all share the References chain back to that one sent
+  // message). Without a recipient check here, the mere presence of that
+  // original blast -- or a reply already sent to a DIFFERENT carrier -- in
+  // the thread would make every other carrier's fresh reply look
+  // "already answered", silently dropping their inquiry.
+  test('when a recipient is given, only counts a SENT message addressed to that recipient', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+      data: {
+        messages: [
+          { labelIds: ['SENT'], payload: { headers: [{ name: 'To', value: 'carrierA@example.com' }] } },
+          { labelIds: ['INBOX'], payload: { headers: [{ name: 'To', value: 'me@example.com' }] } },
+        ],
+      },
+    });
+    const result = await threadHasSentMessage('token', 't1', 'carrierB@example.com');
+    expect(result).toBe(false);
+  });
+
+  test('when a recipient is given, returns true for a SENT message addressed to that recipient', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+      data: {
+        messages: [
+          { labelIds: ['SENT'], payload: { headers: [{ name: 'To', value: 'carrierA@example.com' }] } },
+        ],
+      },
+    });
+    const result = await threadHasSentMessage('token', 't1', 'carrierA@example.com');
+    expect(result).toBe(true);
+  });
+
+  test('requests only the To header via metadataHeaders when a recipient is given', async () => {
+    googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({ data: { messages: [] } });
+    await threadHasSentMessage('token', 't1', 'carrierA@example.com');
+    expect(googleapis.__mockGmailClient.users.threads.get).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: 'me', id: 't1', format: 'metadata', metadataHeaders: ['To'] })
+    );
+  });
 });
 
 describe('sendReply', () => {
@@ -334,5 +375,23 @@ describe('sendReply', () => {
 
     const result = await sendReply('token', { to: 'carrier@example.com', subject: 'Re: Load #4521', body: 'body' });
     expect(result).toEqual({ id: 'sent1', threadId: 't1' });
+  });
+});
+
+describe('markMessageRead', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test('removes the UNREAD label from the given message', async () => {
+    googleapis.__mockGmailClient.users.messages.modify.mockResolvedValue({ data: { id: 'm1' } });
+
+    await markMessageRead('token', 'm1');
+
+    expect(googleapis.__mockGmailClient.users.messages.modify).toHaveBeenCalledWith({
+      userId: 'me',
+      id: 'm1',
+      requestBody: { removeLabelIds: ['UNREAD'] },
+    });
   });
 });

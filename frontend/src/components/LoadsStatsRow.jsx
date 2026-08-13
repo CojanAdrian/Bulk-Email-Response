@@ -42,7 +42,7 @@ function LoadsStatsRow({ refreshKey }) {
   if (!counts) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <StatBlock label="Active" value={counts.active} accentClassName="text-success" />
       <StatBlock label="Booked" value={counts.booked} accentClassName="text-tag" />
       <StatBlock label="Covered" value={counts.covered} accentClassName="text-tag" />

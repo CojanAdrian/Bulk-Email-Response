@@ -106,7 +106,7 @@ describe('composeReply', () => {
   test('never renders the literal string "null" or "undefined" anywhere in the reply', () => {
     const load = {
       load_number: 'TEST-005',
-      origin_city: null, origin_state: null,
+      origin_city: 'Dallas', origin_state: 'TX',
       dest_city: null, dest_state: null,
       early_pu: null, late_del: null,
       weight: null, target_pay: null,
@@ -208,5 +208,15 @@ describe('composeReply', () => {
     expect(() => composeReply(load)).not.toThrow();
     expect(composeReply(load)).not.toContain('2nd');
     expect(composeReply({ ...load, extra_stops: undefined })).not.toContain('2nd');
+  });
+
+  // Regression coverage for the reported bug: "sometimes the reply message
+  // is empty." A load added via the quick-entry Add Load form only requires
+  // a load number -- if it gets matched before anyone fills in PU/DEL/
+  // weight/rate, composeReply used to return '' silently, which the poller
+  // would then auto-send as a blank email.
+  test('returns null (not an empty string) when the load has no PU/DEL/weight/rate data at all', () => {
+    const load = { load_number: '4521' };
+    expect(composeReply(load)).toBeNull();
   });
 });

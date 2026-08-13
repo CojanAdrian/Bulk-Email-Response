@@ -8,6 +8,7 @@ import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
 import EquipmentPicker from './EquipmentPicker';
+import DateTimeField from './DateTimeField';
 
 const MotionCard = motion(Card);
 
@@ -243,57 +244,13 @@ function RateModal({ load, onClose, onSaved }) {
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyPu">
-              Early pickup
-            </label>
-            <input
-              id="earlyPu"
-              type="datetime-local"
-              value={earlyPu}
-              onChange={(e) => setEarlyPu(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="latePu">
-              Late pickup
-            </label>
-            <input
-              id="latePu"
-              type="datetime-local"
-              value={latePu}
-              onChange={(e) => setLatePu(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
+          <DateTimeField id="earlyPu" label="Early pickup" value={earlyPu} onChange={setEarlyPu} />
+          <DateTimeField id="latePu" label="Late pickup" value={latePu} onChange={setLatePu} />
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="earlyDel">
-              Early delivery
-            </label>
-            <input
-              id="earlyDel"
-              type="datetime-local"
-              value={earlyDel}
-              onChange={(e) => setEarlyDel(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="lateDel">
-              Late delivery
-            </label>
-            <input
-              id="lateDel"
-              type="datetime-local"
-              value={lateDel}
-              onChange={(e) => setLateDel(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
+          <DateTimeField id="earlyDel" label="Early delivery" value={earlyDel} onChange={setEarlyDel} />
+          <DateTimeField id="lateDel" label="Late delivery" value={lateDel} onChange={setLateDel} />
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">

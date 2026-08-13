@@ -1,16 +1,18 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import Papa from 'papaparse';
 import MainToolPage from '../../src/pages/MainToolPage';
 import { ToastProvider } from '../../src/components/Toast';
 import * as loadsApi from '../../src/api/loads';
 import * as gmailApi from '../../src/api/gmail';
 import * as inquiriesApi from '../../src/api/inquiries';
+import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('papaparse');
 vi.mock('../../src/api/loads');
 vi.mock('../../src/api/gmail');
 vi.mock('../../src/api/inquiries');
+vi.mock('../../src/lib/liveSocket');
 
 function renderPage(props) {
   return render(
@@ -21,11 +23,20 @@ function renderPage(props) {
 }
 
 describe('MainToolPage', () => {
+  let liveHandlers;
+
   beforeEach(() => {
     vi.resetAllMocks();
     loadsApi.listLoads.mockResolvedValue([]);
     gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
     inquiriesApi.listInquiries.mockResolvedValue([]);
+    liveHandlers = {};
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      liveHandlers[event] = handler;
+      return () => {
+        delete liveHandlers[event];
+      };
+    });
   });
 
   test('renders the upload panel and the loads table by default', async () => {
@@ -112,6 +123,39 @@ describe('MainToolPage', () => {
     await waitFor(() => {
       expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
     });
+  });
+
+  // Regression coverage for the reported request: a new-inquiry
+  // notification that's hard to miss no matter which tab is open, and that
+  // still gets you to the review queue -- not just the small corner toast.
+  test('shows a prominent alert when a live inquiry:new event arrives, and clicking it switches to Inquiries', async () => {
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    await waitFor(() => expect(liveHandlers['inquiry:new']).toBeTruthy());
+
+    act(() => {
+      liveHandlers['inquiry:new']({ from_address: 'dispatch@carrierco.com' });
+    });
+
+    expect(screen.getByRole('alert')).toHaveTextContent('New inquiry from dispatch@carrierco.com');
+
+    fireEvent.click(screen.getByText(/dispatch@carrierco.com/));
+    await waitFor(() => {
+      expect(screen.getByText(/gmail connection/i)).toBeInTheDocument();
+    });
+  });
+
+  test('opens the blast modal from a load row\'s "Blast" button', async () => {
+    const load = {
+      id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
+    };
+    loadsApi.listLoads.mockResolvedValue([load]);
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.click(screen.getByRole('button', { name: /^blast$/i }));
+
+    expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
   test('refreshes the table when an upload completes', async () => {

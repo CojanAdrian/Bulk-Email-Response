@@ -65,7 +65,7 @@ function InquiriesStatsRow({ refreshKey }) {
   if (!counts) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
       <StatBlock label="Pending review" value={counts.pending_review} accentClassName="text-warning" />
       <StatBlock label="Auto-sent" value={counts.auto_sent} accentClassName="text-success" />
       <StatBlock

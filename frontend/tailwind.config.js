@@ -45,11 +45,16 @@ export default {
           '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
           '50%': { transform: 'translate(5%, -7%) scale(1.1)' },
         },
+        'banner-glow': {
+          '0%, 100%': { opacity: '0.6' },
+          '50%': { opacity: '1' },
+        },
       },
       animation: {
         'aurora-drift-a': 'aurora-drift-a 22s ease-in-out infinite',
         'aurora-drift-b': 'aurora-drift-b 26s ease-in-out infinite',
         'aurora-drift-c': 'aurora-drift-c 19s ease-in-out infinite',
+        'banner-glow': 'banner-glow 1.6s ease-in-out infinite',
       },
     },
   },

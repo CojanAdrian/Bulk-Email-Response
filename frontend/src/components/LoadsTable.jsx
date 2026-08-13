@@ -47,7 +47,25 @@ function sortLoads(loads, sort) {
   return sorted;
 }
 
-function LoadsTable({ refreshKey, onSelectLoad }) {
+// The Loads/Inquiries tabs unmount this table (see MainToolPage), which
+// would otherwise reset the sort back to unsorted every time the user
+// switches tabs and comes back -- persist it across that, and across full
+// page reloads, the same way useTheme persists the color theme.
+const SORT_STORAGE_KEY = 'loadsTable.sort';
+
+function getInitialSort() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(SORT_STORAGE_KEY));
+    if (parsed && (parsed.direction === 'asc' || parsed.direction === 'desc')) {
+      return { key: parsed.key ?? null, direction: parsed.direction };
+    }
+  } catch {
+    // malformed or inaccessible storage -- fall back to the default below
+  }
+  return { key: null, direction: 'asc' };
+}
+
+function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
   const [loads, setLoads] = useState([]);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
@@ -56,7 +74,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   const [actionError, setActionError] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [busyLoadId, setBusyLoadId] = useState(null);
-  const [sort, setSort] = useState({ key: null, direction: 'asc' });
+  const [sort, setSort] = useState(getInitialSort);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -87,6 +105,10 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
   useEffect(() => {
     return subscribe('load:changed', () => setLiveTick((t) => t + 1));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+  }, [sort]);
 
   const sortedLoads = useMemo(() => sortLoads(loads, sort), [loads, sort]);
 
@@ -294,6 +316,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
       )}
       {status === 'ready' && loads.length === 0 && <p className="text-sm text-text-muted">No loads found.</p>}
       {status === 'ready' && loads.length > 0 && (
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-text">
           <thead>
             <tr className="border-b border-border text-text-muted">
@@ -397,6 +420,14 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
                     </div>
                   ) : (
                     <div className="flex items-center justify-end gap-2">
+                      {onOpenBlast && (
+                        <button
+                          onClick={() => onOpenBlast(load)}
+                          className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
+                        >
+                          Blast
+                        </button>
+                      )}
                       <button
                         onClick={() => onSelectLoad(load)}
                         className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
@@ -416,6 +447,7 @@ function LoadsTable({ refreshKey, onSelectLoad }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </Card>
   );

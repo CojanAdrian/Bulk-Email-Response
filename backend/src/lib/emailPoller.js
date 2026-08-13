@@ -1,5 +1,5 @@
 const { getAccessToken } = require('./googleOAuth');
-const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadHasSentMessage } = require('./gmailClient');
+const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadHasSentMessage, markMessageRead } = require('./gmailClient');
 const { matchInquiry } = require('./matchingEngine');
 const { composeReply } = require('./replyComposer');
 const { looksLikeAutomatedNotification } = require('./notificationFilter');
@@ -63,25 +63,40 @@ async function pollAccount(pool, account, wsHub) {
       continue;
     }
 
-    // A thread already logged once (regardless of what happened to that
-    // first message -- sent, rejected, still pending) has already been
-    // treated as an inquiry. Later messages in the same thread are followups
-    // in an ongoing conversation (carrier confirming, asking for a BOL,
-    // tracking/check-call chatter, etc.), not a new inquiry -- without this,
-    // every reply in a back-and-forth thread re-matches and queues a
-    // duplicate review-queue entry for what is really one inquiry.
+    // A thread already logged once for THIS sender (regardless of what
+    // happened to that first message -- sent, rejected, still pending) has
+    // already been treated as an inquiry. Later messages from the same
+    // sender in the same thread are followups in an ongoing conversation
+    // (carrier confirming, asking for a BOL, tracking/check-call chatter,
+    // etc.), not a new inquiry -- without this, every reply in a
+    // back-and-forth thread re-matches and queues a duplicate review-queue
+    // entry for what is really one inquiry.
+    //
+    // Scoped by sender, not just threadId: Gmail can assign the SAME
+    // threadId to multiple carriers' replies to one BCC'd Blast Email (they
+    // share the References chain back to that one sent message), so two
+    // different carriers replying "at the same time" can land in what looks
+    // like one thread -- treating that as one inquiry would silently drop
+    // every carrier after the first.
     if (message.threadId) {
-      const [existingThread] = await pool.query(
-        'SELECT id FROM email_inquiries WHERE email_account_id = ? AND gmail_thread_id = ?',
+      const senderAddress = extractEmailAddresses(message.from)[0] || '';
+      const [existingThreadRows] = await pool.query(
+        'SELECT from_address FROM email_inquiries WHERE email_account_id = ? AND gmail_thread_id = ?',
         [account.id, message.threadId]
       );
-      if (existingThread.length > 0) continue;
+      const sameSenderAlreadyLogged = existingThreadRows.some(
+        (row) => extractEmailAddresses(row.from_address)[0] === senderAddress
+      );
+      if (sameSenderAlreadyLogged) continue;
 
-      // A never-before-seen thread might still already be handled -- the
-      // user may have replied to the carrier directly in Gmail without ever
-      // going through this app. If the connected account has already sent
-      // something in this thread, it's not a fresh, unanswered inquiry.
-      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId);
+      // A never-before-seen (thread, sender) pair might still already be
+      // handled -- the user may have replied to this specific carrier
+      // directly in Gmail without ever going through this app. Only a SENT
+      // message actually addressed to this sender counts (see
+      // threadHasSentMessage) -- otherwise the shared-thread blast quirk
+      // above would make every carrier's message look pre-answered the
+      // moment the account replies to just one of them.
+      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress);
       if (alreadyAnswered) continue;
     }
 
@@ -109,7 +124,12 @@ async function pollAccount(pool, account, wsHub) {
       } else if (CONFIDENT_TIERS.has(tier)) {
         replyBody = composeReply(matchedLoad);
       }
-      if (tier === 'load_number' && account.auto_send_enabled) {
+      // A matched load with no PU/DEL/weight/rate data yet (composeReply
+      // returned null -- e.g. a load added via the quick-entry Add Load
+      // form, matched before anyone filled in its details) has nothing
+      // worth auto-sending; fall through to pending_review so a human
+      // fills in a reply instead of a carrier getting a blank email.
+      if (tier === 'load_number' && account.auto_send_enabled && replyBody) {
         try {
           await sendReply(accessToken, {
             to: message.from,
@@ -120,6 +140,14 @@ async function pollAccount(pool, account, wsHub) {
           });
           replyStatus = 'auto_sent';
           replySentAt = new Date();
+          // Best-effort -- the reply itself already went out, so a failure
+          // here shouldn't affect reply_status. It just means the inbox
+          // keeps showing this message as unread.
+          try {
+            await markMessageRead(accessToken, messageId);
+          } catch (readErr) {
+            console.error(`Failed to mark message ${messageId} as read:`, readErr);
+          }
         } catch (err) {
           console.error(`Failed to auto-send reply for message ${messageId}:`, err);
           replyStatus = 'pending_review';

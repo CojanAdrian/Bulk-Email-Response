@@ -30,6 +30,12 @@ const REDUCED_PRESET = {
     exit: { opacity: 0 },
     transition: INSTANT_TRANSITION,
   },
+  banner: {
+    initial: { opacity: 0 },
+    animate: { opacity: 1 },
+    exit: { opacity: 0, transition: INSTANT_TRANSITION },
+    transition: INSTANT_TRANSITION,
+  },
   stagger: 0,
   tap: {},
 };
@@ -61,6 +67,16 @@ const FULL_PRESET = {
     animate: { opacity: 1 },
     exit: { opacity: 0 },
     transition: { duration: 0.2 },
+  },
+  // A bigger entrance than popIn -- this is reserved for the one alert that
+  // needs to interrupt whatever the user is looking at (a new inquiry
+  // coming in), so it drops in from off-screen with a springy overshoot
+  // instead of the subtle fade/scale everything else uses.
+  banner: {
+    initial: { opacity: 0, y: -72, scale: 0.92 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: -40, scale: 0.96, transition: { duration: 0.18 } },
+    transition: { type: 'spring', stiffness: 320, damping: 22 },
   },
   stagger: 0.04,
   tap: { scale: 0.97 },

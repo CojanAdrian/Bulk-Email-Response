@@ -84,16 +84,17 @@ describe('DatExportSection', () => {
     });
   });
 
-  test('renders the load lookup panel once loads are ready, and opens the blast modal from it', async () => {
+  test('renders the load lookup panel once loads are ready, and forwards blast requests from it to onOpenBlast', async () => {
     loadsApi.listLoads.mockResolvedValue(LOADS);
-    render(<DatExportSection refreshKey={0} />);
+    const onOpenBlast = vi.fn();
+    render(<DatExportSection refreshKey={0} onOpenBlast={onOpenBlast} />);
     await waitFor(() => screen.getByLabelText(/search loads/i));
 
     fireEvent.change(screen.getByLabelText(/search loads/i), { target: { value: '1001' } });
     fireEvent.click(screen.getByText(/1001 — V/));
     fireEvent.click(screen.getByRole('button', { name: /blast email/i }));
 
-    expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
+    expect(onOpenBlast).toHaveBeenCalledWith(expect.objectContaining({ id: 1, load_number: '1001' }), false);
   });
 
   test('refetches active loads when a live load:changed event arrives', async () => {

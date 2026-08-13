@@ -22,6 +22,7 @@ describe('LoadsTable', () => {
 
   beforeEach(() => {
     vi.resetAllMocks();
+    localStorage.clear();
     liveHandlers = {};
     liveSocket.subscribe.mockImplementation((event, handler) => {
       liveHandlers[event] = handler;
@@ -83,6 +84,28 @@ describe('LoadsTable', () => {
     await waitFor(() => screen.getByText('L1001'));
     fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
     expect(onSelectLoad).toHaveBeenCalledWith(SAMPLE_LOAD);
+  });
+
+  // Regression coverage: the Blast Email feature existed but was only
+  // reachable by re-searching for a load in a lookup panel buried below the
+  // table -- a per-row action puts it right where the load is already
+  // visible, same as Edit/Delete.
+  test('calls onOpenBlast with the load when "Blast" is clicked', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    const onOpenBlast = vi.fn();
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} onOpenBlast={onOpenBlast} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.click(screen.getByRole('button', { name: /^blast$/i }));
+    expect(onOpenBlast).toHaveBeenCalledWith(SAMPLE_LOAD);
+  });
+
+  test('does not render a Blast button when onOpenBlast is not provided', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    expect(screen.queryByRole('button', { name: /^blast$/i })).not.toBeInTheDocument();
   });
 
   test('changing the per-row status select calls updateLoad with the new status', async () => {
@@ -440,6 +463,39 @@ describe('LoadsTable', () => {
       const rows = screen.getAllByRole('row').slice(1);
       expect(within(rows[0]).getByText('GALOAD')).toBeInTheDocument();
       expect(within(rows[1]).getByText('TXLOAD')).toBeInTheDocument();
+    });
+
+    // Regression coverage for the reported bug: sorting reset every time the
+    // user left the Loads tab (e.g. to check Inquiries) and came back,
+    // because LoadsTable unmounts on tab switch and its sort state was
+    // purely in-memory.
+    test('persists the chosen column and direction across a remount, as if the tab were switched away and back', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      const { unmount } = render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      const header = screen.getByRole('button', { name: /^load #/i });
+      fireEvent.click(header); // ascending
+      fireEvent.click(header); // descending
+      unmount();
+
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^load #/i })).toHaveTextContent('↓');
+    });
+
+    test('defaults to unsorted when nothing has been persisted yet', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
     });
   });
 });

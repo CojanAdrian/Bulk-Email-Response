@@ -6,7 +6,6 @@ import { processLoadsForExport, buildDatCsv, buildDatExportFilename, countAnomal
 import ContactMethodModal from './ContactMethodModal';
 import AnomalyReport from './AnomalyReport';
 import LoadLookupPanel from './LoadLookupPanel';
-import BlastModal from './BlastModal';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import Skeleton from './Skeleton';
@@ -23,13 +22,12 @@ function downloadCsv(csv, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function DatExportSection({ refreshKey }) {
+function DatExportSection({ refreshKey, onOpenBlast }) {
   const [loads, setLoads] = useState([]);
   const [fetchStatus, setFetchStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [fetchError, setFetchError] = useState(null);
   const [step, setStep] = useState('idle'); // 'idle' | 'contactMethod'
   const [result, setResult] = useState(null);
-  const [blastTarget, setBlastTarget] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
 
   useEffect(() => {
@@ -93,17 +91,10 @@ function DatExportSection({ refreshKey }) {
         </>
       )}
 
-      {fetchStatus === 'ready' && loads.length > 0 && (
-        <LoadLookupPanel loads={loads} onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })} />
-      )}
+      {fetchStatus === 'ready' && loads.length > 0 && <LoadLookupPanel loads={loads} onOpenBlast={onOpenBlast} />}
 
       <AnimatePresence>
         {step === 'contactMethod' && <ContactMethodModal onCancel={() => setStep('idle')} onConfirm={handleContactConfirm} />}
-      </AnimatePresence>
-      <AnimatePresence>
-        {blastTarget && (
-          <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
-        )}
       </AnimatePresence>
     </div>
   );

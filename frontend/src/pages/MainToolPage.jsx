@@ -5,6 +5,7 @@ import LoadsTable from '../components/LoadsTable';
 import LoadsStatsRow from '../components/LoadsStatsRow';
 import RateModal from '../components/RateModal';
 import AddLoadModal from '../components/AddLoadModal';
+import BlastModal from '../components/BlastModal';
 import PrimaryButton from '../components/PrimaryButton';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
@@ -14,7 +15,7 @@ import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
 import Sidebar from '../components/Sidebar';
 import AuroraBackground from '../components/AuroraBackground';
-import { useToast } from '../components/Toast';
+import { useInquiryAlerts } from '../components/InquiryAlertBanner';
 import { subscribe } from '../lib/liveSocket';
 import { useMotionPreset } from '../lib/motionConfig';
 
@@ -28,8 +29,9 @@ function MainToolPage({ username, onLogout }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [selectedLoad, setSelectedLoad] = useState(null);
   const [addLoadOpen, setAddLoadOpen] = useState(false);
+  const [blastTarget, setBlastTarget] = useState(null);
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
-  const { showToast } = useToast();
+  const { pushAlert, viewport: inquiryAlertViewport } = useInquiryAlerts();
   const preset = useMotionPreset();
 
   function handleUploadComplete() {
@@ -46,15 +48,16 @@ function MainToolPage({ username, onLogout }) {
 
   useEffect(() => {
     return subscribe('inquiry:new', (inquiry) => {
-      showToast(`New inquiry from ${inquiry.from_address}`, {
-        onClick: () => setTab('inquiries'),
+      pushAlert(`New inquiry from ${inquiry.from_address}`, {
+        onView: () => setTab('inquiries'),
       });
     });
-  }, [showToast]);
+  }, [pushAlert]);
 
   return (
     <div className="relative flex min-h-screen overflow-hidden bg-shell-bg text-shell-text">
       <AuroraBackground />
+      {inquiryAlertViewport}
       <Sidebar tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
       <div className="relative z-10 min-w-0 flex-1">
         <header className="px-8 pt-8">
@@ -64,16 +67,23 @@ function MainToolPage({ username, onLogout }) {
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-8">
               <LoadsStatsRow refreshKey={refreshKey} />
-              <div className="flex items-start gap-4">
-                <div className="flex-1">
+              <div className="flex flex-wrap items-start gap-4">
+                <div className="min-w-[16rem] flex-1">
                   <UploadPanel onUploadComplete={handleUploadComplete} />
                 </div>
                 <PrimaryButton onClick={() => setAddLoadOpen(true)} className="shrink-0">
                   + Add Load
                 </PrimaryButton>
               </div>
-              <LoadsTable refreshKey={refreshKey} onSelectLoad={setSelectedLoad} />
-              <DatExportSection refreshKey={refreshKey} />
+              <LoadsTable
+                refreshKey={refreshKey}
+                onSelectLoad={setSelectedLoad}
+                onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
+              />
+              <DatExportSection
+                refreshKey={refreshKey}
+                onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
+              />
             </motion.main>
           )}
           {tab === 'inquiries' && (
@@ -97,6 +107,9 @@ function MainToolPage({ username, onLogout }) {
         )}
         {addLoadOpen && (
           <AddLoadModal onClose={() => setAddLoadOpen(false)} onCreated={handleLoadCreated} />
+        )}
+        {blastTarget && (
+          <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
         )}
       </AnimatePresence>
     </div>
