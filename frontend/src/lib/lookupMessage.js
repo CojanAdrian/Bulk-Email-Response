@@ -126,8 +126,8 @@ export function buildLookupMessage(load, showRate) {
   lines.push(puLine);
 
   let delLine = `DEL: ${load.dest_city}, ${load.dest_state}${load.dest_zip ? ' ' + load.dest_zip : ''}`;
-  if (load.late_del) {
-    const delSched = buildDELSched(load.late_del);
+  if (load.early_del || load.late_del) {
+    const delSched = buildDELSched(load.early_del, load.late_del);
     if (delSched) delLine += ' – ' + delSched;
   } else {
     const delSchedAlt = extractSched(comment, 'del');

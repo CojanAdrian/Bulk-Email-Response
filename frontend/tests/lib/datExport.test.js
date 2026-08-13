@@ -120,13 +120,25 @@ describe('buildPUSched', () => {
 });
 
 describe('buildDELSched', () => {
-  test('formats a date and time', () => {
+  test('renders "appt" when early and late are identical', () => {
     const iso = new Date(2026, 7, 10, 23, 0, 0).toISOString();
-    expect(buildDELSched(iso)).toBe('08/10/2026 11pm');
+    expect(buildDELSched(iso, iso)).toBe('08/10/2026 11pm appt');
   });
 
-  test('returns an empty string for null input', () => {
-    expect(buildDELSched(null)).toBe('');
+  test('renders a same-day FCFS range when times differ but the date matches', () => {
+    const early = new Date(2026, 7, 10, 9, 0, 0).toISOString();
+    const late = new Date(2026, 7, 10, 17, 0, 0).toISOString();
+    expect(buildDELSched(early, late)).toBe('08/10/2026 9am - 5pm FCFS');
+  });
+
+  test('falls back to whichever side is present when the other is missing', () => {
+    const iso = new Date(2026, 7, 10, 23, 0, 0).toISOString();
+    expect(buildDELSched(iso, null)).toBe('08/10/2026 11pm appt');
+    expect(buildDELSched(null, iso)).toBe('08/10/2026 11pm appt');
+  });
+
+  test('returns an empty string when both sides are missing', () => {
+    expect(buildDELSched(null, null)).toBe('');
   });
 });
 

@@ -7,14 +7,16 @@ describe('composeReply', () => {
       origin_city: 'Saint Louis', origin_state: 'MO',
       dest_city: 'Sheboygan', dest_state: 'WI',
       early_pu: '2026-08-11 18:00:00',
+      late_pu: '2026-08-11 18:00:00',
+      early_del: '2026-08-12 08:00:00',
       late_del: '2026-08-12 08:00:00',
       weight: '43,500 lbs',
       target_pay: '1440.00',
     };
     const reply = composeReply(load);
     expect(reply).toBe(
-      'PU: SAINT LOUIS, MO – 08/11/2026 6pm\n' +
-      'DEL: SHEBOYGAN, WI – 08/12/2026 8am\n' +
+      'PU: SAINT LOUIS, MO – 08/11/2026 6pm appt\n' +
+      'DEL: SHEBOYGAN, WI – 08/12/2026 8am appt\n' +
       'Weight: 43,500 lbs\n' +
       'Rate: $1,440'
     );
@@ -25,9 +27,10 @@ describe('composeReply', () => {
       origin_city: 'Chicago', origin_state: 'IL',
       dest_city: 'Dallas', dest_state: 'TX',
       early_pu: '2026-08-10 14:30:00',
+      late_pu: '2026-08-10 14:30:00',
     };
     const reply = composeReply(load);
-    expect(reply).toContain('PU: CHICAGO, IL – 08/10/2026 2:30pm');
+    expect(reply).toContain('PU: CHICAGO, IL – 08/10/2026 2:30pm appt');
   });
 
   test('omits the PU line entirely when there is no origin city', () => {
@@ -38,6 +41,60 @@ describe('composeReply', () => {
     };
     const reply = composeReply(load);
     expect(reply).not.toContain('PU:');
+  });
+
+  describe('PU/DEL appt vs FCFS scheduling', () => {
+    test('shows a single "appt" time when early and late PU are the same', () => {
+      const load = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_pu: '2026-08-10 08:00:00', late_pu: '2026-08-10 08:00:00',
+      };
+      expect(composeReply(load)).toContain('PU: CHICAGO, IL – 08/10/2026 8am appt');
+    });
+
+    test('shows both times and "FCFS" when early and late PU differ on the same day', () => {
+      const load = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_pu: '2026-08-10 07:00:00', late_pu: '2026-08-10 15:00:00',
+      };
+      expect(composeReply(load)).toContain('PU: CHICAGO, IL – 08/10/2026 7am-3pm FCFS');
+    });
+
+    test('shows both dates and times with "FCFS" when early and late PU are on different days', () => {
+      const load = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_pu: '2026-08-10 07:00:00', late_pu: '2026-08-12 15:00:00',
+      };
+      expect(composeReply(load)).toContain('PU: CHICAGO, IL – 08/10/2026 7am – 08/12/2026 3pm FCFS');
+    });
+
+    test('uses whichever of early/late PU is set when only one is present', () => {
+      const load = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_pu: '2026-08-10 08:00:00', late_pu: null,
+      };
+      expect(composeReply(load)).toContain('PU: CHICAGO, IL – 08/10/2026 8am appt');
+    });
+
+    test('applies the same appt/FCFS treatment to DEL using early_del and late_del', () => {
+      const sameLoad = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_del: '2026-08-11 09:00:00', late_del: '2026-08-11 09:00:00',
+      };
+      expect(composeReply(sameLoad)).toContain('DEL: DALLAS, TX – 08/11/2026 9am appt');
+
+      const windowLoad = {
+        origin_city: 'Chicago', origin_state: 'IL',
+        dest_city: 'Dallas', dest_state: 'TX',
+        early_del: '2026-08-11 09:00:00', late_del: '2026-08-11 17:00:00',
+      };
+      expect(composeReply(windowLoad)).toContain('DEL: DALLAS, TX – 08/11/2026 9am-5pm FCFS');
+    });
   });
 
   test('omits the DEL line entirely when there is no destination city', () => {

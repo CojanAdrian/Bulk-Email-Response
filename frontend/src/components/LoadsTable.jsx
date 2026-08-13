@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
 import { multiStopTagVariant } from '../lib/lookupMessage';
+import { buildPUSched } from '../lib/datExport';
 import Badge from './Badge';
 import Card from './Card';
 import Skeleton from './Skeleton';
@@ -13,6 +14,7 @@ const SORT_COLUMNS = [
   { key: 'load_number', label: 'Load #' },
   { key: 'origin', label: 'Origin' },
   { key: 'destination', label: 'Destination' },
+  { key: 'pu', label: 'PU' },
   { key: 'equipment', label: 'Equipment' },
   { key: 'target_pay', label: 'Target Pay' },
 ];
@@ -27,6 +29,14 @@ function sortValue(load, key) {
       return `${load.origin_state ?? ''} ${load.origin_city ?? ''}`.trim();
     case 'destination':
       return `${load.dest_state ?? ''} ${load.dest_city ?? ''}`.trim();
+    // Sorts by whichever PU time is set (earliest if both are), so loads
+    // with no PU time at all sort as if earliest (matches target_pay's
+    // "missing sorts as 0" convention below).
+    case 'pu': {
+      const raw = load.early_pu ?? load.late_pu;
+      const t = raw ? new Date(raw).getTime() : NaN;
+      return Number.isNaN(t) ? 0 : t;
+    }
     case 'equipment':
       return String(load.equipment ?? '');
     case 'target_pay':
@@ -373,6 +383,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                 <td className="py-2 pr-4">
                   {load.dest_city}, {load.dest_state}
                 </td>
+                <td className="py-2 pr-4 whitespace-nowrap">{buildPUSched(load.early_pu, load.late_pu)}</td>
                 <td className="py-2 pr-4">{load.equipment}</td>
                 <td className="py-2 pr-4">{load.target_pay}</td>
                 <td className="py-2 pr-4">

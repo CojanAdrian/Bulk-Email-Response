@@ -63,7 +63,12 @@ function fmtTime(d) {
   return min === '00' ? `${h12}${p}` : `${h12}:${min}${p}`;
 }
 
-export function buildPUSched(rawEarly, rawLate) {
+// Shared by buildPUSched and buildDELSched: when the early and late times
+// land on the same minute, it's a fixed appointment ("appt") -- otherwise
+// it's a pickup/delivery window and carriers need to know it's
+// first-come-first-served ("FCFS"). A load with only one of the two set
+// uses it for both ends (single known time = an appointment at that time).
+function buildSchedRange(rawEarly, rawLate) {
   const e = rawEarly ? new Date(rawEarly) : null;
   const l = rawLate ? new Date(rawLate) : null;
   const eValid = e && !isNaN(e.getTime()) ? e : null;
@@ -80,11 +85,12 @@ export function buildPUSched(rawEarly, rawLate) {
   return `${earlyDateStr} ${fmtTime(early)} – ${lateDateStr} ${fmtTime(late)} FCFS`;
 }
 
-export function buildDELSched(rawDel) {
-  if (!rawDel) return '';
-  const d = new Date(rawDel);
-  if (isNaN(d.getTime())) return '';
-  return `${formatDateOnlyFromDate(d)} ${fmtTime(d)}`;
+export function buildPUSched(rawEarly, rawLate) {
+  return buildSchedRange(rawEarly, rawLate);
+}
+
+export function buildDELSched(rawEarly, rawLate) {
+  return buildSchedRange(rawEarly, rawLate);
 }
 
 function isStraightBox(equipment) {

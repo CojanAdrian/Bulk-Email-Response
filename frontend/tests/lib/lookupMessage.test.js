@@ -144,12 +144,28 @@ describe('buildLookupMessage', () => {
     expect(msg).toContain('PU: Chicago, IL – 08/10/2026 8am appt');
   });
 
-  test('includes the delivery schedule from late_del when present', () => {
+  test('shows a single "appt" time when only late_del is present (used for both ends)', () => {
     const msg = buildLookupMessage(load({ late_del: iso(2026, 8, 11, 23, 0) }), true);
-    expect(msg).toContain('DEL: Dallas, TX – 08/11/2026 11pm');
+    expect(msg).toContain('DEL: Dallas, TX – 08/11/2026 11pm appt');
   });
 
-  test('falls back to comment-scanned delivery schedule when late_del is absent', () => {
+  test('shows a same-day FCFS window when early_del and late_del differ', () => {
+    const msg = buildLookupMessage(
+      load({ early_del: iso(2026, 8, 11, 9, 0), late_del: iso(2026, 8, 11, 17, 0) }),
+      true
+    );
+    expect(msg).toContain('DEL: Dallas, TX – 08/11/2026 9am - 5pm FCFS');
+  });
+
+  test('shows a single "appt" time when early_del and late_del are the same', () => {
+    const msg = buildLookupMessage(
+      load({ early_del: iso(2026, 8, 11, 9, 0), late_del: iso(2026, 8, 11, 9, 0) }),
+      true
+    );
+    expect(msg).toContain('DEL: Dallas, TX – 08/11/2026 9am appt');
+  });
+
+  test('falls back to comment-scanned delivery schedule when neither early_del nor late_del is present', () => {
     const msg = buildLookupMessage(load({ late_del: null, comment: 'del appt 1400' }), true);
     expect(msg).toContain('DEL: Dallas, TX – Appt 1400');
   });

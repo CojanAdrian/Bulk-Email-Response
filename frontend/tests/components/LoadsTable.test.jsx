@@ -42,6 +42,26 @@ describe('LoadsTable', () => {
     expect(loadsApi.listLoads).toHaveBeenCalledWith('active');
   });
 
+  test('shows the PU column formatted as an appointment when early and late pickup match', async () => {
+    loadsApi.listLoads.mockResolvedValue([
+      { ...SAMPLE_LOAD, early_pu: '2026-08-10T08:00:00Z', late_pu: '2026-08-10T08:00:00Z' },
+    ]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    expect(screen.getByText(/appt/i)).toBeInTheDocument();
+  });
+
+  test('shows the PU column with both times and FCFS when early and late pickup differ', async () => {
+    loadsApi.listLoads.mockResolvedValue([
+      { ...SAMPLE_LOAD, early_pu: '2026-08-10T07:00:00Z', late_pu: '2026-08-10T15:00:00Z' },
+    ]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    expect(screen.getByText(/fcfs/i)).toBeInTheDocument();
+  });
+
   test('shows a yellow "Modified" badge for a load with a custom_reply_body', async () => {
     loadsApi.listLoads.mockResolvedValue([{ ...SAMPLE_LOAD, custom_reply_body: 'Custom text' }]);
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
@@ -433,6 +453,36 @@ describe('LoadsTable', () => {
       const rows = screen.getAllByRole('row').slice(1);
       expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
       expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
+    });
+
+    test('clicking "PU" sorts rows chronologically by pickup time', async () => {
+      loadsApi.listLoads.mockResolvedValue([
+        { ...SAMPLE_LOAD, id: 1, load_number: 'LATER', early_pu: '2026-08-15T08:00:00Z', late_pu: '2026-08-15T08:00:00Z' },
+        { ...SAMPLE_LOAD_2, id: 2, load_number: 'EARLIER', early_pu: '2026-08-10T08:00:00Z', late_pu: '2026-08-10T08:00:00Z' },
+      ]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('LATER'));
+
+      fireEvent.click(screen.getByRole('button', { name: /^pu$/i }));
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(within(rows[0]).getByText('EARLIER')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('LATER')).toBeInTheDocument();
+    });
+
+    test('loads with no PU time sort first when sorting by PU ascending', async () => {
+      loadsApi.listLoads.mockResolvedValue([
+        { ...SAMPLE_LOAD, id: 1, load_number: 'HASPU', early_pu: '2026-08-10T08:00:00Z', late_pu: '2026-08-10T08:00:00Z' },
+        { ...SAMPLE_LOAD_2, id: 2, load_number: 'NOPU', early_pu: null, late_pu: null },
+      ]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('HASPU'));
+
+      fireEvent.click(screen.getByRole('button', { name: /^pu$/i }));
+
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(within(rows[0]).getByText('NOPU')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('HASPU')).toBeInTheDocument();
     });
 
     test('clicking "Target Pay" sorts rows numerically, not as text', async () => {
