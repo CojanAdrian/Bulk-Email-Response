@@ -726,13 +726,15 @@ OAuth client to set up, not two.
 1. Create a project at [console.cloud.google.com](https://console.cloud.google.com).
 2. Enable the **Gmail API** for that project.
 3. Configure the **OAuth consent screen** (app name, and scopes
-   `openid`, `userinfo.email`, `userinfo.profile`, `gmail.readonly`, and
+   `openid`, `userinfo.email`, `userinfo.profile`, `gmail.modify`, and
    `gmail.send` — the sign-in flow requests all five together; the
-   standalone Gmail-connect flow requests just the last two). While the
-   consent screen is in **Testing** publishing status (the default),
-   every Google account that needs to sign in or connect Gmail —
-   including your own — must be added under **Test users**, or the OAuth
-   flow will fail for them.
+   standalone Gmail-connect flow requests just the last two). `gmail.modify`
+   (not `gmail.readonly`) is required because marking an inquiry's message
+   read after replying calls `messages.modify` to remove the UNREAD label,
+   which `gmail.readonly` cannot do. While the consent screen is in
+   **Testing** publishing status (the default), every Google account that
+   needs to sign in or connect Gmail — including your own — must be added
+   under **Test users**, or the OAuth flow will fail for them.
 4. Create an **OAuth 2.0 Client ID** (application type: **Web
    application**), with **both** callback URLs as authorized redirect
    URIs: `http://localhost:4000/api/gmail/oauth/callback` and

@@ -1,7 +1,13 @@
 const { google } = require('googleapis');
 
+// gmail.modify (not gmail.readonly) -- readonly can list/get messages but
+// cannot change labels, so marking a message read (removing UNREAD via
+// messages.modify, see markMessageRead in gmailClient.js) silently fails
+// with a 403 under readonly. modify is a superset of readonly for our
+// purposes: it still allows all the same reading, plus label changes,
+// while stopping short of permanent delete.
 const SCOPES = [
-  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.modify',
   'https://www.googleapis.com/auth/gmail.send',
 ];
 
