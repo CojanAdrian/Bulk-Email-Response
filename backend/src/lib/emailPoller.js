@@ -4,13 +4,6 @@ const { matchInquiry } = require('./matchingEngine');
 const { composeReply } = require('./replyComposer');
 const { looksLikeAutomatedNotification } = require('./notificationFilter');
 
-// Only these tiers confirm enough of the route (both ends, or an exact load
-// number) to safely pre-fill a specific load's PU/DEL/rate details into a
-// suggested reply -- weaker tiers ('city', 'state') still surface the
-// inquiry for a human to handle, but never suggest text that could be about
-// the wrong load.
-const CONFIDENT_TIERS = new Set(['load_number', 'city_state']);
-
 function replySubject(originalSubject) {
   const subject = originalSubject || '';
   return subject.toLowerCase().startsWith('re:') ? subject : `Re: ${subject}`;
@@ -96,7 +89,7 @@ async function pollAccount(pool, account, wsHub) {
       // threadHasSentMessage) -- otherwise the shared-thread blast quirk
       // above would make every carrier's message look pre-answered the
       // moment the account replies to just one of them.
-      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress);
+      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress, message.receivedAt);
       if (alreadyAnswered) continue;
     }
 
@@ -121,7 +114,7 @@ async function pollAccount(pool, account, wsHub) {
       // multi-drop load gets its extra stop info included in the reply.
       if (matchedLoad.custom_reply_body) {
         replyBody = matchedLoad.custom_reply_body;
-      } else if (CONFIDENT_TIERS.has(tier)) {
+      } else {
         replyBody = composeReply(matchedLoad);
       }
       // A matched load with no PU/DEL/weight/rate data yet (composeReply

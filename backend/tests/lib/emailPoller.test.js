@@ -275,7 +275,13 @@ describe('emailPoller', () => {
     expect(inquiries[0].reply_sent_at).toBeNull();
   });
 
-  test('does not pre-fill a reply body for a low-confidence (city) tier match, so a human never sees a possibly-wrong load suggested', async () => {
+  // Regression coverage for the reported bug: "some review queue entries
+  // have an empty reply textarea." A city/state-tier match still has real
+  // origin/dest data on the matched load (that's what matched it), so a
+  // draft can and should be composed from it -- tier only gates auto-send
+  // (still restricted to load_number below), never whether a human editing
+  // in the review queue gets a starting point instead of a blank box.
+  test('still pre-fills a reply body for a low-confidence (city) tier match, but never auto-sends it', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
@@ -291,13 +297,12 @@ describe('emailPoller', () => {
     expect(gmailClient.sendReply).not.toHaveBeenCalled();
     const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
     expect(inquiries[0].reply_status).toBe('pending_review');
-    expect(inquiries[0].reply_body).toBeNull();
-    // still recorded for context, just without a suggested reply
+    expect(inquiries[0].reply_body).toContain('PU: DALLAS, TX');
     expect(inquiries[0].matched_load_id).toBe(1);
     expect(inquiries[0].match_tier).toBe('city');
   });
 
-  test('does not pre-fill a reply body for a low-confidence (state) tier match either', async () => {
+  test('still pre-fills a reply body for a low-confidence (state) tier match too', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
@@ -311,7 +316,7 @@ describe('emailPoller', () => {
     await pollAccount(pool, accountRows[0]);
 
     const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
-    expect(inquiries[0].reply_body).toBeNull();
+    expect(inquiries[0].reply_body).toContain('PU: DALLAS, TX');
   });
 
   describe('recipient filtering (only direct, single-recipient inquiries)', () => {
@@ -645,7 +650,9 @@ describe('emailPoller', () => {
       const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
       await pollAccount(pool, accountRows[0]);
 
-      expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith('fresh-access-token', 't1', 'carrierb@example.com');
+      expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith(
+        'fresh-access-token', 't1', 'carrierb@example.com', new Date('2026-08-08T08:00:00Z')
+      );
     });
 
     test('does not call threadHasSentMessage for a message with no threadId', async () => {

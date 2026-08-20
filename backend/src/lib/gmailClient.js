@@ -78,9 +78,18 @@ async function getMessage(accessToken, messageId) {
 // recipient check, the blast itself (or a reply already sent to a different
 // carrier) would make every other carrier's fresh reply in that thread look
 // pre-answered.
-async function threadHasSentMessage(accessToken, threadId, recipientAddress) {
+//
+// When sinceDate is given, only a SENT message that went out AFTER sinceDate
+// counts. Without this, a thread with any sent reply anywhere in its history
+// -- even one that long predates a brand new question from the carrier --
+// would look permanently "already answered", silently hiding every message
+// that comes in afterward. Callers pass the specific inbound message's own
+// received time here, so only a reply that actually answers THIS message
+// (sent later than it) counts as having already handled it.
+async function threadHasSentMessage(accessToken, threadId, recipientAddress, sinceDate) {
   const gmail = buildGmailClient(accessToken);
   const wantedAddress = String(recipientAddress || '').toLowerCase();
+  const sinceMs = sinceDate ? new Date(sinceDate).getTime() : null;
   const res = await gmail.users.threads.get({
     userId: 'me',
     id: threadId,
@@ -90,6 +99,10 @@ async function threadHasSentMessage(accessToken, threadId, recipientAddress) {
   const messages = res.data.messages || [];
   return messages.some((m) => {
     if (!(m.labelIds || []).includes('SENT')) return false;
+    if (sinceMs !== null) {
+      const sentMs = Number(m.internalDate);
+      if (!Number.isNaN(sentMs) && sentMs <= sinceMs) return false;
+    }
     if (!wantedAddress) return true;
     const headers = (m.payload && m.payload.headers) || [];
     const toHeader = (headers.find((h) => h.name && h.name.toLowerCase() === 'to') || {}).value || '';

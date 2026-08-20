@@ -305,6 +305,57 @@ describe('threadHasSentMessage', () => {
       expect.objectContaining({ userId: 'me', id: 't1', format: 'metadata', metadataHeaders: ['To'] })
     );
   });
+
+  // Regression coverage: a thread with any sent reply anywhere in its
+  // history used to look permanently "already answered", even to a brand
+  // new carrier message that arrived well after that old reply. sinceDate
+  // scopes the check to "answered after this specific message came in".
+  describe('sinceDate (only a reply that postdates the message counts)', () => {
+    test('returns false when the only SENT message predates sinceDate', async () => {
+      googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+        data: { messages: [{ labelIds: ['SENT'], internalDate: '1000' }] },
+      });
+      const result = await threadHasSentMessage('token', 't1', null, new Date(2000));
+      expect(result).toBe(false);
+    });
+
+    test('returns true when a SENT message postdates sinceDate', async () => {
+      googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+        data: { messages: [{ labelIds: ['SENT'], internalDate: '3000' }] },
+      });
+      const result = await threadHasSentMessage('token', 't1', null, new Date(2000));
+      expect(result).toBe(true);
+    });
+
+    test('a SENT message sent at exactly sinceDate does not count (must be strictly after)', async () => {
+      googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+        data: { messages: [{ labelIds: ['SENT'], internalDate: '2000' }] },
+      });
+      const result = await threadHasSentMessage('token', 't1', null, new Date(2000));
+      expect(result).toBe(false);
+    });
+
+    test('combines with the recipient check -- both must hold', async () => {
+      googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+        data: {
+          messages: [
+            { labelIds: ['SENT'], internalDate: '3000', payload: { headers: [{ name: 'To', value: 'someoneElse@example.com' }] } },
+            { labelIds: ['SENT'], internalDate: '1000', payload: { headers: [{ name: 'To', value: 'carrierA@example.com' }] } },
+          ],
+        },
+      });
+      const result = await threadHasSentMessage('token', 't1', 'carrierA@example.com', new Date(2000));
+      expect(result).toBe(false);
+    });
+
+    test('without sinceDate, a SENT message still counts regardless of when it was sent', async () => {
+      googleapis.__mockGmailClient.users.threads.get.mockResolvedValue({
+        data: { messages: [{ labelIds: ['SENT'], internalDate: '1000' }] },
+      });
+      const result = await threadHasSentMessage('token', 't1');
+      expect(result).toBe(true);
+    });
+  });
 });
 
 describe('sendReply', () => {
