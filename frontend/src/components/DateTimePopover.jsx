@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import PopoverPanel from './PopoverPanel';
 import DateTimeCalendar from './DateTimeCalendar';
 import { formatShort } from '../lib/dateTimeLocal';
 
@@ -7,17 +8,20 @@ import { formatShort } from '../lib/dateTimeLocal';
 // a real calendar grid and quick time chips -- a drop-in replacement for the
 // old native <input type="datetime-local"> wherever only one value is needed
 // (e.g. an extra stop's date/time), which is fiddly to read and click
-// through and looks different in every browser.
+// through and looks different in every browser. The popover itself is
+// portaled (see PopoverPanel) so it floats freely instead of being clipped
+// by a scrollable ancestor like the Edit Load modal.
 function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
     function handlePointerDown(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      const insideButton = buttonRef.current && buttonRef.current.contains(e.target);
+      const insidePanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!insideButton && !insidePanel) setOpen(false);
     }
     function handleKeyDown(e) {
       if (e.key === 'Escape') setOpen(false);
@@ -33,7 +37,7 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
   const display = formatShort(value);
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div>
       {label && (
         <label className={labelClassName || 'mb-1 block text-xs text-text-muted'} htmlFor={id}>
           {label}
@@ -41,6 +45,7 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
       )}
       <button
         id={id}
+        ref={buttonRef}
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="dialog"
@@ -51,13 +56,15 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
         {display || 'Set date & time'}
       </button>
       {open && (
-        <div
+        <PopoverPanel
+          ref={panelRef}
+          anchorEl={buttonRef.current}
           role="dialog"
-          aria-label={ariaLabel || label || 'Choose date and time'}
-          className="absolute z-20 mt-1 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          ariaLabel={ariaLabel || label || 'Choose date and time'}
+          className="z-50 rounded-xl border border-border bg-surface p-3 shadow-lg"
         >
           <DateTimeCalendar value={value} onChange={onChange} idPrefix={id} />
-        </div>
+        </PopoverPanel>
       )}
     </div>
   );

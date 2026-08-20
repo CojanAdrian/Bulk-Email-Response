@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import PopoverPanel from './PopoverPanel';
 import DateTimeCalendar from './DateTimeCalendar';
 
 // One popover for an entire PU or DEL window: shows both the early and late
@@ -6,17 +7,20 @@ import DateTimeCalendar from './DateTimeCalendar';
 // formatRange function (buildPUSched/buildDELSched from datExport.js) the
 // loads table uses to display the window -- so what you see while editing
 // is exactly what carriers and the table will show, and a load with a
-// single fixed appointment is one click away via "Same as early".
-function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarlyChange, onLateChange, formatRange }) {
+// single fixed appointment is one click away via "Same as early". The
+// popover itself is portaled (see PopoverPanel) so it floats freely instead
+// of being clipped by a scrollable ancestor like the Edit Load modal.
+function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarlyChange, onLateChange, formatRange, showLegend = true }) {
   const [open, setOpen] = useState(false);
-  const containerRef = useRef(null);
+  const buttonRef = useRef(null);
+  const panelRef = useRef(null);
 
   useEffect(() => {
     if (!open) return undefined;
     function handlePointerDown(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) {
-        setOpen(false);
-      }
+      const insideButton = buttonRef.current && buttonRef.current.contains(e.target);
+      const insidePanel = panelRef.current && panelRef.current.contains(e.target);
+      if (!insideButton && !insidePanel) setOpen(false);
     }
     function handleKeyDown(e) {
       if (e.key === 'Escape') setOpen(false);
@@ -32,9 +36,12 @@ function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarl
   const summary = formatRange(earlyValue, lateValue);
 
   return (
-    <div className="relative" ref={containerRef}>
-      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted">{legend}</label>
+    <div>
+      {showLegend && (
+        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted">{legend}</label>
+      )}
       <button
+        ref={buttonRef}
         type="button"
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -44,10 +51,12 @@ function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarl
         {summary || `Set ${legend.toLowerCase()} window`}
       </button>
       {open && (
-        <div
+        <PopoverPanel
+          ref={panelRef}
+          anchorEl={buttonRef.current}
           role="dialog"
-          aria-label={`${legend} window`}
-          className="absolute z-20 mt-1 flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          ariaLabel={`${legend} window`}
+          className="z-50 flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg"
         >
           <div role="group" aria-label="Early">
             <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Early</span>
@@ -67,7 +76,7 @@ function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarl
             </div>
             <DateTimeCalendar value={lateValue} onChange={onLateChange} idPrefix={lateId} />
           </div>
-        </div>
+        </PopoverPanel>
       )}
     </div>
   );
