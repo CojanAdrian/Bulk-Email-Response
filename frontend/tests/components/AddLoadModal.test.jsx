@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import AddLoadModal from '../../src/components/AddLoadModal';
 import * as loadsApi from '../../src/api/loads';
 
@@ -38,6 +38,8 @@ describe('AddLoadModal', () => {
   });
 
   test('creates a load with the full set of fields, including early/late delivery and a picked equipment type', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 1)); // Aug 1, 2026 -- day 14 is visible without navigating months
     loadsApi.createLoad.mockResolvedValue({ id: 2, load_number: 'L2002' });
     render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
 
@@ -47,8 +49,15 @@ describe('AddLoadModal', () => {
     fireEvent.change(originState, { target: { value: 'TX' } });
     fireEvent.change(screen.getByLabelText(/dest city/i), { target: { value: 'Chicago' } });
     fireEvent.change(destState, { target: { value: 'IL' } });
-    fireEvent.change(screen.getByLabelText(/early delivery/i), { target: { value: '2026-08-14T08:00' } });
-    fireEvent.change(screen.getByLabelText(/late delivery/i), { target: { value: '2026-08-14T16:00' } });
+
+    fireEvent.click(screen.getByRole('button', { name: /set delivery window/i }));
+    const earlyGroup = within(screen.getByRole('group', { name: 'Early' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: '2026-08-14' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: /set time to 8:00 am/i }));
+    const lateGroup = within(screen.getByRole('group', { name: 'Late' }));
+    fireEvent.click(lateGroup.getByRole('button', { name: '2026-08-14' }));
+    fireEvent.click(lateGroup.getByRole('button', { name: /set time to 4:00 pm/i }));
+
     fireEvent.change(screen.getByLabelText(/target pay/i), { target: { value: '1500' } });
     fireEvent.click(screen.getByLabelText(/include rate in replies/i));
 
@@ -66,6 +75,8 @@ describe('AddLoadModal', () => {
         target_pay: 1500, include_rate: false, equipment: 'R',
       }));
     });
+
+    vi.useRealTimers();
   });
 
   test('shows the server error and does not close when creation fails', async () => {

@@ -13,7 +13,7 @@ import InquiriesLog from '../components/InquiriesLog';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
-import Sidebar from '../components/Sidebar';
+import TopNav from '../components/TopNav';
 import AuroraBackground from '../components/AuroraBackground';
 import { useInquiryAlerts } from '../components/InquiryAlertBanner';
 import { subscribe } from '../lib/liveSocket';
@@ -55,17 +55,17 @@ function MainToolPage({ username, onLogout }) {
   }, [pushAlert]);
 
   return (
-    <div className="relative flex min-h-screen overflow-hidden bg-shell-bg text-shell-text">
+    <div className="relative min-h-screen overflow-hidden bg-shell-bg text-shell-text">
       <AuroraBackground />
       {inquiryAlertViewport}
-      <Sidebar tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
-      <div className="relative z-10 min-w-0 flex-1">
-        <header className="px-8 pt-8">
+      <TopNav tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
+      <div className="relative z-10 min-w-0">
+        <header className="px-4 pt-6 sm:px-6">
           <h1 className="text-2xl font-extrabold tracking-tight text-shell-text">{TAB_TITLES[tab]}</h1>
         </header>
         <AnimatePresence>
           {tab === 'loads' && (
-            <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-8">
+            <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
               <LoadsStatsRow refreshKey={refreshKey} />
               <div className="flex flex-wrap items-start gap-4">
                 <div className="min-w-[16rem] flex-1">
@@ -87,7 +87,7 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'inquiries' && (
-            <motion.main key="inquiries" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-8">
+            <motion.main key="inquiries" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
               <div className="flex justify-end">
                 <SecondaryButton onClick={() => setInquiriesRefreshKey((k) => k + 1)} className="px-4 py-2 text-xs">
                   Refresh

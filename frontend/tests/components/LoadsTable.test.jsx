@@ -428,6 +428,55 @@ describe('LoadsTable', () => {
     });
   });
 
+  describe('search', () => {
+    test('filters rows by load number as you type', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.change(screen.getByLabelText(/search loads/i), { target: { value: 'a2002' } });
+
+      expect(screen.queryByText('L1001')).not.toBeInTheDocument();
+      expect(screen.getByText('A2002')).toBeInTheDocument();
+    });
+
+    test('filters rows by origin city', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.change(screen.getByLabelText(/search loads/i), { target: { value: 'atlanta' } });
+
+      expect(screen.queryByText('L1001')).not.toBeInTheDocument();
+      expect(screen.getByText('A2002')).toBeInTheDocument();
+    });
+
+    test('shows a no-match message, distinct from the empty-table message, when nothing matches', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.change(screen.getByLabelText(/search loads/i), { target: { value: 'zzz-no-match' } });
+
+      expect(screen.queryByText('L1001')).not.toBeInTheDocument();
+      expect(screen.getByText(/no loads match/i)).toBeInTheDocument();
+      expect(screen.queryByText(/^no loads found\.$/i)).not.toBeInTheDocument();
+    });
+
+    test('clearing the search restores every row', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      const search = screen.getByLabelText(/search loads/i);
+      fireEvent.change(search, { target: { value: 'atlanta' } });
+      fireEvent.change(search, { target: { value: '' } });
+
+      expect(screen.getByText('L1001')).toBeInTheDocument();
+      expect(screen.getByText('A2002')).toBeInTheDocument();
+    });
+  });
+
   describe('sortable column headers', () => {
     test('clicking "Load #" sorts rows ascending by load number', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);

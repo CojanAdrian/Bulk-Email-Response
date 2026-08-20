@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import RateModal from '../../src/components/RateModal';
 import * as loadsApi from '../../src/api/loads';
 
@@ -248,7 +248,9 @@ describe('RateModal', () => {
     loadsApi.updateLoad.mockResolvedValue(loadWithDates);
     render(<RateModal load={loadWithDates} onClose={vi.fn()} onSaved={vi.fn()} />);
 
-    expect(screen.getByLabelText(/early pickup/i)).toHaveValue('2026-08-12T09:00');
+    // The Pickup range button's label is built with the same formatter the
+    // loads table uses (buildPUSched), so it doubles as the prefill check.
+    expect(screen.getByRole('button', { name: /08\/12\/2026 9am appt/i })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
@@ -258,6 +260,48 @@ describe('RateModal', () => {
       expect(payload.early_del).toBe('2026-08-14 08:00:00');
       expect(payload.late_del).toBe('2026-08-14 16:00:00');
     });
+  });
+
+  test('picking a pickup date and time via the calendar popover saves it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 1)); // Aug 1, 2026 -- day 12 is visible without navigating months
+    loadsApi.updateLoad.mockResolvedValue(LOAD);
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /set pickup window/i }));
+    const earlyGroup = within(screen.getByRole('group', { name: 'Early' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: '2026-08-12' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: /set time to 8:00 am/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.early_pu).toBe('2026-08-12 08:00:00');
+    });
+
+    vi.useRealTimers();
+  });
+
+  test('"Same as early (appt)" copies the early pickup value onto late pickup', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date(2026, 7, 1));
+    loadsApi.updateLoad.mockResolvedValue(LOAD);
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /set pickup window/i }));
+    const earlyGroup = within(screen.getByRole('group', { name: 'Early' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: '2026-08-12' }));
+    fireEvent.click(earlyGroup.getByRole('button', { name: /set time to 8:00 am/i }));
+    fireEvent.click(screen.getByRole('button', { name: /same as early/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      const payload = loadsApi.updateLoad.mock.calls[0][1];
+      expect(payload.early_pu).toBe('2026-08-12 08:00:00');
+      expect(payload.late_pu).toBe('2026-08-12 08:00:00');
+    });
+
+    vi.useRealTimers();
   });
 
   test('picking a new equipment type from the search dropdown saves its code', async () => {

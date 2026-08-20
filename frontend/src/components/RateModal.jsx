@@ -3,12 +3,13 @@ import { motion } from 'framer-motion';
 import { updateLoad, previewLoadReply } from '../api/loads';
 import { useMotionPreset } from '../lib/motionConfig';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
+import { buildPUSched, buildDELSched } from '../lib/datExport';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
 import EquipmentPicker from './EquipmentPicker';
-import DateTimeField from './DateTimeField';
+import DateRangeField from './DateRangeField';
 
 const MotionCard = motion(Card);
 
@@ -243,14 +244,27 @@ function RateModal({ load, onClose, onSaved }) {
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <DateTimeField id="earlyPu" label="Early pickup" value={earlyPu} onChange={setEarlyPu} />
-          <DateTimeField id="latePu" label="Late pickup" value={latePu} onChange={setLatePu} />
-        </div>
-
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <DateTimeField id="earlyDel" label="Early delivery" value={earlyDel} onChange={setEarlyDel} />
-          <DateTimeField id="lateDel" label="Late delivery" value={lateDel} onChange={setLateDel} />
+        <div className="mb-4 space-y-2">
+          <DateRangeField
+            legend="Pickup"
+            earlyId="earlyPu"
+            lateId="latePu"
+            earlyValue={earlyPu}
+            lateValue={latePu}
+            onEarlyChange={setEarlyPu}
+            onLateChange={setLatePu}
+            formatRange={buildPUSched}
+          />
+          <DateRangeField
+            legend="Delivery"
+            earlyId="earlyDel"
+            lateId="lateDel"
+            earlyValue={earlyDel}
+            lateValue={lateDel}
+            onEarlyChange={setEarlyDel}
+            onLateChange={setLateDel}
+            formatRange={buildDELSched}
+          />
         </div>
 
         <div className="mb-4 grid grid-cols-2 gap-2">

@@ -46,6 +46,12 @@ function sortValue(load, key) {
   }
 }
 
+function matchesSearch(load, query) {
+  if (!query) return true;
+  const haystack = `${load.load_number ?? ''} ${load.origin_city ?? ''} ${load.origin_state ?? ''} ${load.dest_city ?? ''} ${load.dest_state ?? ''}`.toLowerCase();
+  return haystack.includes(query);
+}
+
 function sortLoads(loads, sort) {
   if (!sort.key) return loads;
   const sorted = [...loads].sort((a, b) => {
@@ -79,6 +85,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
   const [loads, setLoads] = useState([]);
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
+  const [searchText, setSearchText] = useState('');
   const [error, setError] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
   const [actionError, setActionError] = useState(null);
@@ -120,7 +127,12 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
   }, [sort]);
 
-  const sortedLoads = useMemo(() => sortLoads(loads, sort), [loads, sort]);
+  const filteredLoads = useMemo(() => {
+    const q = searchText.trim().toLowerCase();
+    return q ? loads.filter((load) => matchesSearch(load, q)) : loads;
+  }, [loads, searchText]);
+
+  const sortedLoads = useMemo(() => sortLoads(filteredLoads, sort), [filteredLoads, sort]);
 
   function handleSortClick(key) {
     setSort((prev) => (prev.key === key ? { key, direction: prev.direction === 'asc' ? 'desc' : 'asc' } : { key, direction: 'asc' }));
@@ -230,20 +242,30 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
 
   return (
     <Card>
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-text">Loads</h2>
-        <select
-          aria-label="Filter by status"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text"
-        >
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {STATUS_LABELS[option]}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <input
+            type="search"
+            aria-label="Search loads"
+            placeholder="Search load #, city, state..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="w-48 rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text sm:w-64"
+          />
+          <select
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text"
+          >
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {STATUS_LABELS[option]}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       {status === 'loading' && <Skeleton count={4} height="1.75rem" />}
       {status === 'error' && (
@@ -325,7 +347,10 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
         </div>
       )}
       {status === 'ready' && loads.length === 0 && <p className="text-sm text-text-muted">No loads found.</p>}
-      {status === 'ready' && loads.length > 0 && (
+      {status === 'ready' && loads.length > 0 && sortedLoads.length === 0 && (
+        <p className="text-sm text-text-muted">No loads match "{searchText}".</p>
+      )}
+      {status === 'ready' && sortedLoads.length > 0 && (
         <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-text">
           <thead>

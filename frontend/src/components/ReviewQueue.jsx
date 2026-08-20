@@ -193,6 +193,7 @@ function ReviewQueue() {
                   value={drafts[inquiry.id] ?? ''}
                   onChange={(e) => handleDraftChange(inquiry.id, e.target.value)}
                   rows={5}
+                  placeholder="No load details on file yet — write a reply below."
                   className="mb-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
                 />
                 <div className="flex justify-end gap-2">
