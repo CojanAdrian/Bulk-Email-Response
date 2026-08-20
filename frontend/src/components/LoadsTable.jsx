@@ -1,11 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
-import { multiStopTagVariant } from '../lib/lookupMessage';
+import { multiStopTagVariant, buildLookupMessage } from '../lib/lookupMessage';
 import { buildPUSched } from '../lib/datExport';
+import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import Badge from './Badge';
 import Card from './Card';
 import Skeleton from './Skeleton';
+import DateRangeField from './DateRangeField';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
@@ -95,6 +97,18 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [editingTargetPayId, setEditingTargetPayId] = useState(null);
+  const [targetPayDraft, setTargetPayDraft] = useState('');
+  const [copiedId, setCopiedId] = useState(null);
+  // Staged PU edits, keyed by load id -- DateRangeField's early/late values
+  // are normally driven straight from `load.early_pu`/`late_pu`, but that
+  // only updates once a fetch round-trips back from the server. Without
+  // this, picking a day and then a time in the same popover session (two
+  // separate saves) would have the second save read the date as still
+  // unset, since the row's own data hasn't refreshed yet -- silently
+  // reverting the date. Cleared whenever a fresh fetch resolves, once the
+  // server data is authoritative again.
+  const [puOverrides, setPuOverrides] = useState({});
 
   useEffect(() => {
     let ignore = false;
@@ -106,6 +120,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
           setLoads(data);
           setStatus('ready');
           setSelectedIds(new Set());
+          setPuOverrides({});
         }
       })
       .catch((err) => {
@@ -237,6 +252,71 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
       .finally(() => setBulkBusy(false));
   }
 
+  function startEditTargetPay(load) {
+    setEditingTargetPayId(load.id);
+    setTargetPayDraft(load.target_pay ?? '');
+  }
+
+  function saveTargetPay(load) {
+    if (editingTargetPayId !== load.id) return; // already saved (Enter) or cancelled (Escape)
+    const trimmed = String(targetPayDraft).trim();
+    let normalized = null;
+    if (trimmed !== '') {
+      const parsed = Number(trimmed);
+      if (Number.isNaN(parsed)) {
+        setActionError('Target pay must be a number.');
+        setEditingTargetPayId(null);
+        return;
+      }
+      normalized = parsed;
+    }
+    setActionError(null);
+    setEditingTargetPayId(null);
+    setBusyLoadId(load.id);
+    updateLoad(load.id, { target_pay: normalized })
+      .catch((err) => setActionError(err.message || 'Failed to update target pay.'))
+      .finally(() => setBusyLoadId(null));
+  }
+
+  function handleTargetPayKeyDown(e, load) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      saveTargetPay(load);
+    } else if (e.key === 'Escape') {
+      setEditingTargetPayId(null);
+    }
+  }
+
+  function puValuesFor(load) {
+    return (
+      puOverrides[load.id] ?? {
+        early_pu: isoToDatetimeLocal(load.early_pu),
+        late_pu: isoToDatetimeLocal(load.late_pu),
+      }
+    );
+  }
+
+  function handlePuChange(load, field, datetimeLocalValue) {
+    setPuOverrides((prev) => ({
+      ...prev,
+      [load.id]: { ...puValuesFor(load), [field]: datetimeLocalValue },
+    }));
+    setActionError(null);
+    setBusyLoadId(load.id);
+    updateLoad(load.id, { [field]: datetimeLocalToMysql(datetimeLocalValue) })
+      .catch((err) => setActionError(err.message || 'Failed to update pickup window.'))
+      .finally(() => setBusyLoadId(null));
+  }
+
+  function handleCopy(load) {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+    const text = buildLookupMessage(load, Boolean(load.include_rate));
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedId(load.id);
+      setTimeout(() => setCopiedId((prev) => (prev === load.id ? null : prev)), 1800);
+    });
+  }
+
   const allSelected = sortedLoads.length > 0 && selectedIds.size === sortedLoads.length;
   const someSelected = selectedIds.size > 0 && !allSelected;
 
@@ -351,11 +431,11 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
         <p className="text-sm text-text-muted">No loads match "{searchText}".</p>
       )}
       {status === 'ready' && sortedLoads.length > 0 && (
-        <div className="overflow-x-auto">
+        <div className="max-h-[70vh] overflow-auto">
         <table className="w-full text-left text-sm text-text">
-          <thead>
+          <thead className="sticky top-0 z-10 bg-surface">
             <tr className="border-b border-border text-text-muted">
-              <th className="w-8 py-2 pr-2">
+              <th className="w-8 py-1.5 pr-2">
                 <input
                   type="checkbox"
                   aria-label="Select all loads"
@@ -367,7 +447,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                 />
               </th>
               {SORT_COLUMNS.map((col) => (
-                <th key={col.key} className="py-2 pr-4">
+                <th key={col.key} className="py-1.5 pr-4">
                   <button
                     type="button"
                     onClick={() => handleSortClick(col.key)}
@@ -378,15 +458,15 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                   </button>
                 </th>
               ))}
-              <th className="py-2 pr-4">Rate</th>
-              <th className="py-2 pr-4">Status</th>
-              <th className="py-2"></th>
+              <th className="py-1.5 pr-4">Rate</th>
+              <th className="py-1.5 pr-4">Status</th>
+              <th className="py-1.5"></th>
             </tr>
           </thead>
           <tbody>
             {sortedLoads.map((load) => (
               <tr key={load.id} className="border-b border-border/60">
-                <td className="py-2 pr-2">
+                <td className="py-1.5 pr-2">
                   <input
                     type="checkbox"
                     aria-label={`Select ${load.load_number}`}
@@ -394,7 +474,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     onChange={() => toggleSelectOne(load.id)}
                   />
                 </td>
-                <td className="py-2 pr-4">
+                <td className="py-1.5 pr-4">
                   <div className="flex items-center gap-1.5">
                     <span>{load.load_number}</span>
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
@@ -402,16 +482,50 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     {multiStopTagVariant(load) === 'info' && <Badge variant="info">Stops added</Badge>}
                   </div>
                 </td>
-                <td className="py-2 pr-4">
+                <td className="py-1.5 pr-4">
                   {load.origin_city}, {load.origin_state}
                 </td>
-                <td className="py-2 pr-4">
+                <td className="py-1.5 pr-4">
                   {load.dest_city}, {load.dest_state}
                 </td>
-                <td className="py-2 pr-4 whitespace-nowrap">{buildPUSched(load.early_pu, load.late_pu)}</td>
-                <td className="py-2 pr-4">{load.equipment}</td>
-                <td className="py-2 pr-4">{load.target_pay}</td>
-                <td className="py-2 pr-4">
+                <td className="py-1.5 pr-4 whitespace-nowrap">
+                  <DateRangeField
+                    legend="PU"
+                    showLegend={false}
+                    earlyId={`pu-early-${load.id}`}
+                    lateId={`pu-late-${load.id}`}
+                    earlyValue={puValuesFor(load).early_pu}
+                    lateValue={puValuesFor(load).late_pu}
+                    onEarlyChange={(value) => handlePuChange(load, 'early_pu', value)}
+                    onLateChange={(value) => handlePuChange(load, 'late_pu', value)}
+                    formatRange={buildPUSched}
+                  />
+                </td>
+                <td className="py-1.5 pr-4">{load.equipment}</td>
+                <td className="py-1.5 pr-4">
+                  {editingTargetPayId === load.id ? (
+                    <input
+                      type="number"
+                      step="0.01"
+                      autoFocus
+                      aria-label={`Target pay for ${load.load_number}`}
+                      value={targetPayDraft}
+                      onChange={(e) => setTargetPayDraft(e.target.value)}
+                      onBlur={() => saveTargetPay(load)}
+                      onKeyDown={(e) => handleTargetPayKeyDown(e, load)}
+                      className="w-24 rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text"
+                    />
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startEditTargetPay(load)}
+                      className="rounded-lg border border-transparent px-2 py-1 text-left hover:border-border hover:bg-surface-alt"
+                    >
+                      {load.target_pay ?? '—'}
+                    </button>
+                  )}
+                </td>
+                <td className="py-1.5 pr-4">
                   <input
                     type="checkbox"
                     aria-label={`Include rate for ${load.load_number}`}
@@ -420,7 +534,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     disabled={busyLoadId === load.id}
                   />
                 </td>
-                <td className="py-2 pr-4">
+                <td className="py-1.5 pr-4">
                   <select
                     aria-label={`Status for ${load.load_number}`}
                     value={load.status}
@@ -435,7 +549,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     ))}
                   </select>
                 </td>
-                <td className="py-2">
+                <td className="py-1.5">
                   {confirmingDeleteId === load.id ? (
                     <div className="flex items-center justify-end gap-2">
                       <span className="text-xs text-error">Delete?</span>
@@ -456,6 +570,12 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     </div>
                   ) : (
                     <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleCopy(load)}
+                        className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
+                      >
+                        {copiedId === load.id ? 'Copied!' : 'Copy'}
+                      </button>
                       {onOpenBlast && (
                         <button
                           onClick={() => onOpenBlast(load)}

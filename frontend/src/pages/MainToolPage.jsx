@@ -80,10 +80,7 @@ function MainToolPage({ username, onLogout }) {
                 onSelectLoad={setSelectedLoad}
                 onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
               />
-              <DatExportSection
-                refreshKey={refreshKey}
-                onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
-              />
+              <DatExportSection refreshKey={refreshKey} />
             </motion.main>
           )}
           {tab === 'inquiries' && (
@@ -94,8 +91,8 @@ function MainToolPage({ username, onLogout }) {
                 </SecondaryButton>
               </div>
               <InquiriesStatsRow refreshKey={inquiriesRefreshKey} />
-              <GmailConnectionPanel />
               <ReviewQueue key={`review-${inquiriesRefreshKey}`} />
+              <GmailConnectionPanel />
               <InquiriesLog refreshKey={inquiriesRefreshKey} />
             </motion.main>
           )}

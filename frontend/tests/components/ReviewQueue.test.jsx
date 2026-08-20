@@ -206,6 +206,42 @@ describe('ReviewQueue', () => {
     expect(inquiriesApi.sendInquiryReply).not.toHaveBeenCalled();
   });
 
+  test('Ctrl+Enter in the reply textarea sends it', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
+    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByLabelText(/reply/i));
+
+    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter', ctrlKey: true });
+
+    await waitFor(() => {
+      expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, INQUIRY.reply_body);
+    });
+  });
+
+  test('Cmd+Enter (metaKey) in the reply textarea also sends it', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
+    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByLabelText(/reply/i));
+
+    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter', metaKey: true });
+
+    await waitFor(() => {
+      expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, INQUIRY.reply_body);
+    });
+  });
+
+  test('plain Enter (no modifier) in the reply textarea does not send', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByLabelText(/reply/i));
+
+    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter' });
+
+    expect(inquiriesApi.sendInquiryReply).not.toHaveBeenCalled();
+  });
+
   test('shows an error and keeps the inquiry in the list when sending fails', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
     inquiriesApi.sendInquiryReply.mockRejectedValue(new Error('Gmail account is no longer connected'));

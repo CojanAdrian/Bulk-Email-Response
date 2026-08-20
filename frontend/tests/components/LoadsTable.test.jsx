@@ -597,4 +597,154 @@ describe('LoadsTable', () => {
       expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
     });
   });
+
+  test('the table header is sticky so it stays visible while scrolling', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    const headerRow = screen.getAllByRole('row')[0];
+    expect(headerRow.closest('thead')).toHaveClass('sticky');
+  });
+
+  describe('inline target pay editing', () => {
+    test('clicking the target pay cell swaps it for an editable input', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      expect(screen.getByLabelText(/target pay for l1001/i)).toBeInTheDocument();
+    });
+
+    test('saves the new value on blur', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, target_pay: '1800' });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      const input = screen.getByLabelText(/target pay for l1001/i);
+      fireEvent.change(input, { target: { value: '1800' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { target_pay: 1800 });
+      });
+    });
+
+    test('pressing Enter saves the new value', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, target_pay: '1800' });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      const input = screen.getByLabelText(/target pay for l1001/i);
+      fireEvent.change(input, { target: { value: '1800' } });
+      fireEvent.keyDown(input, { key: 'Enter' });
+
+      await waitFor(() => {
+        expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { target_pay: 1800 });
+      });
+    });
+
+    test('pressing Escape cancels without saving', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      const input = screen.getByLabelText(/target pay for l1001/i);
+      fireEvent.change(input, { target: { value: '999' } });
+      fireEvent.keyDown(input, { key: 'Escape' });
+
+      expect(screen.queryByLabelText(/target pay for l1001/i)).not.toBeInTheDocument();
+      expect(loadsApi.updateLoad).not.toHaveBeenCalled();
+    });
+
+    test('clearing the field sends null instead of an empty string', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, target_pay: null });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      const input = screen.getByLabelText(/target pay for l1001/i);
+      fireEvent.change(input, { target: { value: '' } });
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { target_pay: null });
+      });
+    });
+  });
+
+  describe('inline PU editing', () => {
+    test('picking a PU date and time from the row saves it without opening the Edit modal', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 7, 1)); // Aug 1, 2026
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      loadsApi.updateLoad.mockResolvedValue(SAMPLE_LOAD);
+      const onSelectLoad = vi.fn();
+      render(<LoadsTable refreshKey={0} onSelectLoad={onSelectLoad} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: /set pu window/i }));
+      const early = within(screen.getByRole('group', { name: 'Early' }));
+      fireEvent.click(early.getByRole('button', { name: '2026-08-14' }));
+      fireEvent.click(early.getByRole('button', { name: /set time to 8:00 am/i }));
+
+      await waitFor(() => {
+        expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { early_pu: '2026-08-14 08:00:00' });
+      });
+      expect(onSelectLoad).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
+
+    // Regression coverage: the row's DateRangeField reads its value straight
+    // from the load prop, which only updates once a fetch round-trips back
+    // from the server. Without local staging, a second edit within the same
+    // popover session (day, then a non-default time) would find no date
+    // recorded yet and silently fall back to today's date instead of the
+    // day just picked.
+    test('a second edit in the same popover session (a non-default time) keeps the date already picked', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] });
+      vi.setSystemTime(new Date(2026, 7, 1)); // Aug 1, 2026
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      loadsApi.updateLoad.mockResolvedValue(SAMPLE_LOAD);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: /set pu window/i }));
+      const early = within(screen.getByRole('group', { name: 'Early' }));
+      fireEvent.click(early.getByRole('button', { name: '2026-08-14' }));
+      fireEvent.click(early.getByRole('button', { name: /set time to 10:00 am/i }));
+
+      await waitFor(() => {
+        expect(loadsApi.updateLoad).toHaveBeenLastCalledWith(1, { early_pu: '2026-08-14 10:00:00' });
+      });
+
+      vi.useRealTimers();
+    });
+  });
+
+  describe('copy action', () => {
+    test('copies the formatted lookup message to the clipboard and shows a confirmation', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      const writeText = vi.fn().mockResolvedValue(undefined);
+      Object.assign(navigator, { clipboard: { writeText } });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: /^copy$/i }));
+
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledTimes(1);
+        expect(writeText.mock.calls[0][0]).toContain('PU: Dallas, TX');
+        expect(screen.getByRole('button', { name: /^copied!$/i })).toBeInTheDocument();
+      });
+    });
+  });
 });

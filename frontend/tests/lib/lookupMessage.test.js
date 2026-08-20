@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { searchLoads, extractSched, detectMultiStop, multiStopTagVariant, buildLookupMessage } from '../../src/lib/lookupMessage';
+import { extractSched, detectMultiStop, multiStopTagVariant, buildLookupMessage } from '../../src/lib/lookupMessage';
 
 function iso(y, mo, d, h = 0, min = 0) {
   return new Date(y, mo - 1, d, h, min, 0).toISOString();
@@ -28,44 +28,6 @@ function load(overrides = {}) {
     ...overrides,
   };
 }
-
-describe('searchLoads', () => {
-  const loads = [
-    load({ id: 1, load_number: '1001', origin_city: 'Chicago', origin_state: 'IL', dest_city: 'Dallas', dest_state: 'TX' }),
-    load({ id: 2, load_number: '2002', origin_city: 'Springfield', origin_state: 'IL', dest_city: 'Peoria', dest_state: 'IL' }),
-    load({ id: 3, load_number: '3003', origin_city: 'Atlanta', origin_state: 'GA', dest_city: 'Chicago', dest_state: 'IL' }),
-  ];
-
-  test('returns nothing for an empty query', () => {
-    expect(searchLoads(loads, '')).toEqual([]);
-    expect(searchLoads(loads, '   ')).toEqual([]);
-  });
-
-  test('matches by load number substring, ranked above city/state matches', () => {
-    const result = searchLoads(loads, '1001');
-    expect(result).toHaveLength(1);
-    expect(result[0].id).toBe(1);
-  });
-
-  test('an exact origin-state match outranks an origin-city substring match', () => {
-    const isolatedLoads = [
-      load({ id: 10, origin_city: 'Peoria', origin_state: 'IL', dest_city: 'Reno', dest_state: 'NV' }),
-      load({ id: 11, origin_city: 'Milford', origin_state: 'OH', dest_city: 'Reno', dest_state: 'NV' }),
-    ];
-    const result = searchLoads(isolatedLoads, 'il');
-    expect(result.map((l) => l.id)).toEqual([10, 11]);
-  });
-
-  test('origin city substring match outranks dest city substring match', () => {
-    // "chicago" is load 1's origin (35pts) and load 3's destination (8pts)
-    const result = searchLoads(loads, 'chicago');
-    expect(result.map((l) => l.id)).toEqual([1, 3]);
-  });
-
-  test('returns an empty array when nothing matches', () => {
-    expect(searchLoads(loads, 'nonexistent')).toEqual([]);
-  });
-});
 
 describe('extractSched', () => {
   test('extracts FCFS from a pickup-tagged segment', () => {

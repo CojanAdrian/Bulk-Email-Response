@@ -2,9 +2,10 @@ import { BoxIcon, MailIcon, LogoutIcon } from './icons';
 import ThemeToggle from './ThemeToggle';
 import ConnectionIndicator from './ConnectionIndicator';
 import { useGmailConnected } from '../lib/useGmailConnected';
+import { usePendingReviewCount } from '../lib/usePendingReviewCount';
 import logoIcon from '../assets/logo-icon.png';
 
-function NavButton({ icon, label, active, onClick, badge }) {
+function NavButton({ icon, label, active, onClick, badge, count }) {
   return (
     <button
       onClick={onClick}
@@ -15,7 +16,7 @@ function NavButton({ icon, label, active, onClick, badge }) {
     >
       {icon}
       {label}
-      {badge && (
+      {badge ? (
         // Decorative nudge only -- deliberately not in the accessible name
         // (the button's name stays exactly the nav label); the connection
         // panel itself announces "not connected" once the user gets there.
@@ -25,6 +26,23 @@ function NavButton({ icon, label, active, onClick, badge }) {
           data-testid="gmail-nudge-badge"
           className={`absolute right-1.5 top-1.5 h-2 w-2 shrink-0 rounded-full ${active ? 'bg-accent-ink' : 'bg-warning'}`}
         />
+      ) : (
+        count > 0 && (
+          // Also decorative-only, same accessible-name rule as above -- lets
+          // you tell from the Loads tab whether anything's waiting on you
+          // without switching tabs, but the queue itself is still the source
+          // of truth for what's actually in it.
+          <span
+            aria-hidden="true"
+            title={`${count} inquiry${count === 1 ? '' : 'ies'} waiting for review`}
+            data-testid="pending-review-badge"
+            className={`ml-0.5 inline-flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
+              active ? 'bg-accent-ink text-accent' : 'bg-warning text-white'
+            }`}
+          >
+            {count}
+          </span>
+        )
       )}
     </button>
   );
@@ -36,6 +54,7 @@ function NavButton({ icon, label, active, onClick, badge }) {
 // nav links that only ever need two rows' worth of space.
 function TopNav({ tab, onTabChange, username, onLogout }) {
   const gmailConnected = useGmailConnected();
+  const pendingReviewCount = usePendingReviewCount();
 
   return (
     <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-shell-border bg-shell-surface/80 px-4 py-2.5 backdrop-blur-xl sm:px-6">
@@ -51,6 +70,7 @@ function TopNav({ tab, onTabChange, username, onLogout }) {
           active={tab === 'inquiries'}
           onClick={() => onTabChange('inquiries')}
           badge={gmailConnected === false ? 'Gmail not connected — click to connect' : null}
+          count={pendingReviewCount}
         />
       </nav>
       <div className="ml-auto flex items-center gap-2 sm:gap-3">

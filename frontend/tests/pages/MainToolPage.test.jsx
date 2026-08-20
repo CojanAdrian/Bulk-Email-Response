@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
+import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import Papa from 'papaparse';
 import MainToolPage from '../../src/pages/MainToolPage';
 import { ToastProvider } from '../../src/components/Toast';
@@ -55,12 +55,15 @@ describe('MainToolPage', () => {
     expect(screen.getByText(/dat export/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
-  test('does not fetch inquiries data until the Inquiries tab is opened', async () => {
+  test('only fetches the pending-review count for the nav badge until the Inquiries tab is opened', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalled());
-    // the sidebar itself checks Gmail status (for its "not connected" nav
-    // nudge badge) regardless of tab, so getGmailStatus is called from mount
-    expect(inquiriesApi.listInquiries).not.toHaveBeenCalled();
+    // the top nav itself checks Gmail status (for its "not connected" nudge)
+    // and the pending-review count (for its badge) regardless of tab, so
+    // both are called from mount -- but the full review queue / stats / log
+    // fetches still wait until the Inquiries tab is actually opened.
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledWith('pending_review'));
+    expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(1);
   });
 
   test('switches to the Inquiries tab and renders its panels', async () => {
@@ -79,14 +82,33 @@ describe('MainToolPage', () => {
     });
   });
 
-  test('the Refresh button on the Inquiries tab re-fetches inquiries', async () => {
+  // Regression coverage: the review queue (actionable work) used to sit
+  // below the Gmail connection panel (a settings card, configured once),
+  // forcing a scroll past setup UI to reach what actually needs attention.
+  test('shows the review queue above the Gmail connection panel on the Inquiries tab', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+    await waitFor(() => screen.getByText(/gmail connection/i));
+
+    const main = screen.getByText(/gmail connection/i).closest('main');
+    const reviewQueueHeading = within(main).getByText(/review queue/i);
+    const gmailHeading = within(main).getByText(/gmail connection/i);
+    // DOCUMENT_POSITION_FOLLOWING (4): gmailHeading comes AFTER
+    // reviewQueueHeading in document order.
+    const position = reviewQueueHeading.compareDocumentPosition(gmailHeading);
+    expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  test('the Refresh button on the Inquiries tab re-fetches inquiries', async () => {
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    // the top nav's pending-review badge already fetched once, from mount
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(1));
+    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
     // ReviewQueue + InquiriesLog + InquiriesStatsRow each fetch independently on mount
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(3));
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(4));
 
     fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }));
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(6));
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(7));
   });
 
   test('switching back to Loads keeps the loads table working as before', async () => {

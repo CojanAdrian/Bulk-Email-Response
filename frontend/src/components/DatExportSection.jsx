@@ -5,7 +5,6 @@ import { subscribe } from '../lib/liveSocket';
 import { processLoadsForExport, buildDatCsv, buildDatExportFilename, countAnomalies } from '../lib/datExport';
 import ContactMethodModal from './ContactMethodModal';
 import AnomalyReport from './AnomalyReport';
-import LoadLookupPanel from './LoadLookupPanel';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import Skeleton from './Skeleton';
@@ -22,7 +21,7 @@ function downloadCsv(csv, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function DatExportSection({ refreshKey, onOpenBlast }) {
+function DatExportSection({ refreshKey }) {
   const [loads, setLoads] = useState([]);
   const [fetchStatus, setFetchStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [fetchError, setFetchError] = useState(null);
@@ -90,8 +89,6 @@ function DatExportSection({ refreshKey, onOpenBlast }) {
           <AnomalyReport anomalies={result.anomalies} />
         </>
       )}
-
-      {fetchStatus === 'ready' && loads.length > 0 && <LoadLookupPanel loads={loads} onOpenBlast={onOpenBlast} />}
 
       <AnimatePresence>
         {step === 'contactMethod' && <ContactMethodModal onCancel={() => setStep('idle')} onConfirm={handleContactConfirm} />}

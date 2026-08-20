@@ -72,6 +72,16 @@ function ReviewQueue() {
     setDrafts((prev) => ({ ...prev, [id]: value }));
   }
 
+  // Ctrl/Cmd+Enter sends straight from the textarea -- the common case is
+  // reading the draft, maybe tweaking a word, then sending, and reaching for
+  // the mouse for that last step is the slow part.
+  function handleTextareaKeyDown(e, id) {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      if (actioningId !== id) handleSend(id);
+    }
+  }
+
   function isRateIncluded(inquiry) {
     if (inquiry.id in rateOverrides) return rateOverrides[inquiry.id];
     return Boolean(Number(inquiry.matched_load_include_rate));
@@ -192,6 +202,7 @@ function ReviewQueue() {
                   id={`reply-${inquiry.id}`}
                   value={drafts[inquiry.id] ?? ''}
                   onChange={(e) => handleDraftChange(inquiry.id, e.target.value)}
+                  onKeyDown={(e) => handleTextareaKeyDown(e, inquiry.id)}
                   rows={5}
                   placeholder="No load details on file yet — write a reply below."
                   className="mb-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"

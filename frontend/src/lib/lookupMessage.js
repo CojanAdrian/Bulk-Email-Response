@@ -1,32 +1,6 @@
 import { parseLookupCommodity, parseTemp } from './mcleodParser';
 import { parseWeightNum, formatDateOnly, buildPUSched, buildDELSched } from './datExport';
 
-export function searchLoads(loads, query) {
-  const q = String(query || '').trim().toLowerCase();
-  if (q === '') return [];
-
-  function score(load) {
-    const orderStr = String(load.load_number || '').toLowerCase();
-    const origCity = String(load.origin_city || '').toLowerCase();
-    const origState = String(load.origin_state || '').toLowerCase();
-    const destCity = String(load.dest_city || '').toLowerCase();
-    const destState = String(load.dest_state || '').toLowerCase();
-    let s = 0;
-    if (orderStr.includes(q)) s += 60;
-    if (origState === q) s += 50;
-    if (origCity.includes(q)) s += 35;
-    if (destState === q) s += 15;
-    if (destCity.includes(q)) s += 8;
-    return s;
-  }
-
-  return loads
-    .map((load) => ({ load, score: score(load) }))
-    .filter((x) => x.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .map((x) => x.load);
-}
-
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 function formatShortDateRange(earliest, latest) {

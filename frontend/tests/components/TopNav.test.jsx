@@ -2,9 +2,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TopNav from '../../src/components/TopNav';
 import * as gmailApi from '../../src/api/gmail';
+import * as inquiriesApi from '../../src/api/inquiries';
 import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/gmail');
+vi.mock('../../src/api/inquiries');
 vi.mock('../../src/lib/liveSocket');
 
 describe('TopNav', () => {
@@ -12,6 +14,7 @@ describe('TopNav', () => {
     vi.resetAllMocks();
     liveSocket.subscribe.mockReturnValue(() => {});
     gmailApi.getGmailStatus.mockResolvedValue({ connected: true, gmailAddress: 'a@b.com' });
+    inquiriesApi.listInquiries.mockResolvedValue([]);
   });
 
   test('renders both nav items and the username', () => {
@@ -66,5 +69,51 @@ describe('TopNav', () => {
     render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
     await waitFor(() => expect(gmailApi.getGmailStatus).toHaveBeenCalled());
     expect(screen.queryByTestId('gmail-nudge-badge')).not.toBeInTheDocument();
+  });
+
+  test('shows a pending-review count badge on Inquiries, without changing the button\'s accessible name', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ id: 1 }, { id: 2 }, { id: 3 }]);
+    render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('pending-review-badge')).toHaveTextContent('3');
+    });
+    expect(inquiriesApi.listInquiries).toHaveBeenCalledWith('pending_review');
+    expect(screen.getByRole('button', { name: /^inquiries$/i })).toBeInTheDocument();
+  });
+
+  test('does not show a pending-review badge when the queue is empty', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([]);
+    render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalled());
+    expect(screen.queryByTestId('pending-review-badge')).not.toBeInTheDocument();
+  });
+
+  test('the Gmail nudge takes precedence over the pending-review count when both would apply', async () => {
+    gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
+    inquiriesApi.listInquiries.mockResolvedValue([{ id: 1 }]);
+    render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.getByTestId('gmail-nudge-badge')).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId('pending-review-badge')).not.toBeInTheDocument();
+  });
+
+  test('updates the pending-review count live when an inquiry:new event arrives', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([]);
+    let inquiryNewHandler;
+    liveSocket.subscribe.mockImplementation((event, handler) => {
+      if (event === 'inquiry:new') inquiryNewHandler = handler;
+      return () => {};
+    });
+    render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('pending-review-badge')).not.toBeInTheDocument();
+
+    inquiriesApi.listInquiries.mockResolvedValue([{ id: 1 }]);
+    inquiryNewHandler({ id: 1, reply_status: 'pending_review' });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('pending-review-badge')).toHaveTextContent('1');
+    });
   });
 });
