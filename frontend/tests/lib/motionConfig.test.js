@@ -44,4 +44,39 @@ describe('useMotionPreset', () => {
     expect(result.current.popIn.exit.transition.duration).toBeGreaterThan(0);
     expect(result.current.popIn.exit.transition.duration).toBeLessThan(0.25);
   });
+
+  test('the sheet preset gives the panel a spring entrance from below and a plain fade for the backdrop, when motion is not reduced', () => {
+    useReducedMotion.mockReturnValue(false);
+    const { result } = renderHook(() => useMotionPreset());
+
+    expect(result.current.sheet.panel.initial).toEqual({ y: '100%' });
+    expect(result.current.sheet.panel.animate).toEqual({ y: 0 });
+    expect(result.current.sheet.panel.transition.type).toBe('spring');
+    expect(result.current.sheet.backdrop.transition.type).not.toBe('spring');
+  });
+
+  test('the sheet preset collapses to an instant fade when motion is reduced', () => {
+    useReducedMotion.mockReturnValue(true);
+    const { result } = renderHook(() => useMotionPreset());
+
+    expect(result.current.sheet.panel.transition.type).not.toBe('spring');
+    expect(result.current.sheet.panel.transition.duration).toBeLessThanOrEqual(0.05);
+  });
+
+  test('the selectionPop preset springs a circle in from scale 0, when motion is not reduced', () => {
+    useReducedMotion.mockReturnValue(false);
+    const { result } = renderHook(() => useMotionPreset());
+
+    expect(result.current.selectionPop.initial).toEqual({ scale: 0 });
+    expect(result.current.selectionPop.animate).toEqual({ scale: 1 });
+    expect(result.current.selectionPop.transition.type).toBe('spring');
+  });
+
+  test('the selectionPop preset skips the scale animation when motion is reduced', () => {
+    useReducedMotion.mockReturnValue(true);
+    const { result } = renderHook(() => useMotionPreset());
+
+    expect(result.current.selectionPop.initial).toEqual({ scale: 1 });
+    expect(result.current.selectionPop.transition.type).not.toBe('spring');
+  });
 });
