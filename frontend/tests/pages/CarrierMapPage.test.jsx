@@ -70,6 +70,24 @@ describe('CarrierMapPage', () => {
     expect(screen.getByText('Regional Trucking')).toBeInTheDocument();
   });
 
+  test('a deep-linked load\'s current lane is drawn on the map using the response\'s geocoded coordinates -- not the load\'s own (always-null) lat/lng columns', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [], regionalMatches: [],
+      queryOrigin: { lat: 32.7767, lng: -96.797 }, queryDest: { lat: 41.8781, lng: -87.6298 },
+    });
+    // A realistic load record: origin_lat/dest_lat are always null in
+    // production (see backend/scripts/setup-db.js -- nothing ever writes
+    // them), so the fixture intentionally omits them here too.
+    const loadWithoutStoredCoords = { id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL' };
+    render(<CarrierMapPage focusedLoad={loadWithoutStoredCoords} />);
+
+    await waitFor(() => {
+      expect(globeMock).toHaveBeenCalledWith(expect.objectContaining({
+        focusedLoad: { originLat: 32.7767, originLng: -96.797, destLat: 41.8781, destLng: -87.6298 },
+      }));
+    });
+  });
+
   test('a manual search\'s resolved lane coordinates are passed to the globe to draw and zoom to', async () => {
     carrierMatchesApi.searchCarrierMatches.mockResolvedValue({
       laneMatches: [], regionalMatches: [],

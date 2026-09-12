@@ -108,6 +108,18 @@ function CarrierMapPage({ focusedLoad }) {
         if (isMountedRef.current) {
           setLaneMatches(data.laneMatches);
           setRegionalMatches(data.regionalMatches);
+          // The load's own origin_lat/dest_lat columns are never populated
+          // (matching always geocodes live from city/state instead) -- use
+          // the freshly-geocoded coordinates this response already carries
+          // rather than reading always-null fields off the load itself.
+          if (data.queryOrigin && data.queryDest) {
+            setQueryLane({
+              originLat: data.queryOrigin.lat, originLng: data.queryOrigin.lng,
+              destLat: data.queryDest.lat, destLng: data.queryDest.lng,
+            });
+          } else {
+            setQueryLane(null);
+          }
           setStatus('ready');
         }
       })
@@ -135,11 +147,13 @@ function CarrierMapPage({ focusedLoad }) {
         if (isMountedRef.current) {
           setLaneMatches(data.laneMatches);
           setRegionalMatches(data.regionalMatches);
-          if (!focusedLoad && data.queryOrigin && data.queryDest) {
+          if (data.queryOrigin && data.queryDest) {
             setQueryLane({
               originLat: data.queryOrigin.lat, originLng: data.queryOrigin.lng,
               destLat: data.queryDest.lat, destLng: data.queryDest.lng,
             });
+          } else {
+            setQueryLane(null);
           }
           setStatus('ready');
         }
@@ -174,6 +188,12 @@ function CarrierMapPage({ focusedLoad }) {
         if (isMountedRef.current) {
           setLaneMatches(data.laneMatches);
           setRegionalMatches(data.regionalMatches);
+          if (data.queryOrigin && data.queryDest) {
+            setQueryLane({
+              originLat: data.queryOrigin.lat, originLng: data.queryOrigin.lng,
+              destLat: data.queryDest.lat, destLng: data.queryDest.lng,
+            });
+          }
         }
       });
     } else if (lane.originCity.trim() && lane.originState.trim() && lane.destCity.trim() && lane.destState.trim()) {
@@ -181,15 +201,11 @@ function CarrierMapPage({ focusedLoad }) {
     }
   }
 
-  const mapLane = focusedLoad
-    ? { originLat: focusedLoad.origin_lat, originLng: focusedLoad.origin_lng, destLat: focusedLoad.dest_lat, destLng: focusedLoad.dest_lng }
-    : queryLane;
-
   return (
     <div className="relative h-full min-h-[520px] w-full overflow-hidden bg-[#05060a]">
       <div className="absolute inset-0">
         <CarrierLaneMap
-          focusedLoad={mapLane}
+          focusedLoad={queryLane}
           laneMatches={laneMatches}
           regionalMatches={regionalMatches}
           onSelectCarrier={handleSelectCarrier}
