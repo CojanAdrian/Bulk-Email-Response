@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { AnimatePresence } from 'framer-motion';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
 import { bulkCarrierMatches } from '../api/carrierMatches';
 import { subscribe } from '../lib/liveSocket';
@@ -7,6 +8,7 @@ import { buildPUSched } from '../lib/datExport';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { useSelectionMode } from '../lib/useSelectionMode';
 import Badge from './Badge';
+import BookingCarrierModal from './BookingCarrierModal';
 import BottomActionBar from './BottomActionBar';
 import Card from './Card';
 import Skeleton from './Skeleton';
@@ -15,7 +17,10 @@ import SelectionCircle from './SelectionCircle';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
-const MATCH_BADGE_VARIANT = { perfect: 'success', strong: 'info', weak: 'warning', regional_perfect: 'success', regional: 'default' };
+// A compact colored dot in the row's own left-edge column (see the match
+// indicator below) instead of a wide "N carriers match" pill inline next to
+// the load number -- the pill was cramped/wrapped oddly at narrow widths.
+const MATCH_DOT_VARIANT = { perfect: 'bg-success', strong: 'bg-info', weak: 'bg-warning', regional_perfect: 'bg-success', regional: 'bg-text-muted' };
 
 const SORT_COLUMNS = [
   { key: 'load_number', label: 'Load #' },
@@ -99,6 +104,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   const [actionError, setActionError] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [busyLoadId, setBusyLoadId] = useState(null);
+  const [bookingModalLoad, setBookingModalLoad] = useState(null);
   const [sort, setSort] = useState(getInitialSort);
   const selection = useSelectionMode();
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
@@ -182,6 +188,11 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
     setActionError(null);
     setBusyLoadId(load.id);
     updateLoad(load.id, { status: newStatus })
+      .then(() => {
+        if (newStatus === 'booked' && load.status !== 'booked') {
+          setBookingModalLoad(load);
+        }
+      })
       .catch((err) => {
         setActionError(err.message || 'Failed to update status.');
       })
@@ -333,16 +344,28 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           <h2 className="text-sm font-semibold text-text">Loads</h2>
           {sortedLoads.length > 0 && (
             selection.active ? (
-              <div className="flex items-center gap-3 text-sm font-medium">
-                <button type="button" onClick={() => selection.selectAll(sortedLoads.map((l) => l.id))} className="text-accent hover:underline">
+              <div className="flex items-center gap-2 text-xs font-semibold">
+                <button
+                  type="button"
+                  onClick={() => selection.selectAll(sortedLoads.map((l) => l.id))}
+                  className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
+                >
                   Select All
                 </button>
-                <button type="button" onClick={selection.exit} className="text-text-muted hover:underline">
+                <button
+                  type="button"
+                  onClick={selection.exit}
+                  className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
+                >
                   Done
                 </button>
               </div>
             ) : (
-              <button type="button" onClick={selection.enter} className="text-sm font-medium text-accent hover:underline">
+              <button
+                type="button"
+                onClick={selection.enter}
+                className="rounded-lg border border-border bg-surface px-3 py-1 text-xs font-semibold text-text hover:bg-surface-alt"
+              >
                 Select
               </button>
             )
@@ -477,13 +500,25 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           <tbody>
             {sortedLoads.map((load) => (
               <tr key={load.id} className="border-b border-border/60">
-                <td className="py-1.5 pr-2">
-                  {selection.active && (
+                <td className="w-8 py-1.5 pr-2">
+                  {selection.active ? (
                     <SelectionCircle
                       selected={selection.isSelected(load.id)}
                       onToggle={() => selection.toggle(load.id)}
                       ariaLabel={`Select ${load.load_number}`}
                     />
+                  ) : (
+                    matchInfo[load.id] && (
+                      <button
+                        type="button"
+                        onClick={() => onViewMatches && onViewMatches(load)}
+                        aria-label={`${matchInfo[load.id].count} carrier${matchInfo[load.id].count === 1 ? '' : 's'} match — view`}
+                        title={`${matchInfo[load.id].count} carrier${matchInfo[load.id].count === 1 ? '' : 's'} match`}
+                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ${MATCH_DOT_VARIANT[matchInfo[load.id].tier] || 'bg-text-muted'}`}
+                      >
+                        {matchInfo[load.id].count}
+                      </button>
+                    )
                   )}
                 </td>
                 <td className="py-1.5 pr-4">
@@ -492,17 +527,6 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
                     {multiStopTagVariant(load) === 'error' && <Badge variant="error">Needs stops added</Badge>}
                     {multiStopTagVariant(load) === 'info' && <Badge variant="info">Stops added</Badge>}
-                    {matchInfo[load.id] && (
-                      <button
-                        type="button"
-                        onClick={() => onViewMatches && onViewMatches(load)}
-                        className="cursor-pointer border-0 bg-transparent p-0"
-                      >
-                        <Badge variant={MATCH_BADGE_VARIANT[matchInfo[load.id].tier] || 'default'}>
-                          {matchInfo[load.id].count} carrier{matchInfo[load.id].count === 1 ? '' : 's'} match
-                        </Badge>
-                      </button>
-                    )}
                   </div>
                 </td>
                 <td className="py-1.5 pr-4">
@@ -628,6 +652,11 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         </table>
         </div>
       )}
+      <AnimatePresence>
+        {bookingModalLoad && (
+          <BookingCarrierModal load={bookingModalLoad} onClose={() => setBookingModalLoad(null)} />
+        )}
+      </AnimatePresence>
     </Card>
   );
 }

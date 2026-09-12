@@ -56,12 +56,25 @@ describe('MainToolPage', () => {
     });
   });
 
-  test('renders the DAT export section on the Loads tab', async () => {
+  test('renders the DAT export section on the Loads tab, plus a quick-access button next to Add Load', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /generate dat export/i })).toBeInTheDocument();
+      expect(screen.getAllByRole('button', { name: /generate dat export/i })).toHaveLength(2);
     });
     expect(screen.getByText(/dat export/i, { selector: 'h2' })).toBeInTheDocument();
+  });
+
+  test('the quick-access DAT export button opens the same export flow as the section\'s own button', async () => {
+    loadsApi.listLoads.mockResolvedValue([
+      { id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', status: 'active' },
+    ]);
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    await waitFor(() => screen.getAllByRole('button', { name: /generate dat export/i }));
+
+    const [quickButton] = screen.getAllByRole('button', { name: /generate dat export/i });
+    fireEvent.click(quickButton);
+
+    expect(await screen.findByText(/dat contact method/i)).toBeInTheDocument();
   });
 
   test('only fetches the pending-review count for the nav badge until the Inquiries tab is opened', async () => {

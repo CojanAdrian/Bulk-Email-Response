@@ -14,7 +14,7 @@ const TIER_LABEL = { perfect: 'Perfect match', strong: 'Strong match', weak: 'We
 const EQUIPMENT_LABEL = Object.fromEntries(EQUIPMENT_OPTIONS.map((o) => [o.code, o.label]));
 
 function blankLane() {
-  return { originCity: '', originState: '', destCity: '', destState: '' };
+  return { originCity: '', originState: '', destCity: '', destState: '', equipment: '' };
 }
 
 function laneFromLoad(load) {
@@ -22,7 +22,19 @@ function laneFromLoad(load) {
   return {
     originCity: load.origin_city || '', originState: load.origin_state || '',
     destCity: load.dest_city || '', destState: load.dest_state || '',
+    equipment: load.equipment || '',
   };
+}
+
+// Matches can succeed (they only need the origin resolved) while the lane
+// itself still can't be drawn/zoomed to on the map (origin resolved, dest
+// didn't, or vice versa) -- surfaces which one so "no route showed up"
+// has a visible reason instead of failing silently.
+function noteForQueryLane(data) {
+  if (data.queryOrigin && data.queryDest) return null;
+  if (!data.queryOrigin) return "Couldn't locate the origin on the map (matches, if any, are still shown).";
+  if (!data.queryDest) return "Couldn't locate the destination on the map (matches are still shown).";
+  return null;
 }
 
 // A matched-carrier card, big enough to call someone straight off of it --
@@ -42,9 +54,14 @@ function MatchCard({ match, onSelect }) {
     >
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <span className="font-semibold text-white">{match.carrierName}</span>
-        <Badge variant={TIER_BADGE_VARIANT[match.tier] || 'default'} className="shrink-0">
-          {TIER_LABEL[match.tier] || match.tier}
-        </Badge>
+        <div className="flex shrink-0 items-center gap-1">
+          {match.equipmentMismatch && (
+            <Badge variant="warning" title="Doesn't have the equipment type you searched for">
+              Equipment?
+            </Badge>
+          )}
+          <Badge variant={TIER_BADGE_VARIANT[match.tier] || 'default'}>{TIER_LABEL[match.tier] || match.tier}</Badge>
+        </div>
       </div>
       <p className="mb-1.5 text-xs text-white/50">{distanceLabel}</p>
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-white/70">
@@ -86,6 +103,7 @@ function CarrierMapPage({ focusedLoad }) {
   const [queryLane, setQueryLane] = useState(null); // { originLat, originLng, destLat, destLng } for the map
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'ready' | 'error'
   const [error, setError] = useState(null);
+  const [mapNote, setMapNote] = useState(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState(null);
   const [selectedCarrierHistory, setSelectedCarrierHistory] = useState([]);
   const [editingCarrier, setEditingCarrier] = useState(null);
@@ -120,6 +138,7 @@ function CarrierMapPage({ focusedLoad }) {
           } else {
             setQueryLane(null);
           }
+          setMapNote(noteForQueryLane(data));
           setStatus('ready');
         }
       })
@@ -134,6 +153,7 @@ function CarrierMapPage({ focusedLoad }) {
 
   function handleSearch() {
     setError(null);
+    setMapNote(null);
     if (!lane.originCity.trim() || !lane.originState.trim() || !lane.destCity.trim() || !lane.destState.trim()) {
       setError('Origin and destination city/state are required.');
       return;
@@ -142,6 +162,7 @@ function CarrierMapPage({ focusedLoad }) {
     searchCarrierMatches({
       originCity: lane.originCity.trim(), originState: lane.originState.trim(),
       destCity: lane.destCity.trim(), destState: lane.destState.trim(),
+      equipment: lane.equipment || null,
     })
       .then((data) => {
         if (isMountedRef.current) {
@@ -155,6 +176,7 @@ function CarrierMapPage({ focusedLoad }) {
           } else {
             setQueryLane(null);
           }
+          setMapNote(noteForQueryLane(data));
           setStatus('ready');
         }
       })
@@ -247,6 +269,21 @@ function CarrierMapPage({ focusedLoad }) {
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
             />
           </div>
+          <div className="mb-2">
+            <select
+              aria-label="Equipment"
+              value={lane.equipment}
+              onChange={(e) => setLane((prev) => ({ ...prev, equipment: e.target.value }))}
+              className="w-full rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white [&>option]:bg-[#05060a]"
+            >
+              <option value="">Any equipment</option>
+              {EQUIPMENT_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.code} — {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
           <div className="flex items-center justify-between gap-2">
             {focusedLoad && <span className="text-xs text-white/40">Load {focusedLoad.load_number}</span>}
             <PrimaryButton onClick={handleSearch} disabled={status === 'loading'} className="ml-auto px-4 py-1.5 text-xs">
@@ -256,6 +293,11 @@ function CarrierMapPage({ focusedLoad }) {
           {error && (
             <p role="alert" className="mt-2 text-sm text-error">
               {error}
+            </p>
+          )}
+          {mapNote && (
+            <p role="status" className="mt-2 text-xs text-warning">
+              {mapNote}
             </p>
           )}
         </div>

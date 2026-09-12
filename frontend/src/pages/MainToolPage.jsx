@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import UploadPanel from '../components/UploadPanel';
 import LoadsTable from '../components/LoadsTable';
@@ -63,6 +63,7 @@ function MainToolPage({ username, onLogout }) {
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
   const { pushAlert, viewport: inquiryAlertViewport } = useInquiryAlerts();
   const preset = useMotionPreset();
+  const datExportRef = useRef(null);
 
   function handleUploadComplete() {
     setRefreshKey((k) => k + 1);
@@ -109,9 +110,10 @@ function MainToolPage({ username, onLogout }) {
                 <div className="min-w-[16rem] flex-1">
                   <UploadPanel onUploadComplete={handleUploadComplete} />
                 </div>
-                <PrimaryButton onClick={() => setAddLoadOpen(true)} className="shrink-0">
-                  + Add Load
-                </PrimaryButton>
+                <div className="flex shrink-0 gap-2">
+                  <SecondaryButton onClick={() => datExportRef.current?.openExportFlow()}>Generate DAT Export</SecondaryButton>
+                  <PrimaryButton onClick={() => setAddLoadOpen(true)}>+ Add Load</PrimaryButton>
+                </div>
               </div>
               <LoadsTable
                 refreshKey={refreshKey}
@@ -119,7 +121,7 @@ function MainToolPage({ username, onLogout }) {
                 onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
                 onViewMatches={handleViewMatches}
               />
-              <DatExportSection refreshKey={refreshKey} />
+              <DatExportSection ref={datExportRef} refreshKey={refreshKey} />
             </motion.main>
           )}
           {tab === 'inquiries' && (

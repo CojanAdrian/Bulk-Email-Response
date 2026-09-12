@@ -27,4 +27,16 @@ describe('Badge', () => {
     render(<Badge variant="not-a-real-variant">Status</Badge>);
     expect(screen.getByText('Status').className).toContain('bg-tag-bg');
   });
+
+  test('never shrinks or wraps its label, even inside a cramped flex row', () => {
+    render(<Badge>Needs stops added</Badge>);
+    const el = screen.getByText('Needs stops added');
+    expect(el.className).toContain('shrink-0');
+    expect(el.className).toContain('whitespace-nowrap');
+  });
+
+  test('forwards extra props like title', () => {
+    render(<Badge title="Doesn't have the right equipment">Equipment?</Badge>);
+    expect(screen.getByText('Equipment?')).toHaveAttribute('title', "Doesn't have the right equipment");
+  });
 });

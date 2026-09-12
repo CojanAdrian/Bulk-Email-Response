@@ -157,6 +157,10 @@ function createLoadsRouter(pool, wsHub) {
       return res.status(404).json({ error: 'Load not found' });
     }
 
+    // A booked/covered load's carrier lane-history entry is tied to this
+    // load via load_id -- deleting the load without it would leave a
+    // carrier's history showing a lane that was actually removed/undone.
+    await pool.query('DELETE FROM carrier_lane_history WHERE load_id = ?', [req.params.id]);
     await pool.query('DELETE FROM loads WHERE id = ?', [req.params.id]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: existing.id, deleted: true });
     res.json({ ok: true });
@@ -169,6 +173,14 @@ function createLoadsRouter(pool, wsHub) {
     }
     const isAdmin = req.session.role === 'admin';
     const placeholders = ids.map(() => '?').join(', ');
+    // See the single-delete route above for why lane-history rows tied to
+    // these loads need to go first -- scoped by user_id the same way the
+    // loads deletion below is, so a non-admin passing an id they don't own
+    // can't delete another user's carrier history for it.
+    const historySql = isAdmin
+      ? `DELETE FROM carrier_lane_history WHERE load_id IN (${placeholders})`
+      : `DELETE FROM carrier_lane_history WHERE load_id IN (${placeholders}) AND user_id = ?`;
+    await pool.query(historySql, isAdmin ? ids : [...ids, req.session.userId]);
     const sql = isAdmin
       ? `DELETE FROM loads WHERE id IN (${placeholders})`
       : `DELETE FROM loads WHERE id IN (${placeholders}) AND user_id = ?`;

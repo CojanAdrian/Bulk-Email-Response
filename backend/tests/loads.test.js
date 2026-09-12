@@ -21,6 +21,8 @@ describe('loads routes', () => {
 
   beforeEach(async () => {
     await resetTables(pool);
+    await pool.query('DELETE FROM carrier_lane_history');
+    await pool.query('DELETE FROM carriers');
     const passwordHash = await bcrypt.hash('correcthorse', 10);
     const [result] = await pool.query(
       "INSERT INTO users (username, password_hash, role) VALUES (?, ?, 'user')",
@@ -333,6 +335,22 @@ describe('loads routes', () => {
       const [rows] = await pool.query('SELECT id FROM loads WHERE id = ?', [result.insertId]);
       expect(rows).toHaveLength(0);
     });
+
+    test('also removes the load\'s carrier lane-history entry, so a booked-then-deleted load doesn\'t linger in a carrier\'s history', async () => {
+      const [load] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id, status) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', userId, 'booked']);
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      const [history] = await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL')`,
+        [carrier.insertId, userId, load.insertId]
+      );
+
+      const res = await agent.delete(`/api/loads/${load.insertId}`);
+      expect(res.status).toBe(200);
+
+      const [rows] = await pool.query('SELECT id FROM carrier_lane_history WHERE id = ?', [history.insertId]);
+      expect(rows).toHaveLength(0);
+    });
   });
 
   describe('POST /bulk-delete', () => {
@@ -384,6 +402,30 @@ describe('loads routes', () => {
       expect(res1.status).toBe(400);
       const res2 = await agent.post('/api/loads/bulk-delete').send({ ids: [] });
       expect(res2.status).toBe(400);
+    });
+
+    test('removes each deleted load\'s own carrier lane-history entry, but not a different load\'s entry for the same carrier', async () => {
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      const [deletedLoad] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id, status) VALUES (?, ?, ?, ?)', ['L1001', 'Dallas', userId, 'booked']);
+      const [keptLoad] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id, status) VALUES (?, ?, ?, ?)', ['L1002', 'Atlanta', userId, 'booked']);
+      const [deletedHistory] = await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL')`,
+        [carrier.insertId, userId, deletedLoad.insertId]
+      );
+      const [keptHistory] = await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state)
+         VALUES (?, ?, ?, 'Atlanta', 'GA', 'Miami', 'FL')`,
+        [carrier.insertId, userId, keptLoad.insertId]
+      );
+
+      const res = await agent.post('/api/loads/bulk-delete').send({ ids: [deletedLoad.insertId] });
+      expect(res.status).toBe(200);
+
+      const [deletedRows] = await pool.query('SELECT id FROM carrier_lane_history WHERE id = ?', [deletedHistory.insertId]);
+      expect(deletedRows).toHaveLength(0);
+      const [keptRows] = await pool.query('SELECT id FROM carrier_lane_history WHERE id = ?', [keptHistory.insertId]);
+      expect(keptRows).toHaveLength(1);
     });
   });
 

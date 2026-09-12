@@ -70,6 +70,50 @@ describe('CarrierMapPage', () => {
     expect(screen.getByText('Regional Trucking')).toBeInTheDocument();
   });
 
+  test('shows a note when the destination could not be located on the map, even though matches came back', async () => {
+    carrierMatchesApi.searchCarrierMatches.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'strong', originDistanceMiles: 40 }],
+      regionalMatches: [],
+      queryOrigin: { lat: 32.7767, lng: -96.797 }, queryDest: null,
+    });
+    render(<CarrierMapPage focusedLoad={null} />);
+
+    fireEvent.change(screen.getByLabelText(/origin city/i), { target: { value: 'Dallas' } });
+    fireEvent.change(screen.getByLabelText(/origin state/i), { target: { value: 'TX' } });
+    fireEvent.change(screen.getByLabelText(/destination city/i), { target: { value: 'Nowhereville' } });
+    fireEvent.change(screen.getByLabelText(/destination state/i), { target: { value: 'TX' } });
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+
+    expect(await screen.findByText(/couldn't locate the destination/i)).toBeInTheDocument();
+    expect(screen.getByText('ABC Trucking')).toBeInTheDocument();
+  });
+
+  test('selecting an equipment type includes it in the search request', async () => {
+    carrierMatchesApi.searchCarrierMatches.mockResolvedValue({ laneMatches: [], regionalMatches: [] });
+    render(<CarrierMapPage focusedLoad={null} />);
+
+    fireEvent.change(screen.getByLabelText(/origin city/i), { target: { value: 'Dallas' } });
+    fireEvent.change(screen.getByLabelText(/origin state/i), { target: { value: 'TX' } });
+    fireEvent.change(screen.getByLabelText(/destination city/i), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByLabelText(/destination state/i), { target: { value: 'IL' } });
+    fireEvent.change(screen.getByLabelText(/^equipment$/i), { target: { value: 'R' } });
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+
+    await waitFor(() => {
+      expect(carrierMatchesApi.searchCarrierMatches).toHaveBeenCalledWith(expect.objectContaining({ equipment: 'R' }));
+    });
+  });
+
+  test('flags a match whose equipment doesn\'t cover what was searched for', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10, equipmentMismatch: true }],
+      regionalMatches: [],
+    });
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+    expect(screen.getByText(/equipment\?/i)).toBeInTheDocument();
+  });
+
   test('a deep-linked load\'s current lane is drawn on the map using the response\'s geocoded coordinates -- not the load\'s own (always-null) lat/lng columns', async () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
       laneMatches: [], regionalMatches: [],

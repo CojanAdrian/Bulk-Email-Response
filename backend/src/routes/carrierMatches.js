@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { geocodeCityState } = require('../lib/geocoding');
 const { findMatchesForLane } = require('../lib/carrierMatching');
+const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 
 // Selects every one of the user's carrier_lane_history rows joined with
 // their carrier's name/equipment (what findMatchesForLane needs), plus
@@ -26,13 +27,24 @@ async function loadCandidates(pool, userId) {
   return { historyRows, regionalCarriers };
 }
 
+// Normalizes state codes to uppercase before anything compares them against
+// a carrier's operating_states tags (always stored uppercase -- see
+// CarrierSheet.jsx's parseStates) -- a manually-typed search lane (e.g.
+// "nv" instead of "NV") would otherwise silently fail every regional-match
+// comparison, since ["NV","FL",...].includes("nv") is false. A load's own
+// city/state is already normalized on save, but a lane typed straight into
+// the search box never was.
 async function resolveQueryLane(pool, { originCity, originState, destCity, destState }) {
-  const originGeo = await geocodeCityState(pool, originCity, originState);
-  const destGeo = destCity && destState ? await geocodeCityState(pool, destCity, destState) : null;
+  const normOriginCity = titleCaseCity(originCity);
+  const normOriginState = upperState(originState);
+  const normDestCity = titleCaseCity(destCity);
+  const normDestState = upperState(destState);
+  const originGeo = await geocodeCityState(pool, normOriginCity, normOriginState);
+  const destGeo = normDestCity && normDestState ? await geocodeCityState(pool, normDestCity, normDestState) : null;
   if (!originGeo) return null;
   return {
-    queryOrigin: { lat: originGeo.lat, lng: originGeo.lng, state: originState },
-    queryDest: destGeo ? { lat: destGeo.lat, lng: destGeo.lng, state: destState } : null,
+    queryOrigin: { lat: originGeo.lat, lng: originGeo.lng, state: normOriginState },
+    queryDest: destGeo ? { lat: destGeo.lat, lng: destGeo.lng, state: normDestState } : null,
   };
 }
 

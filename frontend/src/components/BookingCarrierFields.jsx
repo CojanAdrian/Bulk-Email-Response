@@ -18,7 +18,7 @@ function blankToNull(value) {
 // database: an existing carrier (same MC on a prior load) autofills the
 // rest of the form instead of making the user retype it; no match just
 // means it's a new carrier and the fields stay blank to fill in.
-function BookingCarrierFields({ loadId, originCity, originState, destCity, destState }) {
+function BookingCarrierFields({ loadId, originCity, originState, destCity, destState, onLogged }) {
   const [companyName, setCompanyName] = useState('');
   const [mcNumber, setMcNumber] = useState('');
   const [dispatcherName, setDispatcherName] = useState('');
@@ -83,7 +83,10 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           ran_at: new Date().toISOString().slice(0, 10),
         })
       )
-      .then(() => setStatus('saved'))
+      .then(() => {
+        setStatus('saved');
+        if (onLogged) onLogged();
+      })
       .catch((err) => {
         setStatus('error');
         setError(err.message || 'Failed to log the carrier.');

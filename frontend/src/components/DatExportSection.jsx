@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { listLoads } from '../api/loads';
 import { subscribe } from '../lib/liveSocket';
@@ -21,13 +21,23 @@ function downloadCsv(csv, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function DatExportSection({ refreshKey }) {
+// Exposes openExportFlow() via ref so a button elsewhere on the page (see
+// MainToolPage's quick-access "Generate DAT Export" next to "+ Add Load")
+// can trigger the same flow this section's own button does, without
+// duplicating the loads-fetch/anomaly-report logic.
+const DatExportSection = forwardRef(function DatExportSection({ refreshKey }, ref) {
   const [loads, setLoads] = useState([]);
   const [fetchStatus, setFetchStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [fetchError, setFetchError] = useState(null);
   const [step, setStep] = useState('idle'); // 'idle' | 'contactMethod'
   const [result, setResult] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
+
+  useImperativeHandle(ref, () => ({
+    openExportFlow: () => {
+      if (fetchStatus === 'ready' && loads.length > 0) setStep('contactMethod');
+    },
+  }));
 
   useEffect(() => {
     let ignore = false;
@@ -95,6 +105,6 @@ function DatExportSection({ refreshKey }) {
       </AnimatePresence>
     </div>
   );
-}
+});
 
 export default DatExportSection;

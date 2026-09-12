@@ -144,6 +144,48 @@ describe('LoadsTable', () => {
     });
   });
 
+  test('switching status to booked pops up a modal to log the carrier', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, status: 'booked' });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/who's running load l1001/i)).toBeInTheDocument();
+    });
+  });
+
+  test('switching status to something other than booked does not pop up the carrier modal', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, status: 'covered' });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'covered' } });
+
+    await waitFor(() => {
+      expect(loadsApi.updateLoad).toHaveBeenCalled();
+    });
+    expect(screen.queryByText(/who's running load/i)).not.toBeInTheDocument();
+  });
+
+  test('closing the booking-carrier modal dismisses it', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    loadsApi.updateLoad.mockResolvedValue({ ...SAMPLE_LOAD, status: 'booked' });
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    await waitFor(() => screen.getByText('L1001'));
+    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+    await waitFor(() => screen.getByText(/who's running load l1001/i));
+
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    await waitFor(() => {
+      expect(screen.queryByText(/who's running load/i)).not.toBeInTheDocument();
+    });
+  });
+
   test('shows an error when the status quick-change fails', async () => {
     loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
     loadsApi.updateLoad.mockRejectedValue(new Error('Update failed'));

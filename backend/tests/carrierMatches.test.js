@@ -129,6 +129,16 @@ describe('carrier-matches routes', () => {
       expect(res.body.laneMatches).toHaveLength(0);
     });
 
+    test('a lowercased, manually-typed state still matches a regional carrier\'s (uppercase) tagged states', async () => {
+      await pool.query("INSERT INTO carriers (user_id, company_name, operating_states) VALUES (?, 'Regional Co', ?)", [userId, JSON.stringify(['TX'])]);
+      const res = await agent.post('/api/carrier-matches').send({
+        originCity: DALLAS.city, originState: 'tx', destCity: CHICAGO.city, destState: CHICAGO.state,
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.regionalMatches).toHaveLength(1);
+      expect(res.body.regionalMatches[0].carrierName).toBe('Regional Co');
+    });
+
     test('returns regional matches for a carrier with no lane history but a tagged operating state', async () => {
       await pool.query("INSERT INTO carriers (user_id, company_name, operating_states) VALUES (?, 'Regional Co', ?)", [userId, JSON.stringify(['TX'])]);
       const res = await agent.post('/api/carrier-matches').send({
