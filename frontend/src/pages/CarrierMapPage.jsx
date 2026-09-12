@@ -249,6 +249,7 @@ function CarrierMapPage({ focusedLoad }) {
               onChange={(e) => setLane((prev) => ({ ...prev, originCity: e.target.value }))}
               onPlaceSelected={({ city, state }) => setLane((prev) => ({ ...prev, originCity: city, originState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
+              dark
             />
             <input
               aria-label="Origin state"
@@ -265,6 +266,7 @@ function CarrierMapPage({ focusedLoad }) {
               onChange={(e) => setLane((prev) => ({ ...prev, destCity: e.target.value }))}
               onPlaceSelected={({ city, state }) => setLane((prev) => ({ ...prev, destCity: city, destState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
+              dark
             />
             <input
               aria-label="Destination state"
