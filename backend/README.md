@@ -761,6 +761,18 @@ show its own error page) — everything else in the app, including
 The server does not fail to start if these are unset; they're only read
 lazily when a Google/Gmail route or the poller actually needs them.
 
+### Carrier matching (geocoding)
+
+The carrier database's lane-matching feature (`src/lib/geocoding.js`,
+`src/routes/carriers.js`) resolves a lane's city/state to coordinates via
+the Google Maps Geocoding API, so it needs its own key:
+`GOOGLE_MAPS_API_KEY` in `.env`, from a Google Cloud project with the
+**Geocoding API** enabled (the same project used for Gmail/sign-in above
+works fine — just enable that additional API on it). This is entirely
+optional and lazily read, same as the Gmail vars: without it, new lanes
+still save, just without coordinates, and simply won't factor into carrier
+matching until the key is set and they're re-saved.
+
 ## Behavior notes
 
 **`status` can only change via `PATCH /api/loads/:id`.** The upload
