@@ -97,6 +97,14 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE email_accounts ADD COLUMN auto_send_enabled TINYINT(1) NOT NULL DEFAULT 0`);
   }
 
+  const [signatureCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_accounts' AND COLUMN_NAME = 'signature'`,
+    [databaseName]
+  );
+  if (signatureCol[0].count === 0) {
+    await conn.query(`ALTER TABLE email_accounts ADD COLUMN signature TEXT NULL`);
+  }
+
   const [userIdCol] = await conn.query(
     `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = 'user_id'`,
     [databaseName]

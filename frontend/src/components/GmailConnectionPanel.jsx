@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { getGmailStatus, getGmailConnectUrl, disconnectGmail, setAutoSendEnabled } from '../api/gmail';
+import { getGmailStatus, getGmailConnectUrl, disconnectGmail, setAutoSendEnabled, setSignature } from '../api/gmail';
 import { subscribe } from '../lib/liveSocket';
 import { GoogleIcon } from './icons';
 import Card from './Card';
@@ -13,6 +13,8 @@ function GmailConnectionPanel() {
   const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
   const [disconnecting, setDisconnecting] = useState(false);
   const [togglingAutoSend, setTogglingAutoSend] = useState(false);
+  const [signatureDraft, setSignatureDraft] = useState('');
+  const [savingSignature, setSavingSignature] = useState(false);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -56,6 +58,16 @@ function GmailConnectionPanel() {
     });
   }, []);
 
+  // Only re-seeds the draft when the connected account itself changes (a
+  // fresh connect/reconnect), not on every gmail:status push -- an
+  // auto-send toggle from another tab shouldn't clobber signature text the
+  // user is still typing here.
+  useEffect(() => {
+    if (gmailStatus && gmailStatus.connected) {
+      setSignatureDraft(gmailStatus.signature || '');
+    }
+  }, [gmailStatus && gmailStatus.gmailAddress]);
+
   function handleConnect() {
     window.location.href = getGmailConnectUrl();
   }
@@ -78,6 +90,27 @@ function GmailConnectionPanel() {
       .finally(() => {
         if (isMountedRef.current) {
           setTogglingAutoSend(false);
+        }
+      });
+  }
+
+  function handleSaveSignature() {
+    setSavingSignature(true);
+    setError(null);
+    setSignature(signatureDraft)
+      .then((data) => {
+        if (isMountedRef.current) {
+          setGmailStatus(data);
+        }
+      })
+      .catch((err) => {
+        if (isMountedRef.current) {
+          setError(err.message || 'Failed to save signature.');
+        }
+      })
+      .finally(() => {
+        if (isMountedRef.current) {
+          setSavingSignature(false);
         }
       });
   }
@@ -178,6 +211,25 @@ function GmailConnectionPanel() {
                 }`}
               />
             </button>
+          </div>
+          <div className="mt-3 rounded-xl border border-border bg-surface-alt px-4 py-3">
+            <label className="mb-1 block text-sm font-medium text-text" htmlFor="emailSignature">
+              Email signature
+            </label>
+            <p className="mb-2 text-xs text-text-muted">Appended to every reply sent through this account, auto-sent and manual alike.</p>
+            <textarea
+              id="emailSignature"
+              value={signatureDraft}
+              onChange={(e) => setSignatureDraft(e.target.value)}
+              rows={3}
+              placeholder="John Doe&#10;ABC Logistics&#10;(555) 123-4567"
+              className="mb-2 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
+            />
+            <div className="flex justify-end">
+              <PrimaryButton onClick={handleSaveSignature} disabled={savingSignature} className="px-3 py-1 text-xs">
+                {savingSignature ? 'Saving...' : 'Save signature'}
+              </PrimaryButton>
+            </div>
           </div>
         </div>
       )}

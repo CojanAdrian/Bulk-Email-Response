@@ -12,3 +12,11 @@ export function sendInquiryReply(id, body) {
 export function rejectInquiry(id) {
   return post(`/api/inquiries/${id}/reject`, {});
 }
+
+export function bulkSendInquiries(items) {
+  return post('/api/inquiries/bulk-send', { items });
+}
+
+export function bulkRejectInquiries(ids) {
+  return post('/api/inquiries/bulk-reject', { ids });
+}

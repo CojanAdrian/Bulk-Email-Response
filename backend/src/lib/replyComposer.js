@@ -129,4 +129,14 @@ function composeReply(load) {
   return lines.length > 0 ? lines.join('\n') : null;
 }
 
-module.exports = { composeReply };
+// Appends the connected Gmail account's signature (if any) to an outgoing
+// reply body, blank-line separated. Applied at every send call site (auto
+// send, manual send, bulk send) so every outgoing reply carries it the same
+// way, regardless of how it was sent.
+function appendSignature(body, signature) {
+  const trimmedSignature = String(signature || '').trim();
+  if (!trimmedSignature) return body;
+  return `${body}\n\n${trimmedSignature}`;
+}
+
+module.exports = { composeReply, appendSignature };

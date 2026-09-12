@@ -1,8 +1,9 @@
 const { getAccessToken } = require('./googleOAuth');
 const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadHasSentMessage, markMessageRead } = require('./gmailClient');
 const { matchInquiry } = require('./matchingEngine');
-const { composeReply } = require('./replyComposer');
+const { composeReply, appendSignature } = require('./replyComposer');
 const { looksLikeAutomatedNotification } = require('./notificationFilter');
+const { fetchInquiryWithLoad } = require('./inquiryQueries');
 
 function replySubject(originalSubject) {
   const subject = originalSubject || '';
@@ -56,14 +57,32 @@ async function pollAccount(pool, account, wsHub) {
       continue;
     }
 
-    // A thread already logged once for THIS sender (regardless of what
-    // happened to that first message -- sent, rejected, still pending) has
-    // already been treated as an inquiry. Later messages from the same
-    // sender in the same thread are followups in an ongoing conversation
-    // (carrier confirming, asking for a BOL, tracking/check-call chatter,
-    // etc.), not a new inquiry -- without this, every reply in a
-    // back-and-forth thread re-matches and queues a duplicate review-queue
-    // entry for what is really one inquiry.
+    // matchInquiry is cheap (local regex against the already-fetched active
+    // loads, no network) but its result is only needed early when there's
+    // prior same-sender history in this thread to compare against below --
+    // memoized so it's computed at most once per message either way.
+    let cachedMatchResult = null;
+    function getMatchResult() {
+      if (!cachedMatchResult) {
+        cachedMatchResult = matchInquiry(`${message.subject} ${message.body}`, loads);
+      }
+      return cachedMatchResult;
+    }
+
+    // A thread already logged once for THIS sender about the SAME load is a
+    // followup in an ongoing conversation (carrier confirming, asking for a
+    // BOL, tracking/check-call chatter, etc.), not a new inquiry -- without
+    // this, every reply in a back-and-forth thread re-matches and queues a
+    // duplicate review-queue entry for what is really one inquiry.
+    //
+    // Scoped to the SAME load (not just thread+sender): carriers commonly
+    // keep hitting "reply" on an old blast-email thread to ask about a
+    // brand-new, different load. Treating any prior message from that
+    // sender in that thread as "already handled" silently dropped that
+    // second, genuinely new inquiry -- it never even got logged, anywhere.
+    // An unmatched message is still deduped against another unmatched prior
+    // message from the same sender/thread (generic chatter with no load
+    // reference at all shouldn't re-queue on every reply either).
     //
     // Scoped by sender, not just threadId: Gmail can assign the SAME
     // threadId to multiple carriers' replies to one BCC'd Blast Email (they
@@ -74,13 +93,19 @@ async function pollAccount(pool, account, wsHub) {
     if (message.threadId) {
       const senderAddress = extractEmailAddresses(message.from)[0] || '';
       const [existingThreadRows] = await pool.query(
-        'SELECT from_address FROM email_inquiries WHERE email_account_id = ? AND gmail_thread_id = ?',
+        'SELECT from_address, matched_load_id FROM email_inquiries WHERE email_account_id = ? AND gmail_thread_id = ?',
         [account.id, message.threadId]
       );
-      const sameSenderAlreadyLogged = existingThreadRows.some(
+      const priorFromSameSender = existingThreadRows.filter(
         (row) => extractEmailAddresses(row.from_address)[0] === senderAddress
       );
-      if (sameSenderAlreadyLogged) continue;
+      if (priorFromSameSender.length > 0) {
+        const { matchedLoad: earlyMatchedLoad } = getMatchResult();
+        const sameSenderSameLoadAlreadyLogged = priorFromSameSender.some(
+          (row) => row.matched_load_id === (earlyMatchedLoad ? earlyMatchedLoad.id : null)
+        );
+        if (sameSenderSameLoadAlreadyLogged) continue;
+      }
 
       // A never-before-seen (thread, sender) pair might still already be
       // handled -- the user may have replied to this specific carrier
@@ -93,7 +118,7 @@ async function pollAccount(pool, account, wsHub) {
       if (alreadyAnswered) continue;
     }
 
-    const { matchedLoad, tier, refMismatch } = matchInquiry(`${message.subject} ${message.body}`, loads);
+    const { matchedLoad, tier, refMismatch } = getMatchResult();
     const status = matchedLoad ? 'matched' : 'needs_review';
 
     // Only an exact load-number match is confident enough to auto-send without a
@@ -123,15 +148,21 @@ async function pollAccount(pool, account, wsHub) {
       // worth auto-sending; fall through to pending_review so a human
       // fills in a reply instead of a carrier getting a blank email.
       if (tier === 'load_number' && account.auto_send_enabled && replyBody) {
+        // The signature is added at send time, not baked into the drafted
+        // reply_body used for a pending-review draft -- but once this
+        // actually goes out, reply_body is updated to the signed version so
+        // it reflects exactly what the carrier received.
+        const sentBody = appendSignature(replyBody, account.signature);
         try {
           await sendReply(accessToken, {
             to: message.from,
             subject: replySubject(message.subject),
-            body: replyBody,
+            body: sentBody,
             threadId: message.threadId,
             inReplyToMessageId: message.messageIdHeader,
           });
           replyStatus = 'auto_sent';
+          replyBody = sentBody;
           replySentAt = new Date();
           // Best-effort -- the reply itself already went out, so a failure
           // here shouldn't affect reply_status. It just means the inbox
@@ -165,8 +196,15 @@ async function pollAccount(pool, account, wsHub) {
     );
 
     if (wsHub) {
-      const [insertedRows] = await pool.query('SELECT * FROM email_inquiries WHERE id = ?', [insertResult.insertId]);
-      wsHub.emitToUser(account.user_id, 'inquiry:new', insertedRows[0]);
+      // Joined the same way GET /api/inquiries joins its rows (matched
+      // load's comment/extra_stops/etc, plus live_reply_body) -- without
+      // this, an inquiry pushed live over the socket while the review queue
+      // is open would be missing that data entirely (undefined, not just
+      // stale), so e.g. the multi-stop badge silently wouldn't show for an
+      // inquiry that arrived while the page was open, even though the exact
+      // same load's other, page-load-fetched inquiries show it correctly.
+      const inquiryWithLoad = await fetchInquiryWithLoad(pool, insertResult.insertId);
+      wsHub.emitToUser(account.user_id, 'inquiry:new', inquiryWithLoad);
     }
   }
 

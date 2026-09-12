@@ -1,4 +1,4 @@
-const { composeReply } = require('../../src/lib/replyComposer');
+const { composeReply, appendSignature } = require('../../src/lib/replyComposer');
 
 describe('composeReply', () => {
   test('renders the full PU/DEL/Weight/Rate format when every field is present', () => {
@@ -275,5 +275,25 @@ describe('composeReply', () => {
   test('returns null (not an empty string) when the load has no PU/DEL/weight/rate data at all', () => {
     const load = { load_number: '4521' };
     expect(composeReply(load)).toBeNull();
+  });
+});
+
+describe('appendSignature', () => {
+  test('appends the signature after a blank line', () => {
+    expect(appendSignature('PU: DALLAS, TX', 'John Doe\nABC Logistics')).toBe('PU: DALLAS, TX\n\nJohn Doe\nABC Logistics');
+  });
+
+  test('returns the body unchanged when the signature is empty, null, or undefined', () => {
+    expect(appendSignature('PU: DALLAS, TX', '')).toBe('PU: DALLAS, TX');
+    expect(appendSignature('PU: DALLAS, TX', null)).toBe('PU: DALLAS, TX');
+    expect(appendSignature('PU: DALLAS, TX', undefined)).toBe('PU: DALLAS, TX');
+  });
+
+  test('returns the body unchanged when the signature is whitespace-only', () => {
+    expect(appendSignature('PU: DALLAS, TX', '   \n  ')).toBe('PU: DALLAS, TX');
+  });
+
+  test('trims the signature before appending', () => {
+    expect(appendSignature('PU: DALLAS, TX', '  John Doe  ')).toBe('PU: DALLAS, TX\n\nJohn Doe');
   });
 });

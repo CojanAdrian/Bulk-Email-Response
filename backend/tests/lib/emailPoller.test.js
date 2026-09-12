@@ -519,6 +519,80 @@ describe('emailPoller', () => {
       expect(inquiries).toHaveLength(2);
     });
 
+    // Regression test for the reported bug: a carrier's inquiry about a
+    // brand-new load vanished entirely (not even logged) when they replied
+    // to an old blast-email thread instead of composing a fresh message --
+    // a very common carrier habit. The old dedup treated ANY prior message
+    // from that sender in that thread as "already handled", regardless of
+    // which load it was about.
+    test('a same-sender followup in the same thread about a DIFFERENT load is still logged, not dropped', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      await pool.query(
+        "INSERT INTO loads (load_number, origin_city, origin_state, user_id, status) VALUES ('9911', 'Atlanta', 'GA', ?, 'active')",
+        [userId]
+      );
+
+      matchingEngine.matchInquiry.mockReturnValueOnce({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Old Blast Email', body: 'Is load 4521 still available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      let [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      // Same carrier, same thread (they hit "reply" on the old email), but
+      // asking about a completely different load this time.
+      matchingEngine.matchInquiry.mockReturnValueOnce({ matchedLoad: { id: 2, load_number: '9911' }, tier: 'load_number' });
+      gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Re: Old Blast Email', body: 'Actually, is load 9911 available?',
+        receivedAt: new Date('2026-08-08T09:00:00Z'),
+      });
+      [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query(
+        'SELECT * FROM email_inquiries WHERE email_account_id = ? ORDER BY gmail_message_id',
+        [accountId]
+      );
+      expect(inquiries).toHaveLength(2);
+      expect(inquiries.map((i) => i.matched_load_id)).toEqual([1, 2]);
+    });
+
+    // Companion regression guard: generic chatter with no load reference at
+    // all (no load matched either time) must still be deduped as before --
+    // only a genuinely different LOAD should escape the dedup, not every
+    // followup indiscriminately.
+    test('a same-sender followup with no load match either time is still deduped as a followup', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Question', body: 'Do you have parking available?',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      let [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        subject: 'Re: Question', body: 'Thanks!',
+        receivedAt: new Date('2026-08-08T09:00:00Z'),
+      });
+      [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+
+      const [inquiries] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(inquiries).toHaveLength(1);
+      expect(inquiries[0].gmail_message_id).toBe('m1');
+    });
+
     test('does not skip on thread when the message has no threadId at all', async () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });

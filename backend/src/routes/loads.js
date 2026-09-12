@@ -1,6 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { composeReply } = require('../lib/replyComposer');
+const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -22,6 +23,24 @@ const EDITABLE_FIELDS = [
 ];
 
 const STATUS_VALUES = ['active', 'booked', 'covered'];
+
+// Manually-typed city/state values get title-cased/uppercased so a reply or
+// export never mixes "chicago" and "CHICAGO, Il" depending on how the user
+// happened to type it. Only touches fields present in the body, so a
+// partial PATCH doesn't accidentally require every location field.
+function normalizeLoadBody(body) {
+  const normalized = { ...body };
+  if ('origin_city' in normalized) normalized.origin_city = titleCaseCity(normalized.origin_city);
+  if ('origin_state' in normalized) normalized.origin_state = upperState(normalized.origin_state);
+  if ('dest_city' in normalized) normalized.dest_city = titleCaseCity(normalized.dest_city);
+  if ('dest_state' in normalized) normalized.dest_state = upperState(normalized.dest_state);
+  if ('extra_stops' in normalized && Array.isArray(normalized.extra_stops)) {
+    normalized.extra_stops = normalized.extra_stops.map((stop) =>
+      stop && typeof stop === 'object' ? { ...stop, city: titleCaseCity(stop.city), state: upperState(stop.state) } : stop
+    );
+  }
+  return normalized;
+}
 
 function createLoadsRouter(pool, wsHub) {
   const router = express.Router();
@@ -51,12 +70,13 @@ function createLoadsRouter(pool, wsHub) {
     }
 
     const userId = req.session.userId;
+    const body = normalizeLoadBody(req.body);
     const columns = ['load_number', 'user_id'];
     const values = [loadNumber, userId];
     for (const field of EDITABLE_FIELDS) {
-      if (req.body[field] !== undefined) {
+      if (body[field] !== undefined) {
         columns.push(field);
-        values.push(field === 'extra_stops' ? JSON.stringify(req.body[field]) : req.body[field]);
+        values.push(field === 'extra_stops' ? JSON.stringify(body[field]) : body[field]);
       }
     }
     const placeholders = columns.map(() => '?').join(', ');
@@ -110,12 +130,13 @@ function createLoadsRouter(pool, wsHub) {
       return res.status(404).json({ error: 'Load not found' });
     }
 
+    const body = normalizeLoadBody(req.body);
     const updates = [];
     const values = [];
     for (const field of EDITABLE_FIELDS) {
-      if (req.body[field] !== undefined) {
+      if (body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(field === 'extra_stops' ? JSON.stringify(req.body[field]) : req.body[field]);
+        values.push(field === 'extra_stops' ? JSON.stringify(body[field]) : body[field]);
       }
     }
     if (updates.length === 0) {
@@ -225,7 +246,8 @@ function createLoadsRouter(pool, wsHub) {
         existingRows.forEach((row) => existing.add(row.load_number));
       }
 
-      for (const load of loads) {
+      for (const rawLoad of loads) {
+        const load = normalizeLoadBody(rawLoad);
         const columns = [...LOAD_COLUMNS.filter((col) => load[col] !== undefined), 'user_id'];
         const placeholders = columns.map(() => '?').join(', ');
         const values = [...LOAD_COLUMNS.filter((col) => load[col] !== undefined).map((col) => load[col]), userId];

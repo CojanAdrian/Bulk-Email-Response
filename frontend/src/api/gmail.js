@@ -15,3 +15,7 @@ export function disconnectGmail() {
 export function setAutoSendEnabled(enabled) {
   return patch('/api/gmail/auto-send', { enabled });
 }
+
+export function setSignature(signature) {
+  return patch('/api/gmail/signature', { signature });
+}

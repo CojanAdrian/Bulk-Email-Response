@@ -177,6 +177,20 @@ describe('loads routes', () => {
     expect(res.body.comment).toBe('Call on arrival');
   });
 
+  test('PATCH title-cases city and uppercases state, so an edit always normalizes formatting', async () => {
+    const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
+    const res = await agent.patch(`/api/loads/${result.insertId}`).send({
+      origin_city: 'CHICAGO', origin_state: 'il', dest_city: "o'fallon", dest_state: 'mo',
+      extra_stops: [{ type: 'delivery', city: 'winston-salem', state: 'nc', datetime: null }],
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.origin_city).toBe('Chicago');
+    expect(res.body.origin_state).toBe('IL');
+    expect(res.body.dest_city).toBe("O'Fallon");
+    expect(res.body.dest_state).toBe('MO');
+    expect(res.body.extra_stops).toEqual([{ type: 'delivery', city: 'Winston-Salem', state: 'NC', datetime: null }]);
+  });
+
   test('PATCH accepts "covered" as a status value', async () => {
     const [result] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id) VALUES (?, ?, ?)', ['L1001', 'Dallas', userId]);
     const res = await agent.patch(`/api/loads/${result.insertId}`).send({ status: 'covered' });
@@ -490,6 +504,17 @@ describe('loads routes', () => {
     expect(mine.body).toHaveLength(0);
   });
 
+  test('normalizes city/state casing on upload the same way manual entry does', async () => {
+    await agent.post('/api/loads/upload').send({
+      loads: [{ load_number: 'UP1', origin_city: 'CHICAGO', origin_state: 'il', dest_city: 'new york', dest_state: 'NY' }],
+    });
+
+    const [rows] = await pool.query('SELECT origin_city, origin_state, dest_city, dest_state FROM loads WHERE load_number = ?', ['UP1']);
+    expect(rows[0].origin_city).toBe('Chicago');
+    expect(rows[0].origin_state).toBe('IL');
+    expect(rows[0].dest_city).toBe('New York');
+  });
+
   test('uploading a load with only load_number set succeeds instead of producing invalid SQL', async () => {
     const res = await agent.post('/api/loads/upload').send({
       loads: [{ load_number: 'BARE1' }],
@@ -722,6 +747,19 @@ describe('loads routes', () => {
       expect(res.body.origin_city).toBe('Dallas');
       expect(Number(res.body.target_pay)).toBe(1500);
       expect(Number(res.body.include_rate)).toBe(0);
+      expect(res.body.extra_stops).toEqual([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }]);
+    });
+
+    test('title-cases city and uppercases state on create, so manual entry always looks uniform', async () => {
+      const res = await agent.post('/api/loads').send({
+        load_number: 'L3003', origin_city: 'dallas', origin_state: 'tx', dest_city: 'NEW YORK', dest_state: 'ny',
+        extra_stops: [{ type: 'pickup', city: 'fort worth', state: 'tx', datetime: null }],
+      });
+      expect(res.status).toBe(201);
+      expect(res.body.origin_city).toBe('Dallas');
+      expect(res.body.origin_state).toBe('TX');
+      expect(res.body.dest_city).toBe('New York');
+      expect(res.body.dest_state).toBe('NY');
       expect(res.body.extra_stops).toEqual([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }]);
     });
 

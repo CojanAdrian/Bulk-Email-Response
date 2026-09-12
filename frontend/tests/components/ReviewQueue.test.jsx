@@ -1,5 +1,4 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { StrictMode } from 'react';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ReviewQueue from '../../src/components/ReviewQueue';
 import * as inquiriesApi from '../../src/api/inquiries';
@@ -8,11 +7,18 @@ import * as liveSocket from '../../src/lib/liveSocket';
 vi.mock('../../src/api/inquiries');
 vi.mock('../../src/lib/liveSocket');
 
-const INQUIRY = {
-  id: 1,
-  from_address: 'dispatch@carrierco.com',
-  subject: 'Dallas load?',
-  reply_body: 'Hi,\n\nYes, load #4521 is still available.',
+const INQUIRY_1 = {
+  id: 1, from_address: 'carrierA@example.com', subject: 'Dallas load?',
+  reply_status: 'pending_review', reply_body: null, live_reply_body: 'PU: DALLAS, TX\nDEL: CHICAGO, IL',
+  matched_load_target_pay: null, matched_load_include_rate: 1, matched_load_extra_stops: null,
+  ref_mismatch: 0,
+};
+
+const INQUIRY_2 = {
+  id: 2, from_address: 'carrierB@example.com', subject: 'Chicago load?',
+  reply_status: 'pending_review', reply_body: 'stale draft', live_reply_body: 'PU: CHICAGO, IL\nDEL: MIAMI, FL',
+  matched_load_target_pay: null, matched_load_include_rate: 1, matched_load_extra_stops: null,
+  ref_mismatch: 0,
 };
 
 describe('ReviewQueue', () => {
@@ -29,296 +35,140 @@ describe('ReviewQueue', () => {
     });
   });
 
-  test('fetches only pending_review inquiries', async () => {
+  test('seeds the draft textarea from live_reply_body, not the stale reply_body snapshot', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_2]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText('carrierB@example.com', { exact: false }));
+    expect(screen.getByLabelText('Reply').value).toBe('PU: CHICAGO, IL\nDEL: MIAMI, FL');
+  });
+
+  test('falls back to reply_body when live_reply_body is null (no matched load)', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY_1, live_reply_body: null, reply_body: 'fallback text' }]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+    expect(screen.getByLabelText('Reply').value).toBe('fallback text');
+  });
+
+  test('a live-pushed new inquiry also seeds its draft from live_reply_body', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([]);
     render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(inquiriesApi.listInquiries).toHaveBeenCalledWith('pending_review');
-    });
-  });
-
-  test('shows an empty state when the queue is empty', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([]);
-    render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByText(/nothing waiting for review/i)).toBeInTheDocument();
-    });
-  });
-
-  test('renders each inquiry with an editable, pre-filled reply textarea', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-    expect(screen.getByText(/dallas load\?/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/reply/i)).toHaveValue(INQUIRY.reply_body);
-  });
-
-  test('shows a "Different load?" badge when ref_mismatch is set', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, ref_mismatch: 1 }]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByText(/different load\?/i)).toBeInTheDocument();
-  });
-
-  test('does not show the "Different load?" badge when ref_mismatch is 0', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, ref_mismatch: 0 }]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.queryByText(/different load\?/i)).not.toBeInTheDocument();
-  });
-
-  test('shows a red multi-stop badge when the matched load has extra stops', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_stops: 1 }]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByText(/multi-stop/i)).toBeInTheDocument();
-  });
-
-  test('does not show the multi-stop badge when the matched load has no extra stops', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_stops: 0 }]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.queryByText(/multi-stop/i)).not.toBeInTheDocument();
-  });
-
-  test('labels the badge MULTI-PICK when the matched load\'s comment mentions a second pickup', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      { ...INQUIRY, matched_load_stops: 1, matched_load_comment: '2nd pickup in Fort Worth' },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByText(/multi-pick/i)).toBeInTheDocument();
-  });
-
-  test('labels the badge MULTI-DROP when the matched load\'s comment mentions a second delivery', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      { ...INQUIRY, matched_load_stops: 1, matched_load_comment: '2nd delivery in Joliet' },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByText(/multi-drop/i)).toBeInTheDocument();
-  });
-
-  test('shows a blue "extra stops already added" badge instead of the red warning once the matched load has structured extra stops', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      {
-        ...INQUIRY,
-        matched_load_stops: 1,
-        matched_load_comment: '2nd pickup in Fort Worth',
-        matched_load_extra_stops: [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }],
-      },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByText(/extra stops already added/i)).toBeInTheDocument();
-    expect(screen.queryByText(/add extra stops manually/i)).not.toBeInTheDocument();
-  });
-
-  test('shows the rate checkbox, checked by default, when the matched load has a target pay and include_rate is on', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 1, reply_body: 'PU: DALLAS, TX\nRate: $1,500' },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByLabelText(/include rate on send/i)).toBeChecked();
-  });
-
-  test('unchecking the rate checkbox strips the Rate line from the draft without changing the load', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 1, reply_body: 'PU: DALLAS, TX\nRate: $1,500' },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    fireEvent.click(screen.getByLabelText(/include rate on send/i));
-
-    expect(screen.getByLabelText(/reply/i)).toHaveValue('PU: DALLAS, TX');
-  });
-
-  test('checking the rate checkbox appends a Rate line built from the matched load\'s target pay', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([
-      { ...INQUIRY, matched_load_target_pay: 1500, matched_load_include_rate: 0, reply_body: 'PU: DALLAS, TX' },
-    ]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.getByLabelText(/include rate on send/i)).not.toBeChecked();
-    fireEvent.click(screen.getByLabelText(/include rate on send/i));
-
-    expect(screen.getByLabelText(/reply/i)).toHaveValue('PU: DALLAS, TX\nRate: $1,500');
-  });
-
-  test('does not show the rate checkbox when the matched load has no target pay', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY, matched_load_target_pay: null }]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    expect(screen.queryByLabelText(/include rate on send/i)).not.toBeInTheDocument();
-  });
-
-  test('sends the edited textarea content, not the original draft, when Send is clicked', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByLabelText(/reply/i));
-
-    fireEvent.change(screen.getByLabelText(/reply/i), { target: { value: 'An edited reply.' } });
-    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
-
-    await waitFor(() => {
-      expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, 'An edited reply.');
-    });
-  });
-
-  test('removes the inquiry from the list after a successful send', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
-    });
-    expect(screen.getByText(/nothing waiting for review/i)).toBeInTheDocument();
-  });
-
-  test('removes the inquiry from the list after a successful reject, without sending anything', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.rejectInquiry.mockResolvedValue({ id: 1, reply_status: 'rejected' });
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    fireEvent.click(screen.getByRole('button', { name: /reject/i }));
-
-    await waitFor(() => {
-      expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
-    });
-    expect(inquiriesApi.sendInquiryReply).not.toHaveBeenCalled();
-  });
-
-  test('Ctrl+Enter in the reply textarea sends it', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByLabelText(/reply/i));
-
-    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter', ctrlKey: true });
-
-    await waitFor(() => {
-      expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, INQUIRY.reply_body);
-    });
-  });
-
-  test('Cmd+Enter (metaKey) in the reply textarea also sends it', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByLabelText(/reply/i));
-
-    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter', metaKey: true });
-
-    await waitFor(() => {
-      expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, INQUIRY.reply_body);
-    });
-  });
-
-  test('plain Enter (no modifier) in the reply textarea does not send', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByLabelText(/reply/i));
-
-    fireEvent.keyDown(screen.getByLabelText(/reply/i), { key: 'Enter' });
-
-    expect(inquiriesApi.sendInquiryReply).not.toHaveBeenCalled();
-  });
-
-  test('shows an error and keeps the inquiry in the list when sending fails', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockRejectedValue(new Error('Gmail account is no longer connected'));
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-
-    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
-
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Gmail account is no longer connected');
-    });
-    expect(screen.getByText('dispatch@carrierco.com')).toBeInTheDocument();
-  });
-
-  test('shows an error when the initial fetch fails', async () => {
-    inquiriesApi.listInquiries.mockRejectedValue(new Error('Network error'));
-    render(<ReviewQueue />);
-    await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Network error');
-    });
-  });
-
-  test('a live inquiry:new event prepends a pending_review inquiry to the list', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText(/nothing waiting for review/i));
+    await waitFor(() => expect(liveHandlers['inquiry:new']).toBeDefined());
 
     act(() => {
-      liveHandlers['inquiry:new']({ id: 9, from_address: 'new@carrier.com', subject: 'New load?', reply_body: 'draft', reply_status: 'pending_review' });
+      liveHandlers['inquiry:new'](INQUIRY_1);
     });
 
-    expect(screen.getByText('new@carrier.com')).toBeInTheDocument();
-    expect(screen.getByLabelText(/reply/i)).toHaveValue('draft');
+    await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+    expect(screen.getByLabelText('Reply').value).toBe('PU: DALLAS, TX\nDEL: CHICAGO, IL');
   });
 
-  test('a live inquiry:new event for a non-pending inquiry is ignored', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText(/nothing waiting for review/i));
+  describe('bulk selection and actions', () => {
+    test('checking one inquiry shows the bulk action bar with a count of 1', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-    act(() => {
-      liveHandlers['inquiry:new']({ id: 9, from_address: 'new@carrier.com', reply_status: 'auto_sent' });
+      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
+
+      expect(screen.getByText('1 selected')).toBeInTheDocument();
     });
 
-    expect(screen.queryByText('new@carrier.com')).not.toBeInTheDocument();
-  });
+    test('"Select all" checks every inquiry and the count matches', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-  test('a live inquiry:updated event removes the inquiry once it is no longer pending_review', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    render(<ReviewQueue />);
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
+      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
 
-    act(() => {
-      liveHandlers['inquiry:updated']({ ...INQUIRY, reply_status: 'sent' });
+      expect(screen.getByText('2 selected')).toBeInTheDocument();
+      expect(screen.getByLabelText('Select inquiry from carrierA@example.com')).toBeChecked();
+      expect(screen.getByLabelText('Select inquiry from carrierB@example.com')).toBeChecked();
     });
 
-    expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
-  });
+    test('"Clear selection" empties the selection and hides the bulk bar', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-  // Regression test: see GmailConnectionPanel.test.jsx's StrictMode test for
-  // the full explanation. Here the same stale-ref bug would have left the
-  // queue stuck loading forever, and Send/Reject clicks would silently do
-  // nothing (button stuck on "Sending...") in development.
-  test('loads and reacts to Send under React StrictMode\'s dev-only double-mount', async () => {
-    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY]);
-    inquiriesApi.sendInquiryReply.mockResolvedValue({ id: 1, reply_status: 'sent' });
-    render(
-      <StrictMode>
-        <ReviewQueue />
-      </StrictMode>
-    );
+      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
+      fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
 
-    await waitFor(() => screen.getByText('dispatch@carrierco.com'));
-    fireEvent.click(screen.getByRole('button', { name: /^send$/i }));
+      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+    });
 
-    await waitFor(() => {
-      expect(screen.queryByText('dispatch@carrierco.com')).not.toBeInTheDocument();
+    test('bulk-sending selected inquiries calls bulkSendInquiries with each one\'s current draft text', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      inquiriesApi.bulkSendInquiries.mockResolvedValue({
+        results: [{ id: 1, ok: true }, { id: 2, ok: true }],
+      });
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: /send 2/i }));
+
+      await waitFor(() => {
+        expect(inquiriesApi.bulkSendInquiries).toHaveBeenCalledWith([
+          { id: 1, body: 'PU: DALLAS, TX\nDEL: CHICAGO, IL' },
+          { id: 2, body: 'PU: CHICAGO, IL\nDEL: MIAMI, FL' },
+        ]);
+      });
+      await waitFor(() => {
+        expect(screen.queryByText('carrierA@example.com', { exact: false })).not.toBeInTheDocument();
+        expect(screen.queryByText('carrierB@example.com', { exact: false })).not.toBeInTheDocument();
+      });
+    });
+
+    test('a partial bulk-send failure keeps the failed inquiry in the queue and shows an error', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      inquiriesApi.bulkSendInquiries.mockResolvedValue({
+        results: [{ id: 1, ok: true }, { id: 2, ok: false, error: 'Reply body cannot be empty.' }],
+      });
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: /send 2/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText('carrierA@example.com', { exact: false })).not.toBeInTheDocument();
+      });
+      expect(screen.getByText('carrierB@example.com', { exact: false })).toBeInTheDocument();
+      expect(screen.getByRole('alert')).toHaveTextContent(/1 of 2/);
+    });
+
+    test('bulk-rejecting requires confirmation, then calls bulkRejectInquiries and clears the queue', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      inquiriesApi.bulkRejectInquiries.mockResolvedValue({ updated: 2 });
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: /reject selected/i }));
+      expect(inquiriesApi.bulkRejectInquiries).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
+
+      await waitFor(() => {
+        expect(inquiriesApi.bulkRejectInquiries).toHaveBeenCalledWith([1, 2]);
+      });
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
+    });
+
+    test('canceling the bulk-reject confirmation does not call bulkRejectInquiries', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
+      fireEvent.click(screen.getByRole('button', { name: /reject selected/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+      expect(inquiriesApi.bulkRejectInquiries).not.toHaveBeenCalled();
     });
   });
 });

@@ -187,6 +187,44 @@ describe('inquiries routes', () => {
     expect(res.body[0].matched_load_extra_stops).toBeNull();
   });
 
+  // Regression coverage for the reported bug: reply_body is a snapshot
+  // taken when the inquiry first arrived. If the matched load is edited
+  // afterward (PU/DEL filled in, extra stops added), the review queue must
+  // show the load's CURRENT data, not the stale snapshot.
+  test('live_reply_body recomposes the reply from the matched load\'s current data, not the stale reply_body snapshot', async () => {
+    const [loadResult] = await pool.query(
+      `INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, early_pu, late_pu, extra_stops, user_id, status)
+       VALUES ('L1', 'Dallas', 'TX', 'Chicago', 'IL', '2026-08-10 08:00:00', '2026-08-10 08:00:00', ?, ?, 'active')`,
+      [JSON.stringify([{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: null }]), userId]
+    );
+    // Simulates an inquiry that arrived before PU time / extra stops were
+    // filled in -- reply_body was composed to null at the time (see
+    // emailPoller.js), well before the load was edited afterward.
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Dallas load?', '2026-08-01 08:00:00', ?, 'load_number', 'matched', 'pending_review', NULL)`,
+      [userId, accountId, loadResult.insertId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].reply_body).toBeNull();
+    expect(res.body[0].live_reply_body).toContain('PU: DALLAS, TX – 08/10/2026 8am appt');
+    expect(res.body[0].live_reply_body).toContain('2nd PU: FORT WORTH, TX');
+  });
+
+  test('live_reply_body is null when there is no matched load', async () => {
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Unmatched inquiry', '2026-08-01 08:00:00', 'none', 'needs_review')`,
+      [userId, accountId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].live_reply_body).toBeNull();
+  });
+
   describe('POST /:id/send', () => {
     let inquiryId;
 
@@ -284,6 +322,29 @@ describe('inquiries routes', () => {
       expect(gmailClient.sendReply).not.toHaveBeenCalled();
     });
 
+    test('appends the connected account\'s signature to the sent reply and to the stored reply_body', async () => {
+      await pool.query('UPDATE email_accounts SET signature = ? WHERE id = ?', ['John Doe\nABC Logistics', accountId]);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(200);
+      expect(res.body.reply_body).toBe('Yes, load #4521 is still available.\n\nJohn Doe\nABC Logistics');
+
+      const sendArgs = gmailClient.sendReply.mock.calls[0][1];
+      expect(sendArgs.body).toBe('Yes, load #4521 is still available.\n\nJohn Doe\nABC Logistics');
+    });
+
+    test('does not append anything when the account has no signature set', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      await agent.post(`/api/inquiries/${inquiryId}/send`);
+
+      const sendArgs = gmailClient.sendReply.mock.calls[0][1];
+      expect(sendArgs.body).toBe('Yes, load #4521 is still available.');
+    });
+
     test('still returns success and sent status even if marking the message read fails', async () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
@@ -344,6 +405,130 @@ describe('inquiries routes', () => {
       await pool.query("UPDATE email_inquiries SET reply_status = 'rejected' WHERE id = ?", [inquiryId]);
 
       const res = await agent.post(`/api/inquiries/${inquiryId}/reject`);
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /bulk-send', () => {
+    let inquiryId1;
+    let inquiryId2;
+
+    beforeEach(async () => {
+      let [result] = await pool.query(
+        `INSERT INTO email_inquiries
+         (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body, gmail_thread_id)
+         VALUES (?, ?, 'm1', 'carrierA@example.com', 'Dallas load?', '2026-08-01 08:00:00', 1, 'city_state', 'matched', 'pending_review', 'Reply A', 't1')`,
+        [userId, accountId]
+      );
+      inquiryId1 = result.insertId;
+      [result] = await pool.query(
+        `INSERT INTO email_inquiries
+         (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status, reply_body, gmail_thread_id)
+         VALUES (?, ?, 'm2', 'carrierB@example.com', 'Chicago load?', '2026-08-01 08:00:00', 1, 'city_state', 'matched', 'pending_review', 'Reply B', 't2')`,
+        [userId, accountId]
+      );
+      inquiryId2 = result.insertId;
+    });
+
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post('/api/inquiries/bulk-send');
+      expect(res.status).toBe(401);
+    });
+
+    test('sends each selected inquiry and marks them sent', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+
+      const res = await agent.post('/api/inquiries/bulk-send').send({
+        items: [{ id: inquiryId1, body: 'Reply A' }, { id: inquiryId2, body: 'Reply B' }],
+      });
+      expect(res.status).toBe(200);
+      expect(res.body.results).toHaveLength(2);
+      expect(res.body.results.every((r) => r.ok)).toBe(true);
+      expect(gmailClient.sendReply).toHaveBeenCalledTimes(2);
+
+      const [rows] = await pool.query('SELECT reply_status FROM email_inquiries WHERE id IN (?, ?)', [inquiryId1, inquiryId2]);
+      expect(rows.every((r) => r.reply_status === 'sent')).toBe(true);
+    });
+
+    test('reports a per-item failure without blocking the rest of the batch', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+      await pool.query("UPDATE email_inquiries SET reply_status = 'rejected' WHERE id = ?", [inquiryId1]);
+
+      const res = await agent.post('/api/inquiries/bulk-send').send({
+        items: [{ id: inquiryId1, body: 'Reply A' }, { id: inquiryId2, body: 'Reply B' }],
+      });
+      expect(res.status).toBe(200);
+      const resultA = res.body.results.find((r) => r.id === inquiryId1);
+      const resultB = res.body.results.find((r) => r.id === inquiryId2);
+      expect(resultA.ok).toBe(false);
+      expect(resultB.ok).toBe(true);
+      expect(gmailClient.sendReply).toHaveBeenCalledTimes(1);
+    });
+
+    test('returns 400 when items is missing or empty', async () => {
+      const res = await agent.post('/api/inquiries/bulk-send').send({ items: [] });
+      expect(res.status).toBe(400);
+    });
+  });
+
+  describe('POST /bulk-reject', () => {
+    let inquiryId1;
+    let inquiryId2;
+
+    beforeEach(async () => {
+      let [result] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status, reply_status)
+         VALUES (?, ?, 'm1', 'carrierA@example.com', 'Dallas load?', '2026-08-01 08:00:00', 'city_state', 'matched', 'pending_review')`,
+        [userId, accountId]
+      );
+      inquiryId1 = result.insertId;
+      [result] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status, reply_status)
+         VALUES (?, ?, 'm2', 'carrierB@example.com', 'Chicago load?', '2026-08-01 08:00:00', 'city_state', 'matched', 'pending_review')`,
+        [userId, accountId]
+      );
+      inquiryId2 = result.insertId;
+    });
+
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).post('/api/inquiries/bulk-reject');
+      expect(res.status).toBe(401);
+    });
+
+    test('rejects every selected pending_review inquiry', async () => {
+      const res = await agent.post('/api/inquiries/bulk-reject').send({ ids: [inquiryId1, inquiryId2] });
+      expect(res.status).toBe(200);
+      expect(res.body.updated).toBe(2);
+
+      const [rows] = await pool.query('SELECT reply_status FROM email_inquiries WHERE id IN (?, ?)', [inquiryId1, inquiryId2]);
+      expect(rows.every((r) => r.reply_status === 'rejected')).toBe(true);
+    });
+
+    test('does not reject an inquiry belonging to a different user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [otherAccount] = await pool.query(
+        'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+        [otherUser.insertId, 'other@example.com', 'other-refresh']
+      );
+      const [otherInquiry] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, received_at, match_tier, status, reply_status)
+         VALUES (?, ?, 'm-other', NOW(), 'city_state', 'matched', 'pending_review')`,
+        [otherUser.insertId, otherAccount.insertId]
+      );
+
+      const res = await agent.post('/api/inquiries/bulk-reject').send({ ids: [otherInquiry.insertId] });
+      expect(res.status).toBe(200);
+      expect(res.body.updated).toBe(0);
+
+      const [rows] = await pool.query('SELECT reply_status FROM email_inquiries WHERE id = ?', [otherInquiry.insertId]);
+      expect(rows[0].reply_status).toBe('pending_review');
+    });
+
+    test('returns 400 when ids is missing or empty', async () => {
+      const res = await agent.post('/api/inquiries/bulk-reject').send({ ids: [] });
       expect(res.status).toBe(400);
     });
   });
