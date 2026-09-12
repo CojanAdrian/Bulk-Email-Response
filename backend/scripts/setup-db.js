@@ -215,6 +215,78 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS carriers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      mc_number VARCHAR(20) NULL,
+      company_name VARCHAR(255) NOT NULL,
+      dispatcher_name VARCHAR(255) NULL,
+      dispatcher_phone VARCHAR(30) NULL,
+      equipment_types JSON NULL,
+      equipment_notes TEXT NULL,
+      operating_states JSON NULL,
+      operating_notes TEXT NULL,
+      comment TEXT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_carriers_user_mc (user_id, mc_number),
+      INDEX idx_carriers_user_company (user_id, company_name)
+    )
+  `);
+
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS carrier_lane_history (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      carrier_id INT NOT NULL,
+      user_id INT NOT NULL,
+      load_id INT NULL,
+      origin_city VARCHAR(255) NOT NULL,
+      origin_state VARCHAR(2) NOT NULL,
+      origin_lat DECIMAL(9,6) NULL,
+      origin_lng DECIMAL(9,6) NULL,
+      dest_city VARCHAR(255) NOT NULL,
+      dest_state VARCHAR(2) NOT NULL,
+      dest_lat DECIMAL(9,6) NULL,
+      dest_lng DECIMAL(9,6) NULL,
+      rate DECIMAL(10,2) NULL,
+      driver_name VARCHAR(255) NULL,
+      driver_phone VARCHAR(30) NULL,
+      comment TEXT NULL,
+      ran_at DATE NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_history_user (user_id),
+      INDEX idx_history_carrier (carrier_id),
+      CONSTRAINT fk_history_carrier FOREIGN KEY (carrier_id) REFERENCES carriers(id) ON DELETE CASCADE
+    )
+  `);
+
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS geocode_cache (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      city_state_key VARCHAR(255) NOT NULL UNIQUE,
+      lat DECIMAL(9,6) NOT NULL,
+      lng DECIMAL(9,6) NOT NULL,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  const loadsGeoColumns = [
+    ['origin_lat', `ALTER TABLE loads ADD COLUMN origin_lat DECIMAL(9,6) NULL`],
+    ['origin_lng', `ALTER TABLE loads ADD COLUMN origin_lng DECIMAL(9,6) NULL`],
+    ['dest_lat', `ALTER TABLE loads ADD COLUMN dest_lat DECIMAL(9,6) NULL`],
+    ['dest_lng', `ALTER TABLE loads ADD COLUMN dest_lng DECIMAL(9,6) NULL`],
+  ];
+  for (const [columnName, alterSql] of loadsGeoColumns) {
+    const [col] = await conn.query(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'loads' AND COLUMN_NAME = ?`,
+      [databaseName, columnName]
+    );
+    if (col[0].count === 0) {
+      await conn.query(alterSql);
+    }
+  }
+
   await conn.end();
 }
 
