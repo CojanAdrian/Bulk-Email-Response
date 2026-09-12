@@ -17,7 +17,7 @@ vi.mock('../../src/api/inquiries');
 vi.mock('../../src/api/carriers');
 vi.mock('../../src/api/carrierMatches');
 vi.mock('../../src/lib/liveSocket');
-vi.mock('../../src/components/CarrierMapGlobe', () => ({
+vi.mock('../../src/components/CarrierLaneMap', () => ({
   default: () => <div data-testid="globe-mock" />,
 }));
 

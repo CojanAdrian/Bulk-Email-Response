@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { getCarrierMatchesForLoad, searchCarrierMatches } from '../api/carrierMatches';
 import { listCarrierHistory } from '../api/carriers';
-import CarrierMapGlobe from '../components/CarrierMapGlobe';
+import CarrierLaneMap from '../components/CarrierLaneMap';
 import CarrierDetailSheet from '../components/CarrierDetailSheet';
 import CarrierSheet from '../components/CarrierSheet';
 import PrimaryButton from '../components/PrimaryButton';
@@ -28,8 +28,8 @@ function laneFromLoad(load) {
 // A matched-carrier card, big enough to call someone straight off of it --
 // name, tier/distance, MC, phone, and equipment all inline instead of a
 // bare name behind a click. Clicking it swaps this list out for the
-// read-only detail panel (see CarrierMapPage) and highlights that carrier's
-// history on the globe.
+// read-only detail panel (see CarrierMapPage) and draws that carrier's
+// lane history as real driving routes on the map.
 function MatchCard({ match, onSelect }) {
   const distanceLabel = match.taggedStates
     ? (match.taggedStates || []).join(', ')
@@ -69,22 +69,21 @@ function MatchCard({ match, onSelect }) {
   );
 }
 
-// The Carriers tab's globe-first view: a full-bleed dark globe (no boxed-in
-// card -- it fills the whole panel edge to edge) with a manual lane search
-// tucked into the bottom-left corner (out of the way of the globe's usual
-// framing) and the ranked match list docked to the right. Works both
-// deep-linked from a load's "view matches" (focusedLoad pre-fills and
-// auto-searches the lane, but stays editable) and standalone (search any
-// lane with nothing uploaded). Clicking a match swaps the right-hand list
-// for a read-only detail panel (CarrierDetailSheet, docked variant) in the
-// same footprint -- no full-screen popup blocking the globe -- and
-// highlights that carrier's lane history there; the panel's own Edit
-// button opens CarrierSheet.
+// The Carriers tab's map-first view: a full-bleed real Google Map (no
+// boxed-in card -- it fills the whole panel edge to edge) with a manual
+// lane search tucked into the bottom-left corner and the ranked match list
+// docked to the right. Works both deep-linked from a load's "view matches"
+// (focusedLoad pre-fills and auto-searches the lane, but stays editable)
+// and standalone (search any lane with nothing uploaded). Clicking a match
+// swaps the right-hand list for a read-only detail panel (CarrierDetailSheet,
+// docked variant) in the same footprint -- no full-screen popup blocking
+// the map -- and draws that carrier's lane history as real driving routes;
+// the panel's own Edit button opens CarrierSheet.
 function CarrierMapPage({ focusedLoad }) {
   const [lane, setLane] = useState(() => laneFromLoad(focusedLoad));
   const [laneMatches, setLaneMatches] = useState([]);
   const [regionalMatches, setRegionalMatches] = useState([]);
-  const [queryLane, setQueryLane] = useState(null); // { originLat, originLng, destLat, destLng } for the globe
+  const [queryLane, setQueryLane] = useState(null); // { originLat, originLng, destLat, destLng } for the map
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'ready' | 'error'
   const [error, setError] = useState(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState(null);
@@ -182,15 +181,15 @@ function CarrierMapPage({ focusedLoad }) {
     }
   }
 
-  const globeLane = focusedLoad
+  const mapLane = focusedLoad
     ? { originLat: focusedLoad.origin_lat, originLng: focusedLoad.origin_lng, destLat: focusedLoad.dest_lat, destLng: focusedLoad.dest_lng }
     : queryLane;
 
   return (
     <div className="relative h-full min-h-[520px] w-full overflow-hidden bg-[#05060a]">
       <div className="absolute inset-0">
-        <CarrierMapGlobe
-          focusedLoad={globeLane}
+        <CarrierLaneMap
+          focusedLoad={mapLane}
           laneMatches={laneMatches}
           regionalMatches={regionalMatches}
           onSelectCarrier={handleSelectCarrier}

@@ -7,7 +7,7 @@ import * as carriersApi from '../../src/api/carriers';
 vi.mock('../../src/api/carrierMatches');
 vi.mock('../../src/api/carriers');
 const globeMock = vi.fn(() => <div data-testid="globe-mock" />);
-vi.mock('../../src/components/CarrierMapGlobe', () => ({
+vi.mock('../../src/components/CarrierLaneMap', () => ({
   default: (props) => globeMock(props),
 }));
 

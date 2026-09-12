@@ -10,16 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "d3-geo": "^3.1.1",
+    "@googlemaps/js-api-loader": "^2.1.1",
     "framer-motion": "^13.0.0",
     "papaparse": "^5.5.4",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "react-globe.gl": "^2.38.0",
-    "three": "^0.186.0",
-    "topojson-client": "^3.1.0",
-    "us-atlas": "^3.0.1",
-    "world-atlas": "^2.0.2"
+    "react-dom": "^18.3.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.4.8",
