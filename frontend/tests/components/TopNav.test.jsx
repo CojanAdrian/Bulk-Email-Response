@@ -24,6 +24,23 @@ describe('TopNav', () => {
     expect(screen.getByText('admin')).toBeInTheDocument();
   });
 
+  test('renders a Carriers nav item', () => {
+    render(<TopNav tab="loads" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^carriers$/i })).toBeInTheDocument();
+  });
+
+  test('marks Carriers active with aria-current when it is the current tab', () => {
+    render(<TopNav tab="carriers" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /^carriers$/i })).toHaveAttribute('aria-current', 'page');
+  });
+
+  test('calls onTabChange with "carriers" when the Carriers button is clicked', () => {
+    const onTabChange = vi.fn();
+    render(<TopNav tab="loads" onTabChange={onTabChange} username="admin" onLogout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+    expect(onTabChange).toHaveBeenCalledWith('carriers');
+  });
+
   test('marks the active tab with aria-current', () => {
     render(<TopNav tab="inquiries" onTabChange={vi.fn()} username="admin" onLogout={vi.fn()} />);
     expect(screen.getByRole('button', { name: /^inquiries$/i })).toHaveAttribute('aria-current', 'page');

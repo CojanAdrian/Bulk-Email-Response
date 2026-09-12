@@ -10,6 +10,7 @@ import PrimaryButton from '../components/PrimaryButton';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
+import CarriersPanel from '../components/CarriersPanel';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
@@ -22,6 +23,7 @@ import { useMotionPreset } from '../lib/motionConfig';
 const TAB_TITLES = {
   loads: 'Loads',
   inquiries: 'Inquiries',
+  carriers: 'Carriers',
 };
 
 function MainToolPage({ username, onLogout }) {
@@ -94,6 +96,11 @@ function MainToolPage({ username, onLogout }) {
               <ReviewQueue key={`review-${inquiriesRefreshKey}`} />
               <GmailConnectionPanel />
               <InquiriesLog refreshKey={inquiriesRefreshKey} />
+            </motion.main>
+          )}
+          {tab === 'carriers' && (
+            <motion.main key="carriers" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
+              <CarriersPanel />
             </motion.main>
           )}
         </AnimatePresence>

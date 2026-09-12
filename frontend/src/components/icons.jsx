@@ -57,3 +57,14 @@ export function CheckIcon(props) {
     </svg>
   );
 }
+
+export function TruckIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="1" y="6" width="13" height="10" rx="1" />
+      <path d="M14 9h4l3 3v4h-7z" />
+      <circle cx="6" cy="18" r="2" />
+      <circle cx="17" cy="18" r="2" />
+    </svg>
+  );
+}

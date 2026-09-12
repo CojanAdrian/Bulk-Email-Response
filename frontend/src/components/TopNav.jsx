@@ -1,4 +1,4 @@
-import { BoxIcon, MailIcon, LogoutIcon } from './icons';
+import { BoxIcon, MailIcon, LogoutIcon, TruckIcon } from './icons';
 import ThemeToggle from './ThemeToggle';
 import ConnectionIndicator from './ConnectionIndicator';
 import { useGmailConnected } from '../lib/useGmailConnected';
@@ -72,6 +72,7 @@ function TopNav({ tab, onTabChange, username, onLogout }) {
           badge={gmailConnected === false ? 'Gmail not connected — click to connect' : null}
           count={pendingReviewCount}
         />
+        <NavButton icon={<TruckIcon className="h-4 w-4" />} label="Carriers" active={tab === 'carriers'} onClick={() => onTabChange('carriers')} />
       </nav>
       <div className="ml-auto flex items-center gap-2 sm:gap-3">
         <span className="hidden min-w-0 items-center gap-2 truncate text-sm text-shell-text-muted sm:flex">

@@ -6,12 +6,14 @@ import { ToastProvider } from '../../src/components/Toast';
 import * as loadsApi from '../../src/api/loads';
 import * as gmailApi from '../../src/api/gmail';
 import * as inquiriesApi from '../../src/api/inquiries';
+import * as carriersApi from '../../src/api/carriers';
 import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('papaparse');
 vi.mock('../../src/api/loads');
 vi.mock('../../src/api/gmail');
 vi.mock('../../src/api/inquiries');
+vi.mock('../../src/api/carriers');
 vi.mock('../../src/lib/liveSocket');
 
 function renderPage(props) {
@@ -30,6 +32,7 @@ describe('MainToolPage', () => {
     loadsApi.listLoads.mockResolvedValue([]);
     gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
     inquiriesApi.listInquiries.mockResolvedValue([]);
+    carriersApi.listCarriers.mockResolvedValue([]);
     liveHandlers = {};
     liveSocket.subscribe.mockImplementation((event, handler) => {
       liveHandlers[event] = handler;
@@ -178,6 +181,16 @@ describe('MainToolPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /^blast$/i }));
 
     expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
+  });
+
+  test('switches to the Carriers tab and renders the carriers panel', async () => {
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.listCarriers).toHaveBeenCalled();
+    });
+    expect(screen.getByText(/^carriers$/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
   test('refreshes the table when an upload completes', async () => {
