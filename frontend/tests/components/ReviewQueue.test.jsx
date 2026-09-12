@@ -208,6 +208,61 @@ describe('ReviewQueue', () => {
       expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
 
+    test('clicking anywhere on a row toggles its selection while in selection mode', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByText('carrierA@example.com', { exact: false }));
+
+      expect(screen.getByText('1 selected')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toHaveAttribute('aria-checked', 'true');
+
+      fireEvent.click(screen.getByText('carrierA@example.com', { exact: false }));
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
+    });
+
+    test('clicking the selection circle does not double-toggle via the row click handler', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
+
+      expect(screen.getByText('1 selected')).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toHaveAttribute('aria-checked', 'true');
+    });
+
+    test('clicking the reply textarea or action buttons does not toggle row selection', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      inquiriesApi.rejectInquiry.mockResolvedValue({});
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByLabelText('Reply'));
+      fireEvent.click(screen.getByRole('button', { name: 'Reject' }));
+
+      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+    });
+
+    test('a selected row gets a locked selected-state class distinct from an unselected row', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      const row = screen.getByText('carrierA@example.com', { exact: false }).closest('li');
+      expect(row.className).not.toMatch(/border-accent/);
+
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
+      expect(row.className).toMatch(/border-accent/);
+    });
+
     test('canceling the bulk-reject confirmation does not call bulkRejectInquiries', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
       render(<ReviewQueue />);

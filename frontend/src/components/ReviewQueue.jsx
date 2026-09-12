@@ -217,16 +217,28 @@ function ReviewQueue() {
         <h2 className="text-sm font-semibold text-text">Review queue</h2>
         {status === 'ready' && inquiries.length > 0 && (
           selection.active ? (
-            <div className="flex items-center gap-3 text-sm font-medium">
-              <button type="button" onClick={() => selection.selectAll(inquiries.map((inquiry) => inquiry.id))} className="text-accent hover:underline">
+            <div className="flex items-center gap-2 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => selection.selectAll(inquiries.map((inquiry) => inquiry.id))}
+                className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
+              >
                 Select All
               </button>
-              <button type="button" onClick={selection.exit} className="text-text-muted hover:underline">
+              <button
+                type="button"
+                onClick={selection.exit}
+                className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
+              >
                 Done
               </button>
             </div>
           ) : (
-            <button type="button" onClick={selection.enter} className="text-sm font-medium text-accent hover:underline">
+            <button
+              type="button"
+              onClick={selection.enter}
+              className="rounded-lg border border-border bg-surface px-3 py-1 text-xs font-semibold text-text hover:bg-surface-alt"
+            >
               Select
             </button>
           )
@@ -293,21 +305,33 @@ function ReviewQueue() {
                 stops: inquiry.matched_load_stops,
                 extra_stops: inquiry.matched_load_extra_stops,
               });
+              const selected = selection.isSelected(inquiry.id);
               return (
               <motion.li
                 key={inquiry.id}
                 layout
                 {...preset.popIn}
                 transition={{ ...preset.popIn.transition, delay: index * preset.stagger }}
-                className="rounded-xl border border-border bg-surface-alt p-4"
+                onClick={() => {
+                  if (selection.active) selection.toggle(inquiry.id);
+                }}
+                className={`rounded-xl border p-4 transition-colors ${
+                  selection.active
+                    ? selected
+                      ? 'cursor-pointer border-accent bg-accent/10'
+                      : 'cursor-pointer border-border bg-surface-alt hover:bg-border/30'
+                    : 'border-border bg-surface-alt'
+                }`}
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-text">
                   {selection.active && (
-                    <SelectionCircle
-                      selected={selection.isSelected(inquiry.id)}
-                      onToggle={() => selection.toggle(inquiry.id)}
-                      ariaLabel={`Select inquiry from ${inquiry.from_address}`}
-                    />
+                    <div onClick={(e) => e.stopPropagation()}>
+                      <SelectionCircle
+                        selected={selected}
+                        onToggle={() => selection.toggle(inquiry.id)}
+                        ariaLabel={`Select inquiry from ${inquiry.from_address}`}
+                      />
+                    </div>
                   )}
                   <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
                   {Boolean(inquiry.ref_mismatch) && (
@@ -319,7 +343,11 @@ function ReviewQueue() {
                   {multiStopVariant === 'info' && <Badge variant="info">Extra stops already added</Badge>}
                 </div>
                 {inquiry.matched_load_target_pay !== null && inquiry.matched_load_target_pay !== undefined && (
-                  <label className="mb-2 flex items-center gap-2 text-xs text-text-muted" htmlFor={`rate-toggle-${inquiry.id}`}>
+                  <label
+                    className="mb-2 flex items-center gap-2 text-xs text-text-muted"
+                    htmlFor={`rate-toggle-${inquiry.id}`}
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <input
                       id={`rate-toggle-${inquiry.id}`}
                       type="checkbox"
@@ -337,11 +365,12 @@ function ReviewQueue() {
                   value={drafts[inquiry.id] ?? ''}
                   onChange={(e) => handleDraftChange(inquiry.id, e.target.value)}
                   onKeyDown={(e) => handleTextareaKeyDown(e, inquiry.id)}
+                  onClick={(e) => e.stopPropagation()}
                   rows={5}
                   placeholder="No load details on file yet — write a reply below."
                   className="mb-3 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text"
                 />
-                <div className="flex justify-end gap-2">
+                <div className="flex justify-end gap-2" onClick={(e) => e.stopPropagation()}>
                   <SecondaryButton onClick={() => handleReject(inquiry.id)} disabled={actioningId === inquiry.id}>
                     Reject
                   </SecondaryButton>
