@@ -235,6 +235,14 @@ async function migrateSchema(databaseName) {
     )
   `);
 
+  const carrierEmailCol = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'carriers' AND COLUMN_NAME = 'dispatcher_email'`,
+    [databaseName]
+  );
+  if (carrierEmailCol[0][0].count === 0) {
+    await conn.query(`ALTER TABLE carriers ADD COLUMN dispatcher_email VARCHAR(255) NULL AFTER dispatcher_phone`);
+  }
+
   await conn.query(`
     CREATE TABLE IF NOT EXISTS carrier_lane_history (
       id INT AUTO_INCREMENT PRIMARY KEY,

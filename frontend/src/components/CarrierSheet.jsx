@@ -38,6 +38,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
   const [mcNumber, setMcNumber] = useState(carrier?.mc_number ?? '');
   const [dispatcherName, setDispatcherName] = useState(carrier?.dispatcher_name ?? '');
   const [dispatcherPhone, setDispatcherPhone] = useState(carrier?.dispatcher_phone ?? '');
+  const [dispatcherEmail, setDispatcherEmail] = useState(carrier?.dispatcher_email ?? '');
   const [equipmentTypes, setEquipmentTypes] = useState(() => (Array.isArray(carrier?.equipment_types) ? carrier.equipment_types : []));
   const [equipmentNotes, setEquipmentNotes] = useState(carrier?.equipment_notes ?? '');
   const [operatingStatesText, setOperatingStatesText] = useState(() => (Array.isArray(carrier?.operating_states) ? carrier.operating_states.join(', ') : ''));
@@ -93,6 +94,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
       mc_number: blankToNull(mcNumber),
       dispatcher_name: blankToNull(dispatcherName),
       dispatcher_phone: blankToNull(dispatcherPhone),
+      dispatcher_email: blankToNull(dispatcherEmail),
       equipment_types: equipmentTypes,
       equipment_notes: blankToNull(equipmentNotes),
       operating_states: parseStates(operatingStatesText),
@@ -202,6 +204,18 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
               id="carrier-dispatcher-phone"
               value={dispatcherPhone}
               onChange={(e) => setDispatcherPhone(e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-dispatcher-email">
+              Dispatcher email
+            </label>
+            <input
+              id="carrier-dispatcher-email"
+              type="email"
+              value={dispatcherEmail}
+              onChange={(e) => setDispatcherEmail(e.target.value)}
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>

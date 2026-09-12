@@ -103,6 +103,12 @@ describe('carriers routes', () => {
       expect(res.body.dispatcher_name).toBe('Jane Doe');
     });
 
+    test('stores dispatcher_email', async () => {
+      const res = await agent.post('/api/carriers').send({ company_name: 'ABC Trucking', dispatcher_email: 'dispatch@abctrucking.com' });
+      expect(res.status).toBe(200);
+      expect(res.body.dispatcher_email).toBe('dispatch@abctrucking.com');
+    });
+
     test('stores equipment_types and operating_states as JSON arrays', async () => {
       const res = await agent.post('/api/carriers').send({
         company_name: 'ABC Trucking', equipment_types: ['V', 'R'], operating_states: ['TX', 'OK'],

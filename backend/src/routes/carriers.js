@@ -4,7 +4,7 @@ const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 const { geocodeCityState } = require('../lib/geocoding');
 
 const CARRIER_FIELDS = [
-  'mc_number', 'company_name', 'dispatcher_name', 'dispatcher_phone',
+  'mc_number', 'company_name', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email',
   'equipment_types', 'equipment_notes', 'operating_states', 'operating_notes', 'comment',
 ];
 const JSON_CARRIER_FIELDS = new Set(['equipment_types', 'operating_states']);

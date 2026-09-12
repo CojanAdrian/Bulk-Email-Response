@@ -36,6 +36,19 @@ describe('CarrierSheet', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  test('add mode: includes dispatcher email in the saved payload', async () => {
+    carriersApi.createCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
+    render(<CarrierSheet carrier={null} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/company name/i), { target: { value: 'ABC Trucking' } });
+    fireEvent.change(screen.getByLabelText(/dispatcher email/i), { target: { value: 'dispatch@abctrucking.com' } });
+    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.createCarrier).toHaveBeenCalledWith(expect.objectContaining({ dispatcher_email: 'dispatch@abctrucking.com' }));
+    });
+  });
+
   test('add mode: toggling equipment pills includes them in the saved payload', async () => {
     carriersApi.createCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
     render(<CarrierSheet carrier={null} onClose={vi.fn()} onSaved={vi.fn()} />);
