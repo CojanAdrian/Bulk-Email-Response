@@ -23,7 +23,17 @@ async function geocodeCityState(pool, city, state) {
     const res = await fetch(url);
     const data = await res.json();
     const result = data.results && data.results[0];
-    if (!result) return null;
+    if (!result) {
+      // data.results is empty for both "no such place" (status ZERO_RESULTS,
+      // expected/harmless) and a broken API key/quota/billing setup
+      // (REQUEST_DENIED, OVER_QUERY_LIMIT, ...) -- the latter fails
+      // *every* uncached lookup identically and silently, which without
+      // this log looks indistinguishable from "that city doesn't exist".
+      if (data.status !== 'ZERO_RESULTS') {
+        console.error(`Geocoding "${city}, ${state}" failed: ${data.status}${data.error_message ? ` -- ${data.error_message}` : ''}`);
+      }
+      return null;
+    }
     const { lat, lng } = result.geometry.location;
 
     await pool.query(

@@ -52,11 +52,25 @@ describe('geocodeCityState', () => {
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  test('returns null without throwing when the API returns no results', async () => {
-    global.fetch.mockResolvedValue({ json: async () => ({ results: [] }) });
+  test('returns null without throwing when the API returns no results (ZERO_RESULTS)', async () => {
+    global.fetch.mockResolvedValue({ json: async () => ({ status: 'ZERO_RESULTS', results: [] }) });
 
     const result = await geocodeCityState(pool, 'Nonexistentville', 'ZZ');
     expect(result).toBeNull();
+  });
+
+  test('logs the API\'s own status/error_message on a non-ZERO_RESULTS failure (e.g. a key/billing problem), instead of failing silently', async () => {
+    global.fetch.mockResolvedValue({
+      json: async () => ({ status: 'REQUEST_DENIED', error_message: 'This API key is not authorized to use this service or API.', results: [] }),
+    });
+    const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const result = await geocodeCityState(pool, 'Miami', 'FL');
+
+    expect(result).toBeNull();
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('REQUEST_DENIED'));
+    expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('not authorized'));
+    consoleErrorSpy.mockRestore();
   });
 
   test('returns null without throwing when the API call itself fails', async () => {
