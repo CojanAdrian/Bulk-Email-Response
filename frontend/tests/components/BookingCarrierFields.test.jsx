@@ -39,6 +39,34 @@ describe('BookingCarrierFields', () => {
     });
   });
 
+  test('includes a manually-entered gp (gross profit) in the logged lane-history entry', async () => {
+    carriersApi.createCarrier.mockResolvedValue({ id: 7, company_name: 'ABC Trucking' });
+    carriersApi.createCarrierHistory.mockResolvedValue({ id: 20 });
+    render(<BookingCarrierFields loadId={42} originCity="Dallas" originState="TX" destCity="Chicago" destState="IL" />);
+
+    fireEvent.change(screen.getByLabelText(/carrier company name/i), { target: { value: 'ABC Trucking' } });
+    fireEvent.change(screen.getByLabelText(/^rate paid$/i), { target: { value: '1500' } });
+    fireEvent.change(screen.getByLabelText(/gross profit/i), { target: { value: '300' } });
+    fireEvent.click(screen.getByRole('button', { name: /log carrier/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.createCarrierHistory).toHaveBeenCalledWith(7, expect.objectContaining({ rate: 1500, gp: 300 }));
+    });
+  });
+
+  test('suggests gp as targetPay minus the entered rate, once both are known', () => {
+    render(<BookingCarrierFields loadId={1} originCity="Dallas" originState="TX" destCity="Chicago" destState="IL" targetPay={1800} />);
+    fireEvent.change(screen.getByLabelText(/^rate paid$/i), { target: { value: '1500' } });
+    expect(screen.getByLabelText(/gross profit/i)).toHaveValue('300');
+  });
+
+  test('does not override a gp the user already typed themselves', () => {
+    render(<BookingCarrierFields loadId={1} originCity="Dallas" originState="TX" destCity="Chicago" destState="IL" targetPay={1800} />);
+    fireEvent.change(screen.getByLabelText(/gross profit/i), { target: { value: '999' } });
+    fireEvent.change(screen.getByLabelText(/^rate paid$/i), { target: { value: '1500' } });
+    expect(screen.getByLabelText(/gross profit/i)).toHaveValue('999');
+  });
+
   test('tabbing out of a known MC number autofills the rest of the form', async () => {
     carriersApi.lookupCarrierByMc.mockResolvedValue({
       id: 7, company_name: 'ABC Trucking', dispatcher_name: 'Jane Doe', dispatcher_phone: '555-1234', dispatcher_email: 'dispatch@abc.com',

@@ -258,6 +258,7 @@ async function migrateSchema(databaseName) {
       dest_lat DECIMAL(9,6) NULL,
       dest_lng DECIMAL(9,6) NULL,
       rate DECIMAL(10,2) NULL,
+      gp DECIMAL(10,2) NULL,
       driver_name VARCHAR(255) NULL,
       driver_phone VARCHAR(30) NULL,
       comment TEXT NULL,
@@ -268,6 +269,14 @@ async function migrateSchema(databaseName) {
       CONSTRAINT fk_history_carrier FOREIGN KEY (carrier_id) REFERENCES carriers(id) ON DELETE CASCADE
     )
   `);
+
+  const [historyGpCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'carrier_lane_history' AND COLUMN_NAME = 'gp'`,
+    [databaseName]
+  );
+  if (historyGpCol[0].count === 0) {
+    await conn.query(`ALTER TABLE carrier_lane_history ADD COLUMN gp DECIMAL(10,2) NULL AFTER rate`);
+  }
 
   await conn.query(`
     CREATE TABLE IF NOT EXISTS geocode_cache (

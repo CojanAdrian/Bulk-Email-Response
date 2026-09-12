@@ -29,7 +29,7 @@ function parseStates(text) {
 }
 
 function blankHistoryEntry() {
-  return { origin_city: '', origin_state: '', dest_city: '', dest_state: '', rate: '', driver_name: '', driver_phone: '', comment: '', ran_at: '' };
+  return { origin_city: '', origin_state: '', dest_city: '', dest_state: '', rate: '', gp: '', driver_name: '', driver_phone: '', comment: '', ran_at: '' };
 }
 
 function CarrierSheet({ carrier, onClose, onSaved }) {
@@ -136,6 +136,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
       dest_city: historyDraft.dest_city.trim(),
       dest_state: historyDraft.dest_state.trim(),
       rate: blankToNull(historyDraft.rate) === null ? null : Number(historyDraft.rate),
+      gp: blankToNull(historyDraft.gp) === null ? null : Number(historyDraft.gp),
       driver_name: blankToNull(historyDraft.driver_name),
       driver_phone: blankToNull(historyDraft.driver_phone),
       comment: blankToNull(historyDraft.comment),
@@ -377,6 +378,13 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                     placeholder="Rate"
                     value={historyDraft.rate}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, rate: e.target.value }))}
+                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                  />
+                  <input
+                    aria-label="Gross profit"
+                    placeholder="GP"
+                    value={historyDraft.gp}
+                    onChange={(e) => setHistoryDraft((prev) => ({ ...prev, gp: e.target.value }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
                   <input

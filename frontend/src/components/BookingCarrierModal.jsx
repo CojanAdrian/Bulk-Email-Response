@@ -32,6 +32,7 @@ function BookingCarrierModal({ load, onClose }) {
           originState={load.origin_state}
           destCity={load.dest_city}
           destState={load.dest_state}
+          targetPay={load.target_pay}
         />
         <div className="flex justify-end">
           <SecondaryButton onClick={onClose}>Close</SecondaryButton>

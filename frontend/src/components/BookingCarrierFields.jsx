@@ -18,19 +18,36 @@ function blankToNull(value) {
 // database: an existing carrier (same MC on a prior load) autofills the
 // rest of the form instead of making the user retype it; no match just
 // means it's a new carrier and the fields stay blank to fill in.
-function BookingCarrierFields({ loadId, originCity, originState, destCity, destState, onLogged }) {
+function BookingCarrierFields({ loadId, originCity, originState, destCity, destState, targetPay, onLogged }) {
   const [companyName, setCompanyName] = useState('');
   const [mcNumber, setMcNumber] = useState('');
   const [dispatcherName, setDispatcherName] = useState('');
   const [dispatcherPhone, setDispatcherPhone] = useState('');
   const [dispatcherEmail, setDispatcherEmail] = useState('');
   const [rate, setRate] = useState('');
+  const [gp, setGp] = useState('');
+  const [gpTouched, setGpTouched] = useState(false);
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [comment, setComment] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [error, setError] = useState(null);
   const [mcLookupStatus, setMcLookupStatus] = useState('idle'); // 'idle' | 'checking' | 'found' | 'new'
+
+  // Suggests gross profit (what you're charging - what the carrier is
+  // getting paid) as soon as both sides are known, but only until the user
+  // actually types their own gp -- same "don't fight what they typed"
+  // rule the MC autofill above follows.
+  function handleRateChange(value) {
+    setRate(value);
+    if (!gpTouched && targetPay !== undefined && targetPay !== null && targetPay !== '' && value.trim() !== '') {
+      const parsedRate = Number(value);
+      const parsedTarget = Number(targetPay);
+      if (!Number.isNaN(parsedRate) && !Number.isNaN(parsedTarget)) {
+        setGp(String(parsedTarget - parsedRate));
+      }
+    }
+  }
 
   function handleMcBlur() {
     const mc = mcNumber.trim();
@@ -77,6 +94,7 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           dest_city: destCity,
           dest_state: destState,
           rate: blankToNull(rate) === null ? null : Number(rate),
+          gp: blankToNull(gp) === null ? null : Number(gp),
           driver_name: blankToNull(driverName),
           driver_phone: blankToNull(driverPhone),
           comment: blankToNull(comment),
@@ -158,7 +176,17 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           aria-label="Rate paid"
           placeholder="Rate"
           value={rate}
-          onChange={(e) => setRate(e.target.value)}
+          onChange={(e) => handleRateChange(e.target.value)}
+          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+        />
+        <input
+          aria-label="Gross profit"
+          placeholder="GP"
+          value={gp}
+          onChange={(e) => {
+            setGp(e.target.value);
+            setGpTouched(true);
+          }}
           className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
         />
         <input

@@ -167,13 +167,13 @@ function createCarriersRouter(pool) {
     const [result] = await pool.query(
       `INSERT INTO carrier_lane_history
        (carrier_id, user_id, load_id, origin_city, origin_state, origin_lat, origin_lng,
-        dest_city, dest_state, dest_lat, dest_lng, rate, driver_name, driver_phone, comment, ran_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        dest_city, dest_state, dest_lat, dest_lng, rate, gp, driver_name, driver_phone, comment, ran_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         req.params.id, req.session.userId, req.body.load_id || null,
         originCity, originState, origin ? origin.lat : null, origin ? origin.lng : null,
         destCity, destState, dest ? dest.lat : null, dest ? dest.lng : null,
-        req.body.rate ?? null, req.body.driver_name || null, req.body.driver_phone || null,
+        req.body.rate ?? null, req.body.gp ?? null, req.body.driver_name || null, req.body.driver_phone || null,
         req.body.comment || null, req.body.ran_at || null,
       ]
     );
@@ -205,7 +205,7 @@ function createCarriersRouter(pool) {
       updates.push('dest_city = ?', 'dest_state = ?', 'dest_lat = ?', 'dest_lng = ?');
       values.push(destCity, destState, dest ? dest.lat : null, dest ? dest.lng : null);
     }
-    for (const field of ['rate', 'driver_name', 'driver_phone', 'comment', 'ran_at']) {
+    for (const field of ['rate', 'gp', 'driver_name', 'driver_phone', 'comment', 'ran_at']) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
         values.push(req.body[field]);

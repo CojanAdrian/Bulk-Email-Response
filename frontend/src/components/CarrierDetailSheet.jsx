@@ -107,6 +107,7 @@ function CarrierDetailBody({ status, carrier, history, onClose, onEdit }) {
                   </div>
                   <div className="mt-0.5 text-xs text-text-muted">
                     {entry.ran_at && new Date(entry.ran_at).toLocaleDateString()}
+                    {entry.gp !== null && entry.gp !== undefined && ` — GP $${Number(entry.gp).toLocaleString()}`}
                     {entry.driver_name && ` — ${entry.driver_name}`}
                     {entry.driver_phone && ` (${entry.driver_phone})`}
                   </div>

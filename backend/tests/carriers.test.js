@@ -236,6 +236,23 @@ describe('carriers routes', () => {
       expect(Number(res.body.rate)).toBe(1500);
     });
 
+    test('POST /:id/history stores gp (gross profit) alongside rate', async () => {
+      const res = await agent.post(`/api/carriers/${carrierId}/history`).send({
+        origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: 1500, gp: 300,
+      });
+      expect(res.status).toBe(201);
+      expect(Number(res.body.gp)).toBe(300);
+    });
+
+    test('PATCH /history/:historyId can update gp', async () => {
+      const createRes = await agent.post(`/api/carriers/${carrierId}/history`).send({
+        origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: 1500, gp: 300,
+      });
+      const res = await agent.patch(`/api/carriers/history/${createRes.body.id}`).send({ gp: 450 });
+      expect(res.status).toBe(200);
+      expect(Number(res.body.gp)).toBe(450);
+    });
+
     test('POST /:id/history returns 400 when origin/destination city or state is missing', async () => {
       const res = await agent.post(`/api/carriers/${carrierId}/history`).send({ origin_city: 'Dallas' });
       expect(res.status).toBe(400);

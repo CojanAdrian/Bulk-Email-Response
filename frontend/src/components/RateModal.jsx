@@ -409,6 +409,7 @@ function RateModal({ load, onClose, onSaved }) {
             originState={fields.origin_state}
             destCity={fields.dest_city}
             destState={fields.dest_state}
+            targetPay={targetPay}
           />
         )}
 

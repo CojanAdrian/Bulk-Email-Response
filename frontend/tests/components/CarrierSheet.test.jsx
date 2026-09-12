@@ -125,6 +125,27 @@ describe('CarrierSheet', () => {
     expect(screen.getByText(/Dallas, TX.*Chicago, IL/)).toBeInTheDocument();
   });
 
+  test('edit mode: a manually-added lane can include gp (gross profit) alongside rate', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.createCarrierHistory.mockResolvedValue({ id: 11, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: '1500', gp: '300' });
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/^origin city$/i), { target: { value: 'Dallas' } });
+    fireEvent.change(screen.getByLabelText(/^origin state$/i), { target: { value: 'TX' } });
+    fireEvent.change(screen.getByLabelText(/^destination city$/i), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByLabelText(/^destination state$/i), { target: { value: 'IL' } });
+    fireEvent.change(screen.getByLabelText(/^rate$/i), { target: { value: '1500' } });
+    fireEvent.change(screen.getByLabelText(/gross profit/i), { target: { value: '300' } });
+    fireEvent.click(screen.getByRole('button', { name: /^add lane$/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.createCarrierHistory).toHaveBeenCalledWith(5, expect.objectContaining({ rate: 1500, gp: 300 }));
+    });
+  });
+
   test('edit mode: removing a lane calls deleteCarrierHistory and removes it from the list', async () => {
     const carrier = { id: 5, company_name: 'ABC Trucking' };
     carriersApi.listCarrierHistory.mockResolvedValue([

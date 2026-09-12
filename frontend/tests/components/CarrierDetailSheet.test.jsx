@@ -69,6 +69,18 @@ describe('CarrierDetailSheet', () => {
     expect(screen.getByText(/Dallas, TX → Chicago, IL/)).toBeInTheDocument();
   });
 
+  test('shows gp (gross profit) alongside a lane history entry when present', async () => {
+    carriersApi.getCarrier.mockResolvedValue(CARRIER);
+    carriersApi.listCarrierHistory.mockResolvedValue([
+      { id: 1, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: 1500, gp: 300, ran_at: '2026-01-05', driver_name: null, driver_phone: null, comment: null },
+    ]);
+
+    render(<CarrierDetailSheet carrierId={5} onClose={vi.fn()} onEdit={vi.fn()} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    expect(screen.getByText(/GP \$300/)).toBeInTheDocument();
+  });
+
   test('shows an empty state when the carrier has no lane history yet', async () => {
     carriersApi.getCarrier.mockResolvedValue(CARRIER);
     carriersApi.listCarrierHistory.mockResolvedValue([]);
