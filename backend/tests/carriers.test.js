@@ -131,6 +131,55 @@ describe('carriers routes', () => {
     });
   });
 
+  describe('GET /lookup', () => {
+    test('returns the carrier matching the given MC number', async () => {
+      const [existing] = await pool.query("INSERT INTO carriers (user_id, company_name, mc_number) VALUES (?, 'ABC Trucking', '123456')", [userId]);
+      const res = await agent.get('/api/carriers/lookup?mc=123456');
+      expect(res.status).toBe(200);
+      expect(res.body.id).toBe(existing.insertId);
+    });
+
+    test('returns null when no carrier has that MC number', async () => {
+      const res = await agent.get('/api/carriers/lookup?mc=999999');
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+
+    test('returns 400 when mc is missing', async () => {
+      const res = await agent.get('/api/carriers/lookup');
+      expect(res.status).toBe(400);
+    });
+
+    test('does not match another user\'s carrier', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      await pool.query("INSERT INTO carriers (user_id, company_name, mc_number) VALUES (?, 'Someone Elses', '123456')", [otherUser.insertId]);
+
+      const res = await agent.get('/api/carriers/lookup?mc=123456');
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+  });
+
+  describe('GET /:id', () => {
+    test('returns the full carrier record', async () => {
+      const [existing] = await pool.query("INSERT INTO carriers (user_id, company_name, mc_number) VALUES (?, 'ABC Trucking', '123456')", [userId]);
+      const res = await agent.get(`/api/carriers/${existing.insertId}`);
+      expect(res.status).toBe(200);
+      expect(res.body.company_name).toBe('ABC Trucking');
+      expect(res.body.mc_number).toBe('123456');
+    });
+
+    test('returns 404 for a carrier belonging to a different user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [result] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'Someone Elses')", [otherUser.insertId]);
+
+      const res = await agent.get(`/api/carriers/${result.insertId}`);
+      expect(res.status).toBe(404);
+    });
+  });
+
   describe('PATCH /:id', () => {
     test('updates the given fields', async () => {
       const [result] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);

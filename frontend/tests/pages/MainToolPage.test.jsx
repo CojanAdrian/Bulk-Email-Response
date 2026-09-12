@@ -189,9 +189,19 @@ describe('MainToolPage', () => {
     expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
-  test('switches to the Carriers tab and renders the carriers panel', async () => {
+  test('switches to the Carriers tab and shows the find-matches view by default', async () => {
     renderPage({ username: 'admin', onLogout: vi.fn() });
     fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+
+    expect(await screen.findByTestId('globe-mock')).toBeInTheDocument();
+    expect(screen.getByLabelText(/origin city/i)).toBeInTheDocument();
+    expect(carriersApi.listCarriers).not.toHaveBeenCalled();
+  });
+
+  test('the "All carriers" toggle switches to the plain carrier list', async () => {
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^all carriers$/i }));
 
     await waitFor(() => {
       expect(carriersApi.listCarriers).toHaveBeenCalled();

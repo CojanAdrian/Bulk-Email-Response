@@ -34,6 +34,7 @@ function MainToolPage({ username, onLogout }) {
   const [addLoadOpen, setAddLoadOpen] = useState(false);
   const [blastTarget, setBlastTarget] = useState(null);
   const [focusedMatchLoad, setFocusedMatchLoad] = useState(null);
+  const [carriersView, setCarriersView] = useState('find'); // 'find' | 'manage'
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
   const { pushAlert, viewport: inquiryAlertViewport } = useInquiryAlerts();
   const preset = useMotionPreset();
@@ -52,6 +53,7 @@ function MainToolPage({ username, onLogout }) {
 
   function handleViewMatches(load) {
     setFocusedMatchLoad(load);
+    setCarriersView('find');
     setTab('carriers');
   }
 
@@ -107,17 +109,35 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'carriers' && (
-            <motion.main key="carriers" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
-              {focusedMatchLoad ? (
-                <>
-                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="px-4 py-2 text-xs">
-                    ← Back to carrier list
+            <motion.main key="carriers" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCarriersView('find')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+                    }`}
+                  >
+                    Find matches
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCarriersView('manage')}
+                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+                      carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+                    }`}
+                  >
+                    All carriers
+                  </button>
+                </div>
+                {carriersView === 'find' && focusedMatchLoad && (
+                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="px-3 py-1.5 text-xs">
+                    ← Clear load, search any lane
                   </SecondaryButton>
-                  <CarrierMapPage focusedLoad={focusedMatchLoad} />
-                </>
-              ) : (
-                <CarriersPanel />
-              )}
+                )}
+              </div>
+              {carriersView === 'manage' ? <CarriersPanel /> : <CarrierMapPage focusedLoad={focusedMatchLoad} />}
             </motion.main>
           )}
         </AnimatePresence>

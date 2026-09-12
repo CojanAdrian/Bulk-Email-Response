@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { listCarriers, deleteCarrier } from '../api/carriers';
 import Card from './Card';
+import CarrierDetailSheet from './CarrierDetailSheet';
 import CarrierSheet from './CarrierSheet';
 import PrimaryButton from './PrimaryButton';
 import Skeleton from './Skeleton';
@@ -12,6 +13,7 @@ function CarriersPanel() {
   const [error, setError] = useState(null);
   const [searchText, setSearchText] = useState('');
   const [sheetTarget, setSheetTarget] = useState(null); // null = closed, 'new' = add, carrier object = edit
+  const [detailCarrierId, setDetailCarrierId] = useState(null);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const isMountedRef = useRef(true);
 
@@ -92,7 +94,7 @@ function CarriersPanel() {
         <ul className="divide-y divide-border">
           {carriers.map((carrier) => (
             <li key={carrier.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
-              <button type="button" onClick={() => setSheetTarget(carrier)} className="min-w-0 flex-1 truncate text-left text-text hover:underline">
+              <button type="button" onClick={() => setDetailCarrierId(carrier.id)} className="min-w-0 flex-1 truncate text-left text-text hover:underline">
                 <span className="font-medium">{carrier.company_name}</span>
                 {carrier.mc_number && <span className="ml-2 text-text-muted">MC {carrier.mc_number}</span>}
               </button>
@@ -121,6 +123,16 @@ function CarriersPanel() {
       )}
 
       <AnimatePresence>
+        {detailCarrierId && (
+          <CarrierDetailSheet
+            carrierId={detailCarrierId}
+            onClose={() => setDetailCarrierId(null)}
+            onEdit={(carrier) => {
+              setDetailCarrierId(null);
+              setSheetTarget(carrier);
+            }}
+          />
+        )}
         {sheetTarget && (
           <CarrierSheet
             carrier={sheetTarget === 'new' ? null : sheetTarget}

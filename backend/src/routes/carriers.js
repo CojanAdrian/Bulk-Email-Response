@@ -26,6 +26,27 @@ function createCarriersRouter(pool) {
     res.json(rows);
   }));
 
+  // Exact MC-number lookup for the booking flow -- typing an MC that's
+  // already on file autofills the rest of the carrier's info instead of
+  // making the user retype it. Must be registered before GET /:id so
+  // "lookup" isn't parsed as an id.
+  router.get('/lookup', asyncHandler(async (req, res) => {
+    const mc = String(req.query.mc || '').trim();
+    if (!mc) {
+      return res.status(400).json({ error: 'mc is required' });
+    }
+    const [rows] = await pool.query('SELECT * FROM carriers WHERE user_id = ? AND mc_number = ?', [req.session.userId, mc]);
+    res.json(rows[0] || null);
+  }));
+
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const [rows] = await pool.query('SELECT * FROM carriers WHERE id = ? AND user_id = ?', [req.params.id, req.session.userId]);
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Carrier not found' });
+    }
+    res.json(rows[0]);
+  }));
+
   // Finds an existing carrier for this user by MC number (if given),
   // falling back to a case-insensitive company name match, or creates a
   // new one -- so logging the same carrier from different places (the

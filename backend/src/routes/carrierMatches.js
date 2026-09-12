@@ -51,6 +51,31 @@ async function attachStateCentroids(pool, regionalMatches) {
   return regionalMatches;
 }
 
+const CONTACT_FIELDS = ['mc_number', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email', 'equipment_types', 'operating_states', 'comment'];
+
+// Merges the carrier's own contact/equipment fields into each match so the
+// match list (and the detail sheet opened from it) can show everything
+// needed to call the carrier without a second round-trip.
+async function attachCarrierDetails(pool, userId, matches) {
+  if (matches.length === 0) return matches;
+  const ids = matches.map((m) => m.carrierId);
+  const placeholders = ids.map(() => '?').join(', ');
+  const [rows] = await pool.query(
+    `SELECT id, ${CONTACT_FIELDS.join(', ')} FROM carriers WHERE user_id = ? AND id IN (${placeholders})`,
+    [userId, ...ids]
+  );
+  const byId = new Map(rows.map((row) => [row.id, row]));
+  for (const match of matches) {
+    const carrier = byId.get(match.carrierId);
+    if (carrier) {
+      for (const field of CONTACT_FIELDS) {
+        match[field] = carrier[field];
+      }
+    }
+  }
+  return matches;
+}
+
 function createCarrierMatchesRouter(pool) {
   const router = express.Router();
 
@@ -66,6 +91,8 @@ function createCarrierMatchesRouter(pool) {
     }
     const { historyRows, regionalCarriers } = await loadCandidates(pool, req.session.userId);
     const result = findMatchesForLane({ ...lane, equipment: equipment || null, historyRows, regionalCarriers });
+    result.laneMatches = await attachCarrierDetails(pool, req.session.userId, result.laneMatches);
+    result.regionalMatches = await attachCarrierDetails(pool, req.session.userId, result.regionalMatches);
     result.regionalMatches = await attachStateCentroids(pool, result.regionalMatches);
     res.json(result);
   }));
@@ -89,6 +116,8 @@ function createCarrierMatchesRouter(pool) {
     }
     const { historyRows, regionalCarriers } = await loadCandidates(pool, req.session.userId);
     const result = findMatchesForLane({ ...lane, equipment: load.equipment || null, historyRows, regionalCarriers });
+    result.laneMatches = await attachCarrierDetails(pool, req.session.userId, result.laneMatches);
+    result.regionalMatches = await attachCarrierDetails(pool, req.session.userId, result.regionalMatches);
     result.regionalMatches = await attachStateCentroids(pool, result.regionalMatches);
     res.json(result);
   }));

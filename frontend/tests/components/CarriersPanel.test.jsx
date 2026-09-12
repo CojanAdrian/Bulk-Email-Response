@@ -52,13 +52,31 @@ describe('CarriersPanel', () => {
     });
   });
 
-  test('clicking a carrier row opens the edit sheet', async () => {
+  test('clicking a carrier row opens the read-only detail sheet', async () => {
     carriersApi.listCarriers.mockResolvedValue([{ id: 1, company_name: 'ABC Trucking' }]);
     carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
     render(<CarriersPanel />);
     await waitFor(() => screen.getByText('ABC Trucking'));
 
     fireEvent.click(screen.getByText('ABC Trucking'));
+    await waitFor(() => {
+      expect(carriersApi.getCarrier).toHaveBeenCalledWith(1);
+    });
+    expect(screen.queryByLabelText(/company name/i)).not.toBeInTheDocument();
+  });
+
+  test('the detail sheet\'s Edit button opens the edit sheet', async () => {
+    carriersApi.listCarriers.mockResolvedValue([{ id: 1, company_name: 'ABC Trucking' }]);
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
+    render(<CarriersPanel />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    fireEvent.click(screen.getByText('ABC Trucking'));
+    await waitFor(() => screen.getByRole('button', { name: /^edit$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+
     expect(screen.getByText(/^edit ABC Trucking$/i)).toBeInTheDocument();
   });
 

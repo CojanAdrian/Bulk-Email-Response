@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createCarrier, createCarrierHistory } from '../api/carriers';
+import { createCarrier, createCarrierHistory, lookupCarrierByMc } from '../api/carriers';
 import PrimaryButton from './PrimaryButton';
 
 function blankToNull(value) {
@@ -13,17 +13,46 @@ function blankToNull(value) {
 // this load) so booking a load and building carrier history happen in one
 // step instead of two. Independent of RateModal's own Save button -- this
 // logs immediately on its own "Log carrier" click.
+//
+// Typing an MC number and tabbing out looks it up against the carrier
+// database: an existing carrier (same MC on a prior load) autofills the
+// rest of the form instead of making the user retype it; no match just
+// means it's a new carrier and the fields stay blank to fill in.
 function BookingCarrierFields({ loadId, originCity, originState, destCity, destState }) {
   const [companyName, setCompanyName] = useState('');
   const [mcNumber, setMcNumber] = useState('');
   const [dispatcherName, setDispatcherName] = useState('');
   const [dispatcherPhone, setDispatcherPhone] = useState('');
+  const [dispatcherEmail, setDispatcherEmail] = useState('');
   const [rate, setRate] = useState('');
   const [driverName, setDriverName] = useState('');
   const [driverPhone, setDriverPhone] = useState('');
   const [comment, setComment] = useState('');
   const [status, setStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
   const [error, setError] = useState(null);
+  const [mcLookupStatus, setMcLookupStatus] = useState('idle'); // 'idle' | 'checking' | 'found' | 'new'
+
+  function handleMcBlur() {
+    const mc = mcNumber.trim();
+    if (!mc) {
+      setMcLookupStatus('idle');
+      return;
+    }
+    setMcLookupStatus('checking');
+    lookupCarrierByMc(mc)
+      .then((carrier) => {
+        if (carrier) {
+          setCompanyName(carrier.company_name || '');
+          setDispatcherName(carrier.dispatcher_name || '');
+          setDispatcherPhone(carrier.dispatcher_phone || '');
+          setDispatcherEmail(carrier.dispatcher_email || '');
+          setMcLookupStatus('found');
+        } else {
+          setMcLookupStatus('new');
+        }
+      })
+      .catch(() => setMcLookupStatus('idle'));
+  }
 
   function handleLogCarrier() {
     setError(null);
@@ -38,6 +67,7 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
       mc_number: blankToNull(mcNumber),
       dispatcher_name: blankToNull(dispatcherName),
       dispatcher_phone: blankToNull(dispatcherPhone),
+      dispatcher_email: blankToNull(dispatcherEmail),
     })
       .then((carrier) =>
         createCarrierHistory(carrier.id, {
@@ -70,7 +100,7 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
 
   return (
     <div className="mb-4 rounded-lg border border-border p-3">
-      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Log the carrier for this load (optional)</p>
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Who ran this load?</p>
       {error && (
         <p role="alert" className="mb-2 text-xs text-error">
           {error}
@@ -78,19 +108,27 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
       )}
       <div className="mb-2 grid grid-cols-2 gap-2">
         <input
+          aria-label="Carrier MC number"
+          placeholder="MC number"
+          value={mcNumber}
+          onChange={(e) => setMcNumber(e.target.value)}
+          onBlur={handleMcBlur}
+          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+        />
+        <input
           aria-label="Carrier company name"
           placeholder="Company name"
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
           className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
         />
-        <input
-          aria-label="Carrier MC number"
-          placeholder="MC number"
-          value={mcNumber}
-          onChange={(e) => setMcNumber(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
-        />
+      </div>
+      {mcLookupStatus === 'checking' && <p className="mb-2 text-xs text-text-muted">Checking MC {mcNumber.trim()}...</p>}
+      {mcLookupStatus === 'found' && (
+        <p className="mb-2 text-xs font-medium text-success">Existing carrier found — details filled in below.</p>
+      )}
+      {mcLookupStatus === 'new' && <p className="mb-2 text-xs text-text-muted">New carrier — fill in their details below.</p>}
+      <div className="mb-2 grid grid-cols-2 gap-2">
         <input
           aria-label="Dispatcher name"
           placeholder="Dispatcher name"
@@ -103,6 +141,14 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           placeholder="Dispatcher phone"
           value={dispatcherPhone}
           onChange={(e) => setDispatcherPhone(e.target.value)}
+          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+        />
+        <input
+          aria-label="Dispatcher email"
+          type="email"
+          placeholder="Dispatcher email (optional)"
+          value={dispatcherEmail}
+          onChange={(e) => setDispatcherEmail(e.target.value)}
           className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
         />
         <input

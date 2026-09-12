@@ -74,6 +74,21 @@ describe('carrier-matches routes', () => {
       expect(res.body.laneMatches[0].tier).toBe('perfect');
     });
 
+    test('lane matches include the carrier\'s contact/equipment details for the detail view', async () => {
+      const carrierId = await makeCarrierWithHistory();
+      await pool.query(
+        "UPDATE carriers SET mc_number = '123456', dispatcher_phone = '555-1234', dispatcher_email = 'dispatch@abc.com', equipment_types = ? WHERE id = ?",
+        [JSON.stringify(['V']), carrierId]
+      );
+      const res = await agent.post('/api/carrier-matches').send({
+        originCity: DALLAS.city, originState: DALLAS.state, destCity: CHICAGO.city, destState: CHICAGO.state,
+      });
+      expect(res.body.laneMatches[0].mc_number).toBe('123456');
+      expect(res.body.laneMatches[0].dispatcher_phone).toBe('555-1234');
+      expect(res.body.laneMatches[0].dispatcher_email).toBe('dispatch@abc.com');
+      expect(res.body.laneMatches[0].equipment_types).toEqual(['V']);
+    });
+
     test('lane matches include origin/destination coordinates for the globe', async () => {
       await makeCarrierWithHistory();
       const res = await agent.post('/api/carrier-matches').send({

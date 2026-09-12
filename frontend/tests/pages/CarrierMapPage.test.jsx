@@ -23,6 +23,17 @@ describe('CarrierMapPage', () => {
     expect(screen.getByLabelText(/destination city/i)).toBeInTheDocument();
   });
 
+  test('the manual lane search form stays visible and editable even with a focused load', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({ laneMatches: [], regionalMatches: [] });
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
+    await waitFor(() => expect(carrierMatchesApi.getCarrierMatchesForLoad).toHaveBeenCalled());
+
+    expect(screen.getByLabelText(/origin city/i)).toHaveValue('Dallas');
+    expect(screen.getByLabelText(/destination city/i)).toHaveValue('Chicago');
+    fireEvent.change(screen.getByLabelText(/origin city/i), { target: { value: 'Houston' } });
+    expect(screen.getByLabelText(/origin city/i)).toHaveValue('Houston');
+  });
+
   test('with a focused load, fetches and lists its matches automatically', async () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
       laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],
@@ -69,16 +80,49 @@ describe('CarrierMapPage', () => {
     expect(screen.getByText(/no booked lanes/i)).toBeInTheDocument();
   });
 
-  test('clicking a matched carrier opens its detail sheet', async () => {
+  test('match cards show MC number and dispatcher phone inline', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10, mc_number: '123456', dispatcher_phone: '555-1234' }],
+      regionalMatches: [],
+    });
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    expect(screen.getByText(/MC 123456/)).toBeInTheDocument();
+    expect(screen.getByText('555-1234')).toBeInTheDocument();
+  });
+
+  test('clicking a matched carrier opens its read-only detail sheet and highlights its history on the globe', async () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
       laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],
       regionalMatches: [],
     });
     carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
     render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
     await waitFor(() => screen.getByText('ABC Trucking'));
 
     fireEvent.click(screen.getByText('ABC Trucking'));
+    await waitFor(() => {
+      expect(carriersApi.getCarrier).toHaveBeenCalledWith(1);
+    });
+    expect(screen.queryByLabelText(/company name/i)).not.toBeInTheDocument();
+  });
+
+  test('the detail sheet\'s Edit button opens the edit form', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],
+      regionalMatches: [],
+    });
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    fireEvent.click(screen.getByText('ABC Trucking'));
+    await waitFor(() => screen.getByRole('button', { name: /^edit$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
+
     expect(screen.getByText(/^edit ABC Trucking$/i)).toBeInTheDocument();
   });
 });

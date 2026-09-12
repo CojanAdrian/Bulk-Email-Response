@@ -5,6 +5,14 @@ export function listCarriers(query) {
   return get(`/api/carriers${q}`);
 }
 
+export function getCarrier(id) {
+  return get(`/api/carriers/${id}`);
+}
+
+export function lookupCarrierByMc(mc) {
+  return get(`/api/carriers/lookup?mc=${encodeURIComponent(mc)}`);
+}
+
 export function createCarrier(data) {
   return post('/api/carriers', data);
 }

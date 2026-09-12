@@ -75,4 +75,61 @@ describe('CarrierMapGlobe', () => {
     const props = globeMock.mock.calls[0][0];
     expect(props.globeImageUrl).toBeUndefined();
   });
+
+  describe('selected-carrier highlighting', () => {
+    const laneMatches = [
+      { carrierId: 1, carrierName: 'A', tier: 'perfect', originLat: 32.7767, originLng: -96.797, destLat: 41.8781, destLng: -87.6298 },
+      { carrierId: 2, carrierName: 'B', tier: 'weak', originLat: 29.7604, originLng: -95.3698, destLat: 25.7617, destLng: -80.1918 },
+    ];
+    const history = [
+      { origin_lat: 33.0, origin_lng: -97.0, dest_lat: 34.0, dest_lng: -98.0 },
+    ];
+
+    test('adds one arc per selected-carrier history entry', () => {
+      render(
+        <CarrierMapGlobe
+          focusedLoad={null}
+          laneMatches={laneMatches}
+          regionalMatches={[]}
+          selectedCarrierId={1}
+          selectedCarrierHistory={history}
+        />
+      );
+      const props = globeMock.mock.calls[0][0];
+      const historyArcs = props.arcsData.filter((a) => a.isHistory);
+      expect(historyArcs).toHaveLength(1);
+      expect(historyArcs[0].startLat).toBe(33.0);
+    });
+
+    test('dims the arc color of every other carrier while one is selected', () => {
+      render(
+        <CarrierMapGlobe
+          focusedLoad={null}
+          laneMatches={laneMatches}
+          regionalMatches={[]}
+          selectedCarrierId={1}
+          selectedCarrierHistory={[]}
+        />
+      );
+      const props = globeMock.mock.calls[0][0];
+      const otherArc = props.arcsData.find((a) => a.carrierId === 2);
+      const selectedArc = props.arcsData.find((a) => a.carrierId === 1);
+      expect(props.arcColor(otherArc)).toMatch(/rgba/);
+      expect(props.arcColor(selectedArc)).toBe('#ffffff');
+    });
+
+    test('skips a history entry with no cached coordinates', () => {
+      render(
+        <CarrierMapGlobe
+          focusedLoad={null}
+          laneMatches={[]}
+          regionalMatches={[]}
+          selectedCarrierId={1}
+          selectedCarrierHistory={[{ origin_lat: null, origin_lng: null, dest_lat: null, dest_lng: null }]}
+        />
+      );
+      const props = globeMock.mock.calls[0][0];
+      expect(props.arcsData.filter((a) => a.isHistory)).toHaveLength(0);
+    });
+  });
 });
