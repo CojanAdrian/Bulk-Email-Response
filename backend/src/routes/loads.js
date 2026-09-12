@@ -24,6 +24,12 @@ const EDITABLE_FIELDS = [
 
 const STATUS_VALUES = ['active', 'booked', 'covered'];
 
+// Whitelisted so the sort column can never come from unvalidated user input
+// straight into an ORDER BY clause.
+const STATS_SORT_COLUMNS = {
+  gp: 'gp', rate: 'rate', target_pay: 'l.target_pay', ran_at: 'booked_date', load_number: 'l.load_number',
+};
+
 // Manually-typed city/state values get title-cased/uppercased so a reply or
 // export never mixes "chicago" and "CHICAGO, Il" depending on how the user
 // happened to type it. Only touches fields present in the body, so a
@@ -61,6 +67,65 @@ function createLoadsRouter(pool, wsHub) {
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const [rows] = await pool.query(`SELECT * FROM loads ${whereClause} ORDER BY created_at DESC`, params);
     res.json(rows);
+  }));
+
+  // Booked loads with whatever rate/gp/carrier info was logged for them
+  // (the most recent carrier_lane_history row tied to that load_id, if
+  // any -- a load can only sensibly have one "current" booking's worth of
+  // numbers even if it was logged more than once). Falls back to the
+  // load's own updated_at date when nothing was ever logged, so a load
+  // marked booked without going through the carrier popup still shows up
+  // (with rate/gp blank) instead of silently vanishing from stats.
+  // Registered before GET /:id so "stats" isn't parsed as an id.
+  router.get('/stats', asyncHandler(async (req, res) => {
+    const { from, to, sort, direction } = req.query;
+    const sortColumn = STATS_SORT_COLUMNS[sort] || 'booked_date';
+    const sortDirection = String(direction).toLowerCase() === 'asc' ? 'ASC' : 'DESC';
+
+    const conditions = ["l.status = 'booked'", 'l.user_id = ?'];
+    const params = [req.session.userId];
+    if (from) {
+      conditions.push('COALESCE(h.ran_at, DATE(l.updated_at)) >= ?');
+      params.push(from);
+    }
+    if (to) {
+      conditions.push('COALESCE(h.ran_at, DATE(l.updated_at)) <= ?');
+      params.push(to);
+    }
+
+    const sql = `
+      SELECT
+        l.id, l.load_number, l.origin_city, l.origin_state, l.dest_city, l.dest_state,
+        l.target_pay, h.rate, h.gp, h.driver_name, c.company_name AS carrier_name,
+        -- DATE_FORMAT, not just COALESCE(...) -- returning a bare DATE/
+        -- DATETIME value lets mysql2 hand it back as a JS Date, which then
+        -- serializes through res.json() shifted by the server's local
+        -- timezone (a booked_date of "2026-09-10" silently becoming
+        -- "2026-09-09T21:00:00.000Z"). A formatted string sidesteps that.
+        DATE_FORMAT(COALESCE(h.ran_at, DATE(l.updated_at)), '%Y-%m-%d') AS booked_date
+      FROM loads l
+      LEFT JOIN (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY load_id ORDER BY created_at DESC) AS rn
+        FROM carrier_lane_history
+        WHERE load_id IS NOT NULL
+      ) h ON h.load_id = l.id AND h.rn = 1
+      LEFT JOIN carriers c ON c.id = h.carrier_id
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY ${sortColumn} ${sortDirection}
+    `;
+    const [rows] = await pool.query(sql, params);
+
+    const totals = rows.reduce(
+      (acc, row) => ({
+        count: acc.count + 1,
+        totalGp: acc.totalGp + (row.gp !== null ? Number(row.gp) : 0),
+        totalRate: acc.totalRate + (row.rate !== null ? Number(row.rate) : 0),
+        totalTargetPay: acc.totalTargetPay + (row.target_pay !== null ? Number(row.target_pay) : 0),
+      }),
+      { count: 0, totalGp: 0, totalRate: 0, totalTargetPay: 0 }
+    );
+
+    res.json({ loads: rows, totals });
   }));
 
   router.post('/', asyncHandler(async (req, res) => {

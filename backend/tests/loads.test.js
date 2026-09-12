@@ -763,6 +763,146 @@ describe('loads routes', () => {
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
 
+  describe('GET /stats', () => {
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).get('/api/loads/stats');
+      expect(res.status).toBe(401);
+    });
+
+    test('only includes the current user\'s own booked loads, with rate/gp from their logged carrier history', async () => {
+      const [load] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, target_pay, user_id, status) VALUES ('L1001', 'Dallas', 'TX', 'Chicago', 'IL', 1800, ?, 'booked')",
+        [userId]
+      );
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, rate, gp, ran_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', 1500, 300, '2026-09-10')`,
+        [carrier.insertId, userId, load.insertId]
+      );
+      // A different user's own booked load -- must never appear or count.
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('L9999', 'Someone', 'Elses', ?, 'booked')",
+        [otherUser.insertId]
+      );
+
+      const res = await agent.get('/api/loads/stats');
+      expect(res.status).toBe(200);
+      expect(res.body.loads).toHaveLength(1);
+      expect(res.body.loads[0]).toEqual(expect.objectContaining({
+        load_number: 'L1001', carrier_name: 'ABC Trucking', driver_name: null, booked_date: expect.stringContaining('2026-09-10'),
+      }));
+      expect(Number(res.body.loads[0].rate)).toBe(1500);
+      expect(Number(res.body.loads[0].gp)).toBe(300);
+      expect(res.body.totals).toEqual({ count: 1, totalGp: 300, totalRate: 1500, totalTargetPay: 1800 });
+    });
+
+    test('excludes active/covered loads', async () => {
+      await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('L1002', 'Dallas', 'Chicago', ?, 'active')",
+        [userId]
+      );
+      await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('L1003', 'Dallas', 'Chicago', ?, 'covered')",
+        [userId]
+      );
+      const res = await agent.get('/api/loads/stats');
+      expect(res.status).toBe(200);
+      expect(res.body.loads).toHaveLength(0);
+      expect(res.body.totals).toEqual({ count: 0, totalGp: 0, totalRate: 0, totalTargetPay: 0 });
+    });
+
+    test('a booked load with no logged carrier history still shows up, with rate/gp blank and the date falling back to updated_at', async () => {
+      const [load] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('L1004', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      const res = await agent.get('/api/loads/stats');
+      expect(res.status).toBe(200);
+      expect(res.body.loads).toHaveLength(1);
+      expect(res.body.loads[0].rate).toBeNull();
+      expect(res.body.loads[0].gp).toBeNull();
+      expect(res.body.loads[0].booked_date).toBeTruthy();
+    });
+
+    test('only counts a load\'s most recent lane-history entry, not every one logged for it', async () => {
+      const [load] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('L1005', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, rate, gp, ran_at, created_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', 1000, 100, '2026-09-01', '2026-09-01 08:00:00')`,
+        [carrier.insertId, userId, load.insertId]
+      );
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, rate, gp, ran_at, created_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', 2000, 400, '2026-09-05', '2026-09-05 08:00:00')`,
+        [carrier.insertId, userId, load.insertId]
+      );
+
+      const res = await agent.get('/api/loads/stats');
+      expect(res.body.loads).toHaveLength(1);
+      expect(Number(res.body.loads[0].rate)).toBe(2000);
+      expect(Number(res.body.loads[0].gp)).toBe(400);
+      expect(res.body.totals).toEqual({ count: 1, totalGp: 400, totalRate: 2000, totalTargetPay: 0 });
+    });
+
+    test('filters by a from/to date range, against the booked date', async () => {
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      const [oldLoad] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('OLD1', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, ran_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', '2026-01-01')`,
+        [carrier.insertId, userId, oldLoad.insertId]
+      );
+      const [recentLoad] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('NEW1', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, ran_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', '2026-09-10')`,
+        [carrier.insertId, userId, recentLoad.insertId]
+      );
+
+      const res = await agent.get('/api/loads/stats?from=2026-09-01&to=2026-09-30');
+      expect(res.status).toBe(200);
+      expect(res.body.loads.map((l) => l.load_number)).toEqual(['NEW1']);
+    });
+
+    test('sorts by gp descending when asked', async () => {
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      const [lowLoad] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('LOW', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, gp, ran_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', 100, '2026-09-05')`,
+        [carrier.insertId, userId, lowLoad.insertId]
+      );
+      const [highLoad] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, dest_city, user_id, status) VALUES ('HIGH', 'Dallas', 'Chicago', ?, 'booked')",
+        [userId]
+      );
+      await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state, gp, ran_at)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL', 900, '2026-09-06')`,
+        [carrier.insertId, userId, highLoad.insertId]
+      );
+
+      const res = await agent.get('/api/loads/stats?sort=gp&direction=desc');
+      expect(res.body.loads.map((l) => l.load_number)).toEqual(['HIGH', 'LOW']);
+    });
+  });
+
   describe('POST /', () => {
     test('rejects unauthenticated requests', async () => {
       const res = await request(app).post('/api/loads').send({ load_number: 'L1001' });

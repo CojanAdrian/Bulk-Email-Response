@@ -12,6 +12,7 @@ import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
 import CarriersPanel from '../components/CarriersPanel';
 import CarrierMapPage from './CarrierMapPage';
+import StatsPage from './StatsPage';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
@@ -25,6 +26,7 @@ const TAB_TITLES = {
   loads: 'Loads',
   inquiries: 'Inquiries',
   carriers: 'Carriers',
+  stats: 'Stats',
 };
 
 function CarriersViewToggle({ carriersView, onChange }) {
@@ -162,6 +164,11 @@ function MainToolPage({ username, onLogout }) {
                   <CarriersViewToggle carriersView={carriersView} onChange={setCarriersView} />
                 </div>
               </div>
+            </motion.main>
+          )}
+          {tab === 'stats' && (
+            <motion.main key="stats" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
+              <StatsPage />
             </motion.main>
           )}
         </AnimatePresence>

@@ -40,3 +40,13 @@ export function createLoad(data) {
 export function bulkSetIncludeRate(ids, includeRate) {
   return post('/api/loads/bulk-include-rate', { ids, includeRate });
 }
+
+export function getLoadsStats({ from, to, sort, direction } = {}) {
+  const params = new URLSearchParams();
+  if (from) params.set('from', from);
+  if (to) params.set('to', to);
+  if (sort) params.set('sort', sort);
+  if (direction) params.set('direction', direction);
+  const query = params.toString();
+  return get(`/api/loads/stats${query ? `?${query}` : ''}`);
+}
