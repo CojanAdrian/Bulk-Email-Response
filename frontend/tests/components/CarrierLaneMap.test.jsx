@@ -47,7 +47,14 @@ describe('CarrierLaneMap', () => {
 
   beforeEach(async () => {
     vi.resetModules();
-    global.google = { maps: { DirectionsRenderer: DirectionsRendererMock, LatLngBounds: LatLngBoundsMock, Marker: MarkerMock } };
+    global.google = {
+      maps: {
+        DirectionsRenderer: DirectionsRendererMock,
+        LatLngBounds: LatLngBoundsMock,
+        Marker: MarkerMock,
+        SymbolPath: { CIRCLE: 'circle' },
+      },
+    };
     vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'test-key');
     directionsServiceInstance.route.mockReset();
     directionsServiceInstance.route.mockResolvedValue(routeResult());
@@ -147,12 +154,17 @@ describe('CarrierLaneMap', () => {
     expect(directionsServiceInstance.route).not.toHaveBeenCalled();
   });
 
-  test('places a plain marker (no billed route request) for every other unselected match', async () => {
+  test('places a small colored-dot marker (not the default route pin, no billed route request) for every other unselected match', async () => {
     const laneMatches = [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originLat: 32.0, originLng: -96.0, destLat: 40.0, destLng: -88.0 }];
     render(<CarrierLaneMap focusedLoad={null} laneMatches={laneMatches} regionalMatches={[]} />);
 
     await waitFor(() => expect(MarkerMock).toHaveBeenCalled());
-    expect(MarkerMock.mock.calls[0][0]).toEqual(expect.objectContaining({ title: 'ABC Trucking' }));
+    const call = MarkerMock.mock.calls[0][0];
+    expect(call.title).toMatch(/ABC Trucking/);
+    // A custom icon so it's visually distinct from a route's A/B pins --
+    // otherwise a matched carrier's own base looks like a stop on your
+    // current route instead of a separate, unselected carrier.
+    expect(call.icon).toEqual(expect.objectContaining({ path: 'circle', fillColor: '#15803d' }));
     expect(directionsServiceInstance.route).not.toHaveBeenCalled();
   });
 

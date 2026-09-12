@@ -4,6 +4,13 @@ import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
 const CURRENT_LANE_COLOR = '#d7ff3d';
 const HISTORY_COLOR = '#22d3ee';
 const CONTINENTAL_US_CENTER = { lat: 39.5, lng: -98.35 };
+const TIER_COLOR = {
+  perfect: '#15803d',
+  strong: '#1d4ed8',
+  weak: '#92600c',
+  regional_perfect: '#15803d',
+  regional: '#6b7280',
+};
 
 let configured = false;
 let librariesPromise = null;
@@ -177,7 +184,11 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
 
   // Simple pins for the rest of the match list -- a full driving route for
   // every unselected match would mean a billed Directions request per row
-  // just for browsing the list, so those just get a marker at their origin.
+  // just for browsing the list, so those just get a marker at their origin
+  // (where that carrier's own matched lane starts, not a point on your
+  // current route). Drawn as a small colored dot, not the default red
+  // teardrop pin -- otherwise it's indistinguishable from the current
+  // lane's own A/B route endpoints and reads as a mystery stop on the way.
   useEffect(() => {
     if (status !== 'ready') return;
     clearMarkers();
@@ -189,8 +200,15 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
       const marker = new google.maps.Marker({
         position: origin,
         map: mapObjRef.current,
-        title: match.carrierName,
-        opacity: 0.85,
+        title: `${match.carrierName} (matched carrier)`,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7,
+          fillColor: TIER_COLOR[match.tier] || '#6b7280',
+          fillOpacity: 0.9,
+          strokeColor: '#ffffff',
+          strokeWeight: 1.5,
+        },
       });
       marker.addListener('click', () => onSelectCarrier && onSelectCarrier(match.carrierId));
       matchMarkersRef.current.push(marker);
