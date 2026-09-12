@@ -14,6 +14,13 @@ COPY frontend/ ./
 # (frontend/src/api/client.js falls back to localhost:4000 only when this
 # is genuinely unset, not when it's set-but-empty.)
 ENV VITE_API_URL=""
+# Vite inlines VITE_* vars into the built JS at build time, not at
+# container runtime -- setting VITE_GOOGLE_MAPS_API_KEY on the Railway
+# service alone does nothing unless it's also threaded through as a build
+# ARG here, since Railway passes service env vars into `docker build` as
+# ARGs when a matching ARG is declared.
+ARG VITE_GOOGLE_MAPS_API_KEY=""
+ENV VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
 RUN npm run build
 
 # ---- Backend runtime ----
