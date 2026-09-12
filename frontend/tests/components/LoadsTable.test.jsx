@@ -347,63 +347,85 @@ describe('LoadsTable', () => {
   });
 
   describe('row selection and bulk actions', () => {
+    test('no selection circle or bulk bar shows until "Select" is clicked', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      expect(screen.queryByRole('checkbox', { name: /^select /i })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
+    });
+
     test('checking a row shows the bulk action bar with a count of 1', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select L1001'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
 
       expect(screen.getByText('1 selected')).toBeInTheDocument();
     });
 
-    test('"Select all" checks every row and the count matches', async () => {
+    test('"Select All" checks every row and the count matches', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select all loads'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
 
       expect(screen.getByText('2 selected')).toBeInTheDocument();
-      expect(screen.getByLabelText('Select L1001')).toBeChecked();
-      expect(screen.getByLabelText('Select A2002')).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Select L1001' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('checkbox', { name: 'Select A2002' })).toHaveAttribute('aria-checked', 'true');
     });
 
-    test('"Select all" again clears the selection', async () => {
-      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
-      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
-      await waitFor(() => screen.getByText('L1001'));
-
-      const selectAll = screen.getByLabelText('Select all loads');
-      fireEvent.click(selectAll);
-      fireEvent.click(selectAll);
-
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
-    });
-
-    test('"Clear selection" empties the selection and hides the bulk bar', async () => {
+    test('"Done" exits selection mode, hiding the circles and the bulk bar', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select L1001'));
-      fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('checkbox', { name: /^select /i })).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
     });
 
-    test('bulk-deleting selected loads with confirm calls bulkDeleteLoads with the selected ids', async () => {
+    test('"Clear selection" empties the selection but stays in selection mode', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
+      fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('checkbox', { name: 'Select L1001' })).toBeInTheDocument();
+    });
+
+    test('bulk-deleting selected loads with confirm calls bulkDeleteLoads with the selected ids, then exits selection mode', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
       loadsApi.bulkDeleteLoads.mockResolvedValue({ deleted: 2 });
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select all loads'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
       fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
       fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
 
       await waitFor(() => {
         expect(loadsApi.bulkDeleteLoads).toHaveBeenCalledWith([1, 2]);
+      });
+      await waitFor(() => {
+        expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
       });
     });
 
@@ -412,25 +434,12 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select L1001'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
       fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
       fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
 
       expect(loadsApi.bulkDeleteLoads).not.toHaveBeenCalled();
-    });
-
-    test('choosing a bulk status calls bulkUpdateLoadStatus with the selected ids and status', async () => {
-      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
-      loadsApi.bulkUpdateLoadStatus.mockResolvedValue({ updated: 2 });
-      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
-      await waitFor(() => screen.getByText('L1001'));
-
-      fireEvent.click(screen.getByLabelText('Select all loads'));
-      fireEvent.change(screen.getByLabelText(/mark selected as/i), { target: { value: 'covered' } });
-
-      await waitFor(() => {
-        expect(loadsApi.bulkUpdateLoadStatus).toHaveBeenCalledWith([1, 2], 'covered');
-      });
     });
 
     test('shows an error when the bulk delete fails', async () => {
@@ -439,12 +448,28 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select L1001'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
       fireEvent.click(screen.getByRole('button', { name: /delete selected/i }));
       fireEvent.click(screen.getByRole('button', { name: /^confirm$/i }));
 
       await waitFor(() => {
         expect(screen.getByText('Bulk delete failed')).toBeInTheDocument();
+      });
+    });
+
+    test('choosing a bulk status calls bulkUpdateLoadStatus with the selected ids and status', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      loadsApi.bulkUpdateLoadStatus.mockResolvedValue({ updated: 2 });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
+      fireEvent.change(screen.getByLabelText(/mark selected as/i), { target: { value: 'covered' } });
+
+      await waitFor(() => {
+        expect(loadsApi.bulkUpdateLoadStatus).toHaveBeenCalledWith([1, 2], 'covered');
       });
     });
 
@@ -454,7 +479,8 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByLabelText('Select all loads'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
       fireEvent.change(screen.getByLabelText(/rate for selected/i), { target: { value: 'exclude' } });
 
       await waitFor(() => {

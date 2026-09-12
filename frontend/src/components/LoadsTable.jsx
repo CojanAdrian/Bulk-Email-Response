@@ -5,10 +5,13 @@ import { subscribe } from '../lib/liveSocket';
 import { multiStopTagVariant, buildLookupMessage } from '../lib/lookupMessage';
 import { buildPUSched } from '../lib/datExport';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
+import { useSelectionMode } from '../lib/useSelectionMode';
 import Badge from './Badge';
+import BottomActionBar from './BottomActionBar';
 import Card from './Card';
 import Skeleton from './Skeleton';
 import DateRangeField from './DateRangeField';
+import SelectionCircle from './SelectionCircle';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
@@ -97,7 +100,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
   const [busyLoadId, setBusyLoadId] = useState(null);
   const [sort, setSort] = useState(getInitialSort);
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const selection = useSelectionMode();
   const [confirmingBulkDelete, setConfirmingBulkDelete] = useState(false);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [editingTargetPayId, setEditingTargetPayId] = useState(null);
@@ -122,7 +125,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         if (!ignore) {
           setLoads(data);
           setStatus('ready');
-          setSelectedIds(new Set());
+          selection.exit();
           setPuOverrides({});
         }
       })
@@ -202,30 +205,14 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
       });
   }
 
-  function toggleSelectOne(id) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelectedIds((prev) => (prev.size === sortedLoads.length ? new Set() : new Set(sortedLoads.map((l) => l.id))));
-  }
-
   function handleBulkStatusChange(e) {
     const newStatus = e.target.value;
     if (!newStatus) return;
     setActionError(null);
     setBulkBusy(true);
-    bulkUpdateLoadStatus(Array.from(selectedIds), newStatus)
+    bulkUpdateLoadStatus(Array.from(selection.selectedIds), newStatus)
       .then(() => {
-        setSelectedIds(new Set());
+        selection.exit();
       })
       .catch((err) => setActionError(err.message || 'Failed to update selected loads.'))
       .finally(() => {
@@ -251,9 +238,9 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
     if (!value) return;
     setActionError(null);
     setBulkBusy(true);
-    bulkSetIncludeRate(Array.from(selectedIds), value === 'include')
+    bulkSetIncludeRate(Array.from(selection.selectedIds), value === 'include')
       .then(() => {
-        setSelectedIds(new Set());
+        selection.exit();
       })
       .catch((err) => setActionError(err.message || 'Failed to update rate for selected loads.'))
       .finally(() => {
@@ -265,9 +252,9 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   function handleBulkDelete() {
     setActionError(null);
     setBulkBusy(true);
-    bulkDeleteLoads(Array.from(selectedIds))
+    bulkDeleteLoads(Array.from(selection.selectedIds))
       .then(() => {
-        setSelectedIds(new Set());
+        selection.exit();
         setConfirmingBulkDelete(false);
       })
       .catch((err) => setActionError(err.message || 'Failed to delete selected loads.'))
@@ -339,13 +326,28 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
     });
   }
 
-  const allSelected = sortedLoads.length > 0 && selectedIds.size === sortedLoads.length;
-  const someSelected = selectedIds.size > 0 && !allSelected;
-
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-text">Loads</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="text-sm font-semibold text-text">Loads</h2>
+          {sortedLoads.length > 0 && (
+            selection.active ? (
+              <div className="flex items-center gap-3 text-sm font-medium">
+                <button type="button" onClick={() => selection.selectAll(sortedLoads.map((l) => l.id))} className="text-accent hover:underline">
+                  Select All
+                </button>
+                <button type="button" onClick={selection.exit} className="text-text-muted hover:underline">
+                  Done
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={selection.enter} className="text-sm font-medium text-accent hover:underline">
+                Select
+              </button>
+            )
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <input
             type="search"
@@ -380,74 +382,71 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           {actionError}
         </p>
       )}
-      {selectedIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm">
-          <span className="font-medium text-text">{selectedIds.size} selected</span>
-          <select
-            aria-label="Mark selected as"
-            defaultValue=""
-            onChange={handleBulkStatusChange}
-            disabled={bulkBusy}
-            className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
-          >
-            <option value="" disabled>
-              Mark as...
+      <BottomActionBar count={selection.selectedIds.size}>
+        <select
+          aria-label="Mark selected as"
+          defaultValue=""
+          onChange={handleBulkStatusChange}
+          disabled={bulkBusy}
+          className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+        >
+          <option value="" disabled>
+            Mark as...
+          </option>
+          {STATUS_OPTIONS.map((option) => (
+            <option key={option} value={option}>
+              {STATUS_LABELS[option]}
             </option>
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {STATUS_LABELS[option]}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="Rate for selected"
-            defaultValue=""
-            onChange={handleBulkIncludeRate}
-            disabled={bulkBusy}
-            className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
-          >
-            <option value="" disabled>
-              Rate...
-            </option>
-            <option value="include">Include rate</option>
-            <option value="exclude">Exclude rate</option>
-          </select>
-          {confirmingBulkDelete ? (
-            <>
-              <span className="text-xs text-error">Delete {selectedIds.size}?</span>
-              <button
-                onClick={handleBulkDelete}
-                disabled={bulkBusy}
-                className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
-              >
-                {bulkBusy ? 'Deleting...' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => setConfirmingBulkDelete(false)}
-                disabled={bulkBusy}
-                className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
+          ))}
+        </select>
+        <select
+          aria-label="Rate for selected"
+          defaultValue=""
+          onChange={handleBulkIncludeRate}
+          disabled={bulkBusy}
+          className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+        >
+          <option value="" disabled>
+            Rate...
+          </option>
+          <option value="include">Include rate</option>
+          <option value="exclude">Exclude rate</option>
+        </select>
+        {confirmingBulkDelete ? (
+          <>
+            <span className="text-xs text-error">Delete {selection.selectedIds.size}?</span>
             <button
-              onClick={() => setConfirmingBulkDelete(true)}
+              onClick={handleBulkDelete}
               disabled={bulkBusy}
-              className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
+              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
             >
-              Delete selected
+              {bulkBusy ? 'Deleting...' : 'Confirm'}
             </button>
-          )}
+            <button
+              onClick={() => setConfirmingBulkDelete(false)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
           <button
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => setConfirmingBulkDelete(true)}
             disabled={bulkBusy}
-            className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+            className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
           >
-            Clear selection
+            Delete selected
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={selection.clear}
+          disabled={bulkBusy}
+          className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+        >
+          Clear selection
+        </button>
+      </BottomActionBar>
       {status === 'ready' && loads.length === 0 && <p className="text-sm text-text-muted">No loads found.</p>}
       {status === 'ready' && loads.length > 0 && sortedLoads.length === 0 && (
         <p className="text-sm text-text-muted">No loads match "{searchText}".</p>
@@ -457,17 +456,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         <table className="w-full text-left text-sm text-text">
           <thead className="sticky top-0 z-10 bg-surface">
             <tr className="border-b border-border text-text-muted">
-              <th className="w-8 py-1.5 pr-2">
-                <input
-                  type="checkbox"
-                  aria-label="Select all loads"
-                  checked={allSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = someSelected;
-                  }}
-                  onChange={toggleSelectAll}
-                />
-              </th>
+              <th className="w-8 py-1.5 pr-2" />
               {SORT_COLUMNS.map((col) => (
                 <th key={col.key} className="py-1.5 pr-4">
                   <button
@@ -489,12 +478,13 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
             {sortedLoads.map((load) => (
               <tr key={load.id} className="border-b border-border/60">
                 <td className="py-1.5 pr-2">
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${load.load_number}`}
-                    checked={selectedIds.has(load.id)}
-                    onChange={() => toggleSelectOne(load.id)}
-                  />
+                  {selection.active && (
+                    <SelectionCircle
+                      selected={selection.isSelected(load.id)}
+                      onToggle={() => selection.toggle(load.id)}
+                      ariaLabel={`Select ${load.load_number}`}
+                    />
+                  )}
                 </td>
                 <td className="py-1.5 pr-4">
                   <div className="flex items-center gap-1.5">
