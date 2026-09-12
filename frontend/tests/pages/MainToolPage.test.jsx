@@ -7,6 +7,7 @@ import * as loadsApi from '../../src/api/loads';
 import * as gmailApi from '../../src/api/gmail';
 import * as inquiriesApi from '../../src/api/inquiries';
 import * as carriersApi from '../../src/api/carriers';
+import * as carrierMatchesApi from '../../src/api/carrierMatches';
 import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('papaparse');
@@ -14,7 +15,11 @@ vi.mock('../../src/api/loads');
 vi.mock('../../src/api/gmail');
 vi.mock('../../src/api/inquiries');
 vi.mock('../../src/api/carriers');
+vi.mock('../../src/api/carrierMatches');
 vi.mock('../../src/lib/liveSocket');
+vi.mock('../../src/components/CarrierMapGlobe', () => ({
+  default: () => <div data-testid="globe-mock" />,
+}));
 
 function renderPage(props) {
   return render(
@@ -33,6 +38,7 @@ describe('MainToolPage', () => {
     gmailApi.getGmailStatus.mockResolvedValue({ connected: false });
     inquiriesApi.listInquiries.mockResolvedValue([]);
     carriersApi.listCarriers.mockResolvedValue([]);
+    carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({});
     liveHandlers = {};
     liveSocket.subscribe.mockImplementation((event, handler) => {
       liveHandlers[event] = handler;
@@ -191,6 +197,26 @@ describe('MainToolPage', () => {
       expect(carriersApi.listCarriers).toHaveBeenCalled();
     });
     expect(screen.getByText(/^carriers$/i, { selector: 'h2' })).toBeInTheDocument();
+  });
+
+  test('clicking a load\'s carrier-match badge switches to Carriers with that load focused', async () => {
+    const load = {
+      id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
+    };
+    loadsApi.listLoads.mockResolvedValue([load]);
+    carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [load.id]: { tier: 'perfect', count: 1 } });
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({ laneMatches: [], regionalMatches: [] });
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+
+    await waitFor(() => screen.getByRole('button', { name: /1 carrier.* match/i }));
+    fireEvent.click(screen.getByRole('button', { name: /1 carrier.* match/i }));
+
+    await waitFor(() => {
+      expect(carrierMatchesApi.getCarrierMatchesForLoad).toHaveBeenCalledWith(1);
+    });
+    expect(screen.getByText(/^carriers$/i, { selector: 'h1' })).toBeInTheDocument();
+    expect(screen.getByText(/matched carriers/i)).toBeInTheDocument();
   });
 
   test('refreshes the table when an upload completes', async () => {

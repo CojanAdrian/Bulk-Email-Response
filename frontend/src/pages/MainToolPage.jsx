@@ -11,6 +11,7 @@ import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
 import CarriersPanel from '../components/CarriersPanel';
+import CarrierMapPage from './CarrierMapPage';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
@@ -32,6 +33,7 @@ function MainToolPage({ username, onLogout }) {
   const [selectedLoad, setSelectedLoad] = useState(null);
   const [addLoadOpen, setAddLoadOpen] = useState(false);
   const [blastTarget, setBlastTarget] = useState(null);
+  const [focusedMatchLoad, setFocusedMatchLoad] = useState(null);
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
   const { pushAlert, viewport: inquiryAlertViewport } = useInquiryAlerts();
   const preset = useMotionPreset();
@@ -46,6 +48,11 @@ function MainToolPage({ username, onLogout }) {
 
   function handleSaved() {
     setRefreshKey((k) => k + 1);
+  }
+
+  function handleViewMatches(load) {
+    setFocusedMatchLoad(load);
+    setTab('carriers');
   }
 
   useEffect(() => {
@@ -81,6 +88,7 @@ function MainToolPage({ username, onLogout }) {
                 refreshKey={refreshKey}
                 onSelectLoad={setSelectedLoad}
                 onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
+                onViewMatches={handleViewMatches}
               />
               <DatExportSection refreshKey={refreshKey} />
             </motion.main>
@@ -100,7 +108,16 @@ function MainToolPage({ username, onLogout }) {
           )}
           {tab === 'carriers' && (
             <motion.main key="carriers" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
-              <CarriersPanel />
+              {focusedMatchLoad ? (
+                <>
+                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="px-4 py-2 text-xs">
+                    ← Back to carrier list
+                  </SecondaryButton>
+                  <CarrierMapPage focusedLoad={focusedMatchLoad} />
+                </>
+              ) : (
+                <CarriersPanel />
+              )}
             </motion.main>
           )}
         </AnimatePresence>
