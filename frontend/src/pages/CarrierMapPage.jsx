@@ -5,6 +5,7 @@ import { listCarrierHistory } from '../api/carriers';
 import CarrierLaneMap from '../components/CarrierLaneMap';
 import CarrierDetailSheet from '../components/CarrierDetailSheet';
 import CarrierSheet from '../components/CarrierSheet';
+import CityStateAutocomplete from '../components/CityStateAutocomplete';
 import PrimaryButton from '../components/PrimaryButton';
 import Badge from '../components/Badge';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
@@ -240,11 +241,13 @@ function CarrierMapPage({ focusedLoad }) {
         <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur-xl">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">Search a lane</p>
           <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <input
-              aria-label="Origin city"
+            <CityStateAutocomplete
+              id="lane-origin-city"
+              ariaLabel="Origin city"
               placeholder="Origin city"
               value={lane.originCity}
               onChange={(e) => setLane((prev) => ({ ...prev, originCity: e.target.value }))}
+              onPlaceSelected={({ city, state }) => setLane((prev) => ({ ...prev, originCity: city, originState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
             />
             <input
@@ -254,11 +257,13 @@ function CarrierMapPage({ focusedLoad }) {
               onChange={(e) => setLane((prev) => ({ ...prev, originState: e.target.value }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
             />
-            <input
-              aria-label="Destination city"
+            <CityStateAutocomplete
+              id="lane-dest-city"
+              ariaLabel="Destination city"
               placeholder="Destination city"
               value={lane.destCity}
               onChange={(e) => setLane((prev) => ({ ...prev, destCity: e.target.value }))}
+              onPlaceSelected={({ city, state }) => setLane((prev) => ({ ...prev, destCity: city, destState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
             />
             <input

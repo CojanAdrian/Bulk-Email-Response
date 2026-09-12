@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { setOptions, importLibrary } from '@googlemaps/js-api-loader';
+import { loadGoogleMapsLibrary, hasGoogleMapsKey } from '../lib/googleMapsLoader';
 
 const CURRENT_LANE_COLOR = '#d7ff3d';
 const HISTORY_COLOR = '#22d3ee';
@@ -12,27 +12,16 @@ const TIER_COLOR = {
   regional: '#6b7280',
 };
 
-let configured = false;
-let librariesPromise = null;
-
 // Loads the real Google Maps JavaScript API (satellite/hybrid imagery,
 // actual roads) plus the Routes library (DirectionsService/Renderer) --
 // replacing the earlier custom WebGL globe with the genuine Google Maps
-// product, per direct request. Cached at module scope so repeated mounts
-// (e.g. switching tabs) don't re-trigger the script load.
+// product, per direct request.
 function loadMapsLibraries() {
-  if (!librariesPromise) {
-    if (!configured) {
-      setOptions({ key: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '', v: 'weekly' });
-      configured = true;
-    }
-    librariesPromise = Promise.all([importLibrary('maps'), importLibrary('routes')]).then(([mapsLib, routesLib]) => ({
-      Map: mapsLib.Map,
-      DirectionsService: routesLib.DirectionsService,
-      DirectionsRenderer: routesLib.DirectionsRenderer,
-    }));
-  }
-  return librariesPromise;
+  return Promise.all([loadGoogleMapsLibrary('maps'), loadGoogleMapsLibrary('routes')]).then(([mapsLib, routesLib]) => ({
+    Map: mapsLib.Map,
+    DirectionsService: routesLib.DirectionsService,
+    DirectionsRenderer: routesLib.DirectionsRenderer,
+  }));
 }
 
 function toLatLng(lat, lng) {
@@ -75,7 +64,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
   const [routeInfo, setRouteInfo] = useState({ current: null, history: [] });
 
   useEffect(() => {
-    if (!import.meta.env.VITE_GOOGLE_MAPS_API_KEY) {
+    if (!hasGoogleMapsKey()) {
       setStatus('missing-key');
       return;
     }

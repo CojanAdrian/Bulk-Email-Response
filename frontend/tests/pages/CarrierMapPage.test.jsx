@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import CarrierMapPage from '../../src/pages/CarrierMapPage';
 import * as carrierMatchesApi from '../../src/api/carrierMatches';
 import * as carriersApi from '../../src/api/carriers';
@@ -9,6 +9,17 @@ vi.mock('../../src/api/carriers');
 const globeMock = vi.fn(() => <div data-testid="globe-mock" />);
 vi.mock('../../src/components/CarrierLaneMap', () => ({
   default: (props) => globeMock(props),
+}));
+// A stand-in that behaves like a normal input for existing fireEvent.change
+// assertions, but also captures onPlaceSelected per field id so a test can
+// simulate picking a suggestion -- the real autocomplete/Places wiring is
+// covered by CityStateAutocomplete's own tests.
+const capturedOnPlaceSelected = {};
+vi.mock('../../src/components/CityStateAutocomplete', () => ({
+  default: (props) => {
+    capturedOnPlaceSelected[props.id] = props.onPlaceSelected;
+    return <input aria-label={props.ariaLabel} placeholder={props.placeholder} value={props.value} onChange={props.onChange} />;
+  },
 }));
 
 const FOCUSED_LOAD = { id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', origin_lat: 32.7767, origin_lng: -96.797, dest_lat: 41.8781, dest_lng: -87.6298 };
@@ -86,6 +97,15 @@ describe('CarrierMapPage', () => {
 
     expect(await screen.findByText(/couldn't locate the destination/i)).toBeInTheDocument();
     expect(screen.getByText('ABC Trucking')).toBeInTheDocument();
+  });
+
+  test('picking a city from the autocomplete also fills in its state', async () => {
+    render(<CarrierMapPage focusedLoad={null} />);
+    act(() => {
+      capturedOnPlaceSelected['lane-origin-city']({ city: 'Gary', state: 'SD' });
+    });
+    expect(screen.getByLabelText(/origin city/i)).toHaveValue('Gary');
+    expect(screen.getByLabelText(/origin state/i)).toHaveValue('SD');
   });
 
   test('selecting an equipment type includes it in the search request', async () => {

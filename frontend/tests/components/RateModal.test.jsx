@@ -1,10 +1,17 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import RateModal from '../../src/components/RateModal';
 import * as loadsApi from '../../src/api/loads';
 
 vi.mock('../../src/api/loads');
+const capturedOnPlaceSelected = {};
+vi.mock('../../src/components/CityStateAutocomplete', () => ({
+  default: (props) => {
+    capturedOnPlaceSelected[props.id] = props.onPlaceSelected;
+    return <input id={props.id} aria-label={props.ariaLabel} value={props.value} onChange={props.onChange} className={props.className} />;
+  },
+}));
 
 const LOAD = { id: 1, load_number: 'L1001', target_pay: '1500.00', status: 'active' };
 
@@ -302,6 +309,15 @@ describe('RateModal', () => {
     });
 
     vi.useRealTimers();
+  });
+
+  test('picking a destination city from the autocomplete also fills in its state', () => {
+    render(<RateModal load={LOAD} onClose={vi.fn()} onSaved={vi.fn()} />);
+    act(() => {
+      capturedOnPlaceSelected['dest_city']({ city: 'Gary', state: 'SD' });
+    });
+    expect(screen.getByLabelText(/dest city/i)).toHaveValue('Gary');
+    expect(screen.getAllByLabelText(/^state$/i)[1]).toHaveValue('SD');
   });
 
   test('picking a new equipment type from the search dropdown saves its code', async () => {

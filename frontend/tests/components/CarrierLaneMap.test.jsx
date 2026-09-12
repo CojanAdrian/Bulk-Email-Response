@@ -24,16 +24,15 @@ const MarkerMock = vi.fn(function Marker(opts) {
   return instance;
 });
 
-const setOptionsMock = vi.fn();
-const importLibraryMock = vi.fn((name) => {
+const loadLibraryMock = vi.fn((name) => {
   if (name === 'maps') return Promise.resolve({ Map: MapMock });
   if (name === 'routes') return Promise.resolve({ DirectionsService: DirectionsServiceMock });
   return Promise.resolve({});
 });
 
-vi.mock('@googlemaps/js-api-loader', () => ({
-  setOptions: (...args) => setOptionsMock(...args),
-  importLibrary: (...args) => importLibraryMock(...args),
+vi.mock('../../src/lib/googleMapsLoader', () => ({
+  loadGoogleMapsLibrary: (...args) => loadLibraryMock(...args),
+  hasGoogleMapsKey: () => Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
 }));
 
 const FOCUSED_LOAD = { originLat: 32.7767, originLng: -96.797, destLat: 41.8781, destLng: -87.6298 };
@@ -62,8 +61,7 @@ describe('CarrierLaneMap', () => {
     DirectionsServiceMock.mockClear();
     DirectionsRendererMock.mockClear();
     MarkerMock.mockClear();
-    setOptionsMock.mockClear();
-    importLibraryMock.mockClear();
+    loadLibraryMock.mockClear();
     directionsRendererInstances.length = 0;
     markerInstances.length = 0;
     ({ default: CarrierLaneMap } = await import('../../src/components/CarrierLaneMap'));
@@ -78,7 +76,7 @@ describe('CarrierLaneMap', () => {
     vi.unstubAllEnvs();
     render(<CarrierLaneMap focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
     expect(await screen.findByText(/VITE_GOOGLE_MAPS_API_KEY/)).toBeInTheDocument();
-    expect(importLibraryMock).not.toHaveBeenCalled();
+    expect(loadLibraryMock).not.toHaveBeenCalled();
   });
 
   test('initializes a satellite/hybrid Google Map once the API loads', async () => {

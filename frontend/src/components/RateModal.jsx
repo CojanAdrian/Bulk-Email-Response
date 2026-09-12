@@ -5,6 +5,7 @@ import { useMotionPreset } from '../lib/motionConfig';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
 import Card from './Card';
+import CityStateAutocomplete from './CityStateAutocomplete';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
@@ -178,10 +179,12 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_city">
               Origin city
             </label>
-            <input
+            <CityStateAutocomplete
               id="origin_city"
+              ariaLabel="Origin city"
               value={fields.origin_city}
               onChange={(e) => handleFieldChange('origin_city', e.target.value)}
+              onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>
@@ -214,10 +217,12 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_city">
               Dest city
             </label>
-            <input
+            <CityStateAutocomplete
               id="dest_city"
+              ariaLabel="Dest city"
               value={fields.dest_city}
               onChange={(e) => handleFieldChange('dest_city', e.target.value)}
+              onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
               className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>

@@ -1,9 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import AddLoadModal from '../../src/components/AddLoadModal';
 import * as loadsApi from '../../src/api/loads';
 
 vi.mock('../../src/api/loads');
+const capturedOnPlaceSelected = {};
+vi.mock('../../src/components/CityStateAutocomplete', () => ({
+  default: (props) => {
+    capturedOnPlaceSelected[props.id] = props.onPlaceSelected;
+    return <input id={props.id} aria-label={props.ariaLabel} value={props.value} onChange={props.onChange} className={props.className} />;
+  },
+}));
 
 describe('AddLoadModal', () => {
   beforeEach(() => {
@@ -99,6 +106,15 @@ describe('AddLoadModal', () => {
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     expect(onClose).toHaveBeenCalled();
     expect(loadsApi.createLoad).not.toHaveBeenCalled();
+  });
+
+  test('picking an origin city from the autocomplete also fills in its state', () => {
+    render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    act(() => {
+      capturedOnPlaceSelected['origin_city']({ city: 'Gary', state: 'SD' });
+    });
+    expect(screen.getByLabelText(/origin city/i)).toHaveValue('Gary');
+    expect(screen.getAllByLabelText(/^state$/i)[0]).toHaveValue('SD');
   });
 
   test('has no Stops or Extra Stops controls', () => {
