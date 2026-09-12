@@ -6,8 +6,9 @@ import * as carriersApi from '../../src/api/carriers';
 
 vi.mock('../../src/api/carrierMatches');
 vi.mock('../../src/api/carriers');
+const globeMock = vi.fn(() => <div data-testid="globe-mock" />);
 vi.mock('../../src/components/CarrierMapGlobe', () => ({
-  default: () => <div data-testid="globe-mock" />,
+  default: (props) => globeMock(props),
 }));
 
 const FOCUSED_LOAD = { id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', origin_lat: 32.7767, origin_lng: -96.797, dest_lat: 41.8781, dest_lng: -87.6298 };
@@ -15,6 +16,7 @@ const FOCUSED_LOAD = { id: 1, load_number: 'L1001', origin_city: 'Dallas', origi
 describe('CarrierMapPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    globeMock.mockImplementation(() => <div data-testid="globe-mock" />);
   });
 
   test('with no focused load, shows the manual lane search form', () => {
@@ -66,6 +68,26 @@ describe('CarrierMapPage', () => {
       }));
     });
     expect(screen.getByText('Regional Trucking')).toBeInTheDocument();
+  });
+
+  test('a manual search\'s resolved lane coordinates are passed to the globe to draw and zoom to', async () => {
+    carrierMatchesApi.searchCarrierMatches.mockResolvedValue({
+      laneMatches: [], regionalMatches: [],
+      queryOrigin: { lat: 32.7767, lng: -96.797 }, queryDest: { lat: 41.8781, lng: -87.6298 },
+    });
+    render(<CarrierMapPage focusedLoad={null} />);
+
+    fireEvent.change(screen.getByLabelText(/origin city/i), { target: { value: 'Dallas' } });
+    fireEvent.change(screen.getByLabelText(/origin state/i), { target: { value: 'TX' } });
+    fireEvent.change(screen.getByLabelText(/destination city/i), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByLabelText(/destination state/i), { target: { value: 'IL' } });
+    fireEvent.click(screen.getByRole('button', { name: /search/i }));
+
+    await waitFor(() => {
+      expect(globeMock).toHaveBeenCalledWith(expect.objectContaining({
+        focusedLoad: { originLat: 32.7767, originLng: -96.797, destLat: 41.8781, destLng: -87.6298 },
+      }));
+    });
   });
 
   test('lists regional matches in a separate group from lane matches', async () => {

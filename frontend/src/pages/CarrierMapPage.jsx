@@ -27,8 +27,9 @@ function laneFromLoad(load) {
 
 // A matched-carrier card, big enough to call someone straight off of it --
 // name, tier/distance, MC, phone, and equipment all inline instead of a
-// bare name behind a click. Clicking it opens the read-only detail sheet
-// and highlights that carrier's history on the globe (see onSelect).
+// bare name behind a click. Clicking it swaps this list out for the
+// read-only detail panel (see CarrierMapPage) and highlights that carrier's
+// history on the globe.
 function MatchCard({ match, onSelect }) {
   const distanceLabel = match.taggedStates
     ? (match.taggedStates || []).join(', ')
@@ -68,18 +69,22 @@ function MatchCard({ match, onSelect }) {
   );
 }
 
-// The Carriers tab's globe-first view: a full-bleed dark globe (Genlogs-
-// style -- no white card behind it, always visible) with a manual lane
-// search and the ranked match list floating over it as glass panels. Works
-// both deep-linked from a load's "view matches" (focusedLoad pre-fills and
+// The Carriers tab's globe-first view: a full-bleed dark globe (no boxed-in
+// card -- it fills the whole panel edge to edge) with a manual lane search
+// tucked into the bottom-left corner (out of the way of the globe's usual
+// framing) and the ranked match list docked to the right. Works both
+// deep-linked from a load's "view matches" (focusedLoad pre-fills and
 // auto-searches the lane, but stays editable) and standalone (search any
-// lane with nothing uploaded). Clicking a match opens a read-only detail
-// sheet (CarrierDetailSheet) and highlights that carrier's lane history on
-// the globe; the sheet's own Edit button opens CarrierSheet.
+// lane with nothing uploaded). Clicking a match swaps the right-hand list
+// for a read-only detail panel (CarrierDetailSheet, docked variant) in the
+// same footprint -- no full-screen popup blocking the globe -- and
+// highlights that carrier's lane history there; the panel's own Edit
+// button opens CarrierSheet.
 function CarrierMapPage({ focusedLoad }) {
   const [lane, setLane] = useState(() => laneFromLoad(focusedLoad));
   const [laneMatches, setLaneMatches] = useState([]);
   const [regionalMatches, setRegionalMatches] = useState([]);
+  const [queryLane, setQueryLane] = useState(null); // { originLat, originLng, destLat, destLng } for the globe
   const [status, setStatus] = useState('idle'); // 'idle' | 'loading' | 'ready' | 'error'
   const [error, setError] = useState(null);
   const [selectedCarrierId, setSelectedCarrierId] = useState(null);
@@ -131,6 +136,12 @@ function CarrierMapPage({ focusedLoad }) {
         if (isMountedRef.current) {
           setLaneMatches(data.laneMatches);
           setRegionalMatches(data.regionalMatches);
+          if (!focusedLoad && data.queryOrigin && data.queryDest) {
+            setQueryLane({
+              originLat: data.queryOrigin.lat, originLng: data.queryOrigin.lng,
+              destLat: data.queryDest.lat, destLng: data.queryDest.lng,
+            });
+          }
           setStatus('ready');
         }
       })
@@ -171,15 +182,15 @@ function CarrierMapPage({ focusedLoad }) {
     }
   }
 
-  const globeFocusedLoad = focusedLoad
+  const globeLane = focusedLoad
     ? { originLat: focusedLoad.origin_lat, originLng: focusedLoad.origin_lng, destLat: focusedLoad.dest_lat, destLng: focusedLoad.dest_lng }
-    : null;
+    : queryLane;
 
   return (
-    <div className="relative h-[calc(100vh-13rem)] min-h-[560px] w-full overflow-hidden rounded-3xl border border-white/10 bg-[#05060a]">
+    <div className="relative h-[calc(100vh-12rem)] min-h-[520px] w-full overflow-hidden bg-[#05060a]">
       <div className="absolute inset-0">
         <CarrierMapGlobe
-          focusedLoad={globeFocusedLoad}
+          focusedLoad={globeLane}
           laneMatches={laneMatches}
           regionalMatches={regionalMatches}
           onSelectCarrier={handleSelectCarrier}
@@ -188,8 +199,8 @@ function CarrierMapPage({ focusedLoad }) {
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-0 flex flex-col gap-4 p-4 sm:p-6 lg:flex-row lg:items-start">
-        <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/40 p-3 backdrop-blur-xl">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start p-4 sm:p-6">
+        <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur-xl">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">Search a lane</p>
           <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
             <input
@@ -233,46 +244,53 @@ function CarrierMapPage({ focusedLoad }) {
             </p>
           )}
         </div>
+      </div>
 
-        <div className="pointer-events-auto flex w-full max-w-sm flex-1 flex-col overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-xl lg:ml-auto lg:h-full">
-          <h2 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Matched carriers</h2>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            {laneMatches.length === 0 && regionalMatches.length === 0 && (
-              <p className="text-sm text-white/50">{status === 'loading' ? 'Searching...' : 'No matches yet.'}</p>
-            )}
-            {laneMatches.length > 0 && (
-              <ul className="mb-4 space-y-2">
-                {laneMatches.map((match) => (
+      <div className="absolute inset-y-0 right-0 z-10 flex w-full max-w-sm flex-col overflow-hidden border-l border-white/10 bg-black/40 backdrop-blur-xl">
+        <h2 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Matched carriers</h2>
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+          {laneMatches.length === 0 && regionalMatches.length === 0 && (
+            <p className="text-sm text-white/50">{status === 'loading' ? 'Searching...' : 'No matches yet.'}</p>
+          )}
+          {laneMatches.length > 0 && (
+            <ul className="mb-4 space-y-2">
+              {laneMatches.map((match) => (
+                <li key={match.carrierId}>
+                  <MatchCard match={match} onSelect={handleSelectCarrier} />
+                </li>
+              ))}
+            </ul>
+          )}
+          {regionalMatches.length > 0 && (
+            <>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">No booked lanes — tagged region</p>
+              <ul className="space-y-2">
+                {regionalMatches.map((match) => (
                   <li key={match.carrierId}>
                     <MatchCard match={match} onSelect={handleSelectCarrier} />
                   </li>
                 ))}
               </ul>
-            )}
-            {regionalMatches.length > 0 && (
-              <>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/40">No booked lanes — tagged region</p>
-                <ul className="space-y-2">
-                  {regionalMatches.map((match) => (
-                    <li key={match.carrierId}>
-                      <MatchCard match={match} onSelect={handleSelectCarrier} />
-                    </li>
-                  ))}
-                </ul>
-              </>
-            )}
-          </div>
+            </>
+          )}
         </div>
       </div>
 
+      {/* Slides in over the match list, in the same right-edge footprint,
+          instead of the old centered popup -- the globe (and the list
+          underneath) stays visible and interactive on the left. */}
       <AnimatePresence>
         {selectedCarrierId && !editingCarrier && (
           <CarrierDetailSheet
             carrierId={selectedCarrierId}
             onClose={closeDetail}
             onEdit={(carrier) => setEditingCarrier(carrier)}
+            variant="docked"
           />
         )}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {editingCarrier && (
           <CarrierSheet
             carrier={editingCarrier}

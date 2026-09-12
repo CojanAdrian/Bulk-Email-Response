@@ -104,6 +104,14 @@ describe('carrier-matches routes', () => {
       expect(res.status).toBe(400);
     });
 
+    test('includes the resolved query lane coordinates, for the globe to draw/zoom to even with no matches', async () => {
+      const res = await agent.post('/api/carrier-matches').send({
+        originCity: DALLAS.city, originState: DALLAS.state, destCity: CHICAGO.city, destState: CHICAGO.state,
+      });
+      expect(res.body.queryOrigin).toEqual(expect.objectContaining({ lat: expect.closeTo(DALLAS.lat, 2), lng: expect.closeTo(DALLAS.lng, 2) }));
+      expect(res.body.queryDest).toEqual(expect.objectContaining({ lat: expect.closeTo(CHICAGO.lat, 2), lng: expect.closeTo(CHICAGO.lng, 2) }));
+    });
+
     test('only matches the current user\'s own carriers', async () => {
       const passwordHash = await bcrypt.hash('otherpw', 10);
       const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
@@ -153,6 +161,7 @@ describe('carrier-matches routes', () => {
       const res = await agent.get(`/api/carrier-matches?loadId=${loadResult.insertId}`);
       expect(res.status).toBe(200);
       expect(res.body.laneMatches).toHaveLength(1);
+      expect(res.body.queryOrigin).toEqual(expect.objectContaining({ lat: expect.closeTo(DALLAS.lat, 2), lng: expect.closeTo(DALLAS.lng, 2) }));
     });
 
     test('returns 404 for a load belonging to a different user', async () => {

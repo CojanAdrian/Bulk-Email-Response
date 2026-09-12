@@ -109,8 +109,8 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'carriers' && (
-            <motion.main key="carriers" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6">
-              <div className="flex flex-wrap items-center justify-between gap-2">
+            <motion.main key="carriers" {...preset.crossfade}>
+              <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2 px-4 pb-4 sm:px-6">
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -137,7 +137,13 @@ function MainToolPage({ username, onLogout }) {
                   </SecondaryButton>
                 )}
               </div>
-              {carriersView === 'manage' ? <CarriersPanel /> : <CarrierMapPage focusedLoad={focusedMatchLoad} />}
+              {carriersView === 'manage' ? (
+                <div className="mx-auto max-w-[1400px] px-4 pb-6 sm:px-6">
+                  <CarriersPanel />
+                </div>
+              ) : (
+                <CarrierMapPage focusedLoad={focusedMatchLoad} />
+              )}
             </motion.main>
           )}
         </AnimatePresence>

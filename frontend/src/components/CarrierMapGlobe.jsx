@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
+import * as THREE from 'three';
 import { feature } from 'topojson-client';
 import statesTopology from 'us-atlas/states-10m.json';
-import earthTexture from '../assets/earth-night.jpg';
+import countriesTopology from 'world-atlas/countries-110m.json';
 
 const TIER_COLOR = {
   perfect: '#15803d',
@@ -12,25 +13,34 @@ const TIER_COLOR = {
   regional: '#6b7280',
 };
 const DIMMED_COLOR = 'rgba(107,114,128,0.15)';
-const HIGHLIGHT_COLOR = '#ffffff';
+const HISTORY_COLOR = '#22d3ee';
+const CURRENT_LANE_COLOR = '#d7ff3d';
 
-// US state outlines (from the Census-derived us-atlas TopoJSON package),
-// converted to GeoJSON once at module load -- static data, no need to
-// recompute per render/instance.
-const STATE_FEATURES = feature(statesTopology, statesTopology.objects.states).features;
+// Country + US-state outlines (from the topojson-client/world-atlas/us-atlas
+// ecosystem -- real Census/Natural-Earth-derived data, not a photographic
+// texture), converted to GeoJSON once at module load and tagged with a
+// `_kind` so one polygon layer can style the two differently (country fill
+// + a faint border, state borders drawn on top with no fill of their own).
+const COUNTRY_FEATURES = feature(countriesTopology, countriesTopology.objects.countries).features.map((f) => ({ ...f, _kind: 'country' }));
+const STATE_FEATURES = feature(statesTopology, statesTopology.objects.states).features.map((f) => ({ ...f, _kind: 'state' }));
+const MAP_POLYGONS = [...COUNTRY_FEATURES, ...STATE_FEATURES];
+
+const OCEAN_MATERIAL = new THREE.MeshPhongMaterial({ color: '#050a14', shininess: 0 });
+
+function midpoint(lat1, lng1, lat2, lng2) {
+  return { lat: (lat1 + lat2) / 2, lng: (lng1 + lng2) / 2 };
+}
 
 // Wraps react-globe.gl, translating match data (see carrierMatching.js on
-// the backend) into the arcs/points that library expects. Uses the NASA
-// "Black Marble" night-lights texture that react-globe.gl's own underlying
-// library (three-globe) ships as an example asset, plus a state-outline
-// polygon layer, so the globe reads as an actual earth (continents, city
-// lights, state lines) rather than a plain black sphere.
+// the backend) into the arcs/points that library expects. Styled as a flat,
+// muted map (dark ocean + faint country fill/borders + brighter state
+// borders) rather than a photographic satellite texture -- closer to a
+// clean "trucking ops" map look than an actual photo of the earth.
 //
-// When a carrier is selected (selectedCarrierId), their historical lanes
-// (selectedCarrierHistory, from carrier_lane_history) are drawn as bright
-// white arcs alongside whatever match arc they already have, and every
-// other carrier's arc/point is dimmed out -- the camera also eases toward
-// the selected carrier's lanes so the highlight isn't lost on a full globe.
+// The camera eases toward whatever's relevant: the searched/focused lane on
+// load (a wider view), then in tighter on a selected carrier's own lane
+// when one is picked from the list -- with a gentle idle auto-rotate the
+// rest of the time, paused while either of those transitions is active.
 function CarrierMapGlobe({ focusedLoad, laneMatches, regionalMatches, onSelectCarrier, selectedCarrierId, selectedCarrierHistory }) {
   const containerRef = useRef(null);
   const globeRef = useRef(null);
@@ -96,29 +106,47 @@ function CarrierMapGlobe({ focusedLoad, laneMatches, regionalMatches, onSelectCa
     });
   });
 
-  // Ease the camera toward the selected carrier's lanes so a highlight on a
-  // full globe of arcs is actually visible instead of lost at the current view.
+  // Idle ambient rotation -- switched off while a directed camera move
+  // (focused lane / selected carrier) is in flight, back on once neither
+  // is set (see the two effects below).
+  useEffect(() => {
+    if (!globeRef.current) return;
+    const controls = globeRef.current.controls();
+    controls.autoRotate = !focusedLoad && !selectedCarrierId;
+    controls.autoRotateSpeed = 0.35;
+  }, [focusedLoad, selectedCarrierId]);
+
+  // Ease toward the searched/focused lane first (a wider establishing view).
+  useEffect(() => {
+    if (!focusedLoad || !globeRef.current) return;
+    const mid = midpoint(focusedLoad.originLat, focusedLoad.originLng, focusedLoad.destLat, focusedLoad.destLng);
+    globeRef.current.pointOfView({ ...mid, altitude: 0.9 }, 1800);
+  }, [focusedLoad?.originLat, focusedLoad?.originLng, focusedLoad?.destLat, focusedLoad?.destLng]);
+
+  // Then zoom in tight on a selected carrier's own lane (their current
+  // match if they have one, else their most recent history entry).
   useEffect(() => {
     if (!selectedCarrierId || !globeRef.current) return;
-    const relevant = arcsData.filter((a) => a.carrierId === selectedCarrierId);
-    if (relevant.length === 0) return;
-    const avgLat = relevant.reduce((sum, a) => sum + a.startLat, 0) / relevant.length;
-    const avgLng = relevant.reduce((sum, a) => sum + a.startLng, 0) / relevant.length;
-    globeRef.current.pointOfView({ lat: avgLat, lng: avgLng, altitude: 1.6 }, 1200);
+    const currentArc = arcsData.find((a) => a.carrierId === selectedCarrierId && !a.isHistory);
+    const historyArc = arcsData.find((a) => a.carrierId === selectedCarrierId && a.isHistory);
+    const target = currentArc || historyArc;
+    if (!target) return;
+    const mid = midpoint(target.startLat, target.startLng, target.endLat, target.endLng);
+    globeRef.current.pointOfView({ ...mid, altitude: 0.35 }, 1800);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCarrierId, selectedCarrierHistory]);
 
   function arcColor(d) {
-    if (d.isFocusedLoad) return '#d7ff3d';
-    if (d.isHistory) return HIGHLIGHT_COLOR;
+    if (d.isFocusedLoad) return CURRENT_LANE_COLOR;
+    if (d.isHistory) return HISTORY_COLOR;
     if (selectedCarrierId && d.carrierId !== selectedCarrierId) return DIMMED_COLOR;
-    if (selectedCarrierId && d.carrierId === selectedCarrierId) return HIGHLIGHT_COLOR;
+    if (selectedCarrierId && d.carrierId === selectedCarrierId) return CURRENT_LANE_COLOR;
     return TIER_COLOR[d.tier] || '#6b7280';
   }
 
   function pointColor(d) {
     if (selectedCarrierId && d.carrierId !== selectedCarrierId) return DIMMED_COLOR;
-    if (selectedCarrierId && d.carrierId === selectedCarrierId) return HIGHLIGHT_COLOR;
+    if (selectedCarrierId && d.carrierId === selectedCarrierId) return CURRENT_LANE_COLOR;
     return TIER_COLOR[d.tier] || '#6b7280';
   }
 
@@ -129,15 +157,15 @@ function CarrierMapGlobe({ focusedLoad, laneMatches, regionalMatches, onSelectCa
         width={size.width}
         height={size.height}
         backgroundColor="rgba(0,0,0,0)"
-        globeImageUrl={earthTexture}
+        globeMaterial={OCEAN_MATERIAL}
         showAtmosphere
         atmosphereColor="#d7ff3d"
-        atmosphereAltitude={0.2}
-        polygonsData={STATE_FEATURES}
-        polygonCapColor={() => 'rgba(0,0,0,0)'}
+        atmosphereAltitude={0.18}
+        polygonsData={MAP_POLYGONS}
+        polygonCapColor={(d) => (d._kind === 'country' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0)')}
         polygonSideColor={() => 'rgba(0,0,0,0)'}
-        polygonStrokeColor={() => 'rgba(215,255,61,0.35)'}
-        polygonAltitude={0.001}
+        polygonStrokeColor={(d) => (d._kind === 'country' ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.32)')}
+        polygonAltitude={(d) => (d._kind === 'country' ? 0.001 : 0.0016)}
         polygonLabel={(d) => d.properties.name}
         arcsData={arcsData}
         arcStartLat={(d) => d.startLat}

@@ -58,6 +58,17 @@ describe('CarrierDetailSheet', () => {
     expect(onEdit).toHaveBeenCalledWith(CARRIER);
   });
 
+  test('docked variant renders the same content without the bottom-sheet backdrop/dialog role', async () => {
+    carriersApi.getCarrier.mockResolvedValue(CARRIER);
+    carriersApi.listCarrierHistory.mockResolvedValue(HISTORY);
+
+    render(<CarrierDetailSheet carrierId={5} onClose={vi.fn()} onEdit={vi.fn()} variant="docked" />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    expect(screen.getByRole('dialog')).toHaveAttribute('aria-modal', 'false');
+    expect(screen.getByText(/Dallas, TX → Chicago, IL/)).toBeInTheDocument();
+  });
+
   test('shows an empty state when the carrier has no lane history yet', async () => {
     carriersApi.getCarrier.mockResolvedValue(CARRIER);
     carriersApi.listCarrierHistory.mockResolvedValue([]);

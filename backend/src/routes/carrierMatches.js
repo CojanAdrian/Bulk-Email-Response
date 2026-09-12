@@ -87,13 +87,15 @@ function createCarrierMatchesRouter(pool) {
 
     const lane = await resolveQueryLane(pool, { originCity, originState, destCity, destState });
     if (!lane) {
-      return res.json({ laneMatches: [], regionalMatches: [] });
+      return res.json({ laneMatches: [], regionalMatches: [], queryOrigin: null, queryDest: null });
     }
     const { historyRows, regionalCarriers } = await loadCandidates(pool, req.session.userId);
     const result = findMatchesForLane({ ...lane, equipment: equipment || null, historyRows, regionalCarriers });
     result.laneMatches = await attachCarrierDetails(pool, req.session.userId, result.laneMatches);
     result.regionalMatches = await attachCarrierDetails(pool, req.session.userId, result.regionalMatches);
     result.regionalMatches = await attachStateCentroids(pool, result.regionalMatches);
+    result.queryOrigin = lane.queryOrigin;
+    result.queryDest = lane.queryDest;
     res.json(result);
   }));
 
@@ -112,13 +114,15 @@ function createCarrierMatchesRouter(pool) {
       destCity: load.dest_city, destState: load.dest_state,
     });
     if (!lane) {
-      return res.json({ laneMatches: [], regionalMatches: [] });
+      return res.json({ laneMatches: [], regionalMatches: [], queryOrigin: null, queryDest: null });
     }
     const { historyRows, regionalCarriers } = await loadCandidates(pool, req.session.userId);
     const result = findMatchesForLane({ ...lane, equipment: load.equipment || null, historyRows, regionalCarriers });
     result.laneMatches = await attachCarrierDetails(pool, req.session.userId, result.laneMatches);
     result.regionalMatches = await attachCarrierDetails(pool, req.session.userId, result.regionalMatches);
     result.regionalMatches = await attachStateCentroids(pool, result.regionalMatches);
+    result.queryOrigin = lane.queryOrigin;
+    result.queryDest = lane.queryDest;
     res.json(result);
   }));
 
