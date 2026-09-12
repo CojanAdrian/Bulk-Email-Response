@@ -70,10 +70,19 @@ describe('CarrierMapGlobe', () => {
     expect(onSelectCarrier).toHaveBeenCalledWith(1);
   });
 
-  test('renders no globeImageUrl (stylized dark sphere, not a fabricated texture URL)', () => {
+  test('renders a real earth texture, not a plain sphere', () => {
     render(<CarrierMapGlobe focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
     const props = globeMock.mock.calls[0][0];
-    expect(props.globeImageUrl).toBeUndefined();
+    expect(typeof props.globeImageUrl).toBe('string');
+    expect(props.globeImageUrl.length).toBeGreaterThan(0);
+  });
+
+  test('renders a state-outline polygon per US state from the bundled us-atlas topology', () => {
+    render(<CarrierMapGlobe focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
+    const props = globeMock.mock.calls[0][0];
+    expect(props.polygonsData.length).toBeGreaterThan(45);
+    expect(props.polygonsData.some((d) => d.properties.name === 'Texas')).toBe(true);
+    expect(props.polygonLabel(props.polygonsData[0])).toBe(props.polygonsData[0].properties.name);
   });
 
   describe('selected-carrier highlighting', () => {

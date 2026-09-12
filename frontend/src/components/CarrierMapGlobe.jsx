@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
+import { feature } from 'topojson-client';
+import statesTopology from 'us-atlas/states-10m.json';
+import earthTexture from '../assets/earth-night.jpg';
 
 const TIER_COLOR = {
   perfect: '#15803d',
@@ -11,13 +14,17 @@ const TIER_COLOR = {
 const DIMMED_COLOR = 'rgba(107,114,128,0.15)';
 const HIGHLIGHT_COLOR = '#ffffff';
 
+// US state outlines (from the Census-derived us-atlas TopoJSON package),
+// converted to GeoJSON once at module load -- static data, no need to
+// recompute per render/instance.
+const STATE_FEATURES = feature(statesTopology, statesTopology.objects.states).features;
+
 // Wraps react-globe.gl, translating match data (see carrierMatching.js on
-// the backend) into the arcs/points that library expects. No globeImageUrl
-// is set -- per the library's own documented fallback ("If no image is
-// provided, the globe is represented as a black sphere"), omitting it
-// avoids depending on an external texture URL while still looking
-// intentional (a dark sphere + colored atmosphere glow), rather than
-// guessing at a CDN link.
+// the backend) into the arcs/points that library expects. Uses the NASA
+// "Black Marble" night-lights texture that react-globe.gl's own underlying
+// library (three-globe) ships as an example asset, plus a state-outline
+// polygon layer, so the globe reads as an actual earth (continents, city
+// lights, state lines) rather than a plain black sphere.
 //
 // When a carrier is selected (selectedCarrierId), their historical lanes
 // (selectedCarrierHistory, from carrier_lane_history) are drawn as bright
@@ -122,9 +129,16 @@ function CarrierMapGlobe({ focusedLoad, laneMatches, regionalMatches, onSelectCa
         width={size.width}
         height={size.height}
         backgroundColor="rgba(0,0,0,0)"
+        globeImageUrl={earthTexture}
         showAtmosphere
         atmosphereColor="#d7ff3d"
         atmosphereAltitude={0.2}
+        polygonsData={STATE_FEATURES}
+        polygonCapColor={() => 'rgba(0,0,0,0)'}
+        polygonSideColor={() => 'rgba(0,0,0,0)'}
+        polygonStrokeColor={() => 'rgba(215,255,61,0.35)'}
+        polygonAltitude={0.001}
+        polygonLabel={(d) => d.properties.name}
         arcsData={arcsData}
         arcStartLat={(d) => d.startLat}
         arcStartLng={(d) => d.startLng}
