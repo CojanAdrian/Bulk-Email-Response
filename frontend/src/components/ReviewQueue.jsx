@@ -4,11 +4,14 @@ import { listInquiries, sendInquiryReply, rejectInquiry, bulkSendInquiries, bulk
 import { subscribe } from '../lib/liveSocket';
 import { detectMultiStop, multiStopTagVariant } from '../lib/lookupMessage';
 import { useMotionPreset } from '../lib/motionConfig';
+import { useSelectionMode } from '../lib/useSelectionMode';
 import Badge from './Badge';
+import BottomActionBar from './BottomActionBar';
 import Card from './Card';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import Skeleton from './Skeleton';
+import SelectionCircle from './SelectionCircle';
 
 // live_reply_body is recomposed from the matched load's CURRENT data every
 // time inquiries are fetched/pushed (see backend/src/lib/inquiryQueries.js)
@@ -27,7 +30,7 @@ function ReviewQueue() {
   const [error, setError] = useState(null);
   const [actioningId, setActioningId] = useState(null);
   const [rateOverrides, setRateOverrides] = useState({});
-  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const selection = useSelectionMode();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingBulkReject, setConfirmingBulkReject] = useState(false);
   const isMountedRef = useRef(true);
@@ -49,7 +52,7 @@ function ReviewQueue() {
         if (isMountedRef.current) {
           setInquiries(data);
           setDrafts(Object.fromEntries(data.map((inquiry) => [inquiry.id, draftTextFor(inquiry)])));
-          setSelectedIds(new Set());
+          selection.exit();
           setStatus('ready');
         }
       })
@@ -74,12 +77,7 @@ function ReviewQueue() {
     const unsubscribeUpdated = subscribe('inquiry:updated', (inquiry) => {
       if (inquiry.reply_status === 'pending_review') return;
       setInquiries((prev) => prev.filter((existing) => existing.id !== inquiry.id));
-      setSelectedIds((prev) => {
-        if (!prev.has(inquiry.id)) return prev;
-        const next = new Set(prev);
-        next.delete(inquiry.id);
-        return next;
-      });
+      selection.remove(inquiry.id);
     });
     return () => {
       unsubscribeNew();
@@ -146,12 +144,7 @@ function ReviewQueue() {
       .then(() => {
         if (isMountedRef.current) {
           setInquiries((prev) => prev.filter((inquiry) => inquiry.id !== id));
-          setSelectedIds((prev) => {
-            if (!prev.has(id)) return prev;
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
+          selection.remove(id);
         }
       })
       .catch((err) => {
@@ -166,38 +159,20 @@ function ReviewQueue() {
       });
   }
 
-  function toggleSelectOne(id) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }
-
-  function toggleSelectAll() {
-    setSelectedIds((prev) => (prev.size === inquiries.length ? new Set() : new Set(inquiries.map((inquiry) => inquiry.id))));
-  }
-
   function handleBulkSend() {
     setError(null);
     setBulkBusy(true);
-    const items = Array.from(selectedIds).map((id) => ({ id, body: drafts[id] }));
+    const items = Array.from(selection.selectedIds).map((id) => ({ id, body: drafts[id] }));
     bulkSendInquiries(items)
       .then((res) => {
         if (!isMountedRef.current) return;
-        const succeededIds = new Set(res.results.filter((r) => r.ok).map((r) => r.id));
+        const succeededIds = res.results.filter((r) => r.ok).map((r) => r.id);
         const failed = res.results.filter((r) => !r.ok);
-        setInquiries((prev) => prev.filter((inquiry) => !succeededIds.has(inquiry.id)));
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          succeededIds.forEach((id) => next.delete(id));
-          return next;
-        });
-        if (failed.length > 0) {
+        setInquiries((prev) => prev.filter((inquiry) => !succeededIds.includes(inquiry.id)));
+        if (failed.length === 0) {
+          selection.exit();
+        } else {
+          succeededIds.forEach((id) => selection.remove(id));
           setError(`${failed.length} of ${res.results.length} selected replies could not be sent: ${failed.map((f) => f.error).join('; ')}`);
         }
       })
@@ -216,12 +191,12 @@ function ReviewQueue() {
   function handleBulkReject() {
     setError(null);
     setBulkBusy(true);
-    const ids = Array.from(selectedIds);
+    const ids = Array.from(selection.selectedIds);
     bulkRejectInquiries(ids)
       .then(() => {
         if (!isMountedRef.current) return;
-        setInquiries((prev) => prev.filter((inquiry) => !selectedIds.has(inquiry.id)));
-        setSelectedIds(new Set());
+        setInquiries((prev) => prev.filter((inquiry) => !ids.includes(inquiry.id)));
+        selection.exit();
       })
       .catch((err) => {
         if (isMountedRef.current) {
@@ -238,7 +213,25 @@ function ReviewQueue() {
 
   return (
     <Card>
-      <h2 className="mb-3 text-sm font-semibold text-text">Review queue</h2>
+      <div className="mb-3 flex items-center justify-between">
+        <h2 className="text-sm font-semibold text-text">Review queue</h2>
+        {status === 'ready' && inquiries.length > 0 && (
+          selection.active ? (
+            <div className="flex items-center gap-3 text-sm font-medium">
+              <button type="button" onClick={() => selection.selectAll(inquiries.map((inquiry) => inquiry.id))} className="text-accent hover:underline">
+                Select All
+              </button>
+              <button type="button" onClick={selection.exit} className="text-text-muted hover:underline">
+                Done
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={selection.enter} className="text-sm font-medium text-accent hover:underline">
+              Select
+            </button>
+          )
+        )}
+      </div>
       {status === 'loading' && <Skeleton count={2} height="6rem" />}
       {error && (
         <p role="alert" className="mb-3 text-sm text-error">
@@ -248,62 +241,45 @@ function ReviewQueue() {
       {status === 'ready' && inquiries.length === 0 && (
         <p className="text-sm text-text-muted">Nothing waiting for review.</p>
       )}
-      {status === 'ready' && inquiries.length > 0 && (
-        <label className="mb-2 flex items-center gap-1.5 text-xs text-text-muted">
-          <input
-            type="checkbox"
-            aria-label="Select all pending inquiries"
-            checked={selectedIds.size > 0 && selectedIds.size === inquiries.length}
-            ref={(el) => {
-              if (el) el.indeterminate = selectedIds.size > 0 && selectedIds.size < inquiries.length;
-            }}
-            onChange={toggleSelectAll}
-          />
-          Select all
-        </label>
-      )}
-      {selectedIds.size > 0 && (
-        <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm">
-          <span className="font-medium text-text">{selectedIds.size} selected</span>
-          <PrimaryButton onClick={handleBulkSend} disabled={bulkBusy} className="px-3 py-1 text-xs">
-            {bulkBusy ? 'Sending...' : `Send ${selectedIds.size}`}
-          </PrimaryButton>
-          {confirmingBulkReject ? (
-            <>
-              <span className="text-xs text-error">Reject {selectedIds.size}?</span>
-              <button
-                onClick={handleBulkReject}
-                disabled={bulkBusy}
-                className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
-              >
-                {bulkBusy ? 'Rejecting...' : 'Confirm'}
-              </button>
-              <button
-                onClick={() => setConfirmingBulkReject(false)}
-                disabled={bulkBusy}
-                className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
+      <BottomActionBar count={selection.selectedIds.size}>
+        <PrimaryButton onClick={handleBulkSend} disabled={bulkBusy} className="px-3 py-1 text-xs">
+          {bulkBusy ? 'Sending...' : `Send ${selection.selectedIds.size}`}
+        </PrimaryButton>
+        {confirmingBulkReject ? (
+          <>
+            <span className="text-xs text-error">Reject {selection.selectedIds.size}?</span>
             <button
-              onClick={() => setConfirmingBulkReject(true)}
+              onClick={handleBulkReject}
               disabled={bulkBusy}
-              className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
+              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
             >
-              Reject selected
+              {bulkBusy ? 'Rejecting...' : 'Confirm'}
             </button>
-          )}
+            <button
+              onClick={() => setConfirmingBulkReject(false)}
+              disabled={bulkBusy}
+              className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+            >
+              Cancel
+            </button>
+          </>
+        ) : (
           <button
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => setConfirmingBulkReject(true)}
             disabled={bulkBusy}
-            className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+            className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
           >
-            Clear selection
+            Reject selected
           </button>
-        </div>
-      )}
+        )}
+        <button
+          onClick={selection.clear}
+          disabled={bulkBusy}
+          className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+        >
+          Clear selection
+        </button>
+      </BottomActionBar>
       {status === 'ready' && inquiries.length > 0 && (
         <ul className="space-y-4">
           <AnimatePresence initial={false}>
@@ -326,12 +302,13 @@ function ReviewQueue() {
                 className="rounded-xl border border-border bg-surface-alt p-4"
               >
                 <div className="mb-2 flex flex-wrap items-center gap-2 text-sm text-text">
-                  <input
-                    type="checkbox"
-                    aria-label={`Select inquiry from ${inquiry.from_address}`}
-                    checked={selectedIds.has(inquiry.id)}
-                    onChange={() => toggleSelectOne(inquiry.id)}
-                  />
+                  {selection.active && (
+                    <SelectionCircle
+                      selected={selection.isSelected(inquiry.id)}
+                      onToggle={() => selection.toggle(inquiry.id)}
+                      ariaLabel={`Select inquiry from ${inquiry.from_address}`}
+                    />
+                  )}
                   <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
                   {Boolean(inquiry.ref_mismatch) && (
                     <Badge variant="warning">Different load? — reference # didn't match, verify</Badge>

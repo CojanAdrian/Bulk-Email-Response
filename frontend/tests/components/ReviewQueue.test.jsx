@@ -64,41 +64,84 @@ describe('ReviewQueue', () => {
     expect(screen.getByLabelText('Reply').value).toBe('PU: DALLAS, TX\nDEL: CHICAGO, IL');
   });
 
-  describe('bulk selection and actions', () => {
+  test('no selection circle or bulk bar shows until "Select" is clicked', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
+  });
+
+  describe('selection mode and bulk actions', () => {
+    test('clicking "Select" reveals selection circles and "Select All"/"Done" controls', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toBeInTheDocument();
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierB@example.com' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Select All' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+    });
+
     test('checking one inquiry shows the bulk action bar with a count of 1', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
 
       expect(screen.getByText('1 selected')).toBeInTheDocument();
     });
 
-    test('"Select all" checks every inquiry and the count matches', async () => {
+    test('"Select All" checks every inquiry and the count matches', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
 
       expect(screen.getByText('2 selected')).toBeInTheDocument();
-      expect(screen.getByLabelText('Select inquiry from carrierA@example.com')).toBeChecked();
-      expect(screen.getByLabelText('Select inquiry from carrierB@example.com')).toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierB@example.com' })).toHaveAttribute('aria-checked', 'true');
     });
 
-    test('"Clear selection" empties the selection and hides the bulk bar', async () => {
+    test('"Done" exits selection mode, hiding the circles and the bulk bar', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
-      fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
     });
 
-    test('bulk-sending selected inquiries calls bulkSendInquiries with each one\'s current draft text', async () => {
+    test('"Clear selection" empties the selection but stays in selection mode', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+      render(<ReviewQueue />);
+      await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
+      fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
+
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
+      expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toBeInTheDocument();
+    });
+
+    test('bulk-sending selected inquiries calls bulkSendInquiries with each one\'s current draft text, then exits selection mode', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
       inquiriesApi.bulkSendInquiries.mockResolvedValue({
         results: [{ id: 1, ok: true }, { id: 2, ok: true }],
@@ -106,7 +149,8 @@ describe('ReviewQueue', () => {
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
       fireEvent.click(screen.getByRole('button', { name: /send 2/i }));
 
       await waitFor(() => {
@@ -119,9 +163,10 @@ describe('ReviewQueue', () => {
         expect(screen.queryByText('carrierA@example.com', { exact: false })).not.toBeInTheDocument();
         expect(screen.queryByText('carrierB@example.com', { exact: false })).not.toBeInTheDocument();
       });
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
 
-    test('a partial bulk-send failure keeps the failed inquiry in the queue and shows an error', async () => {
+    test('a partial bulk-send failure keeps the failed inquiry selected in selection mode and shows an error', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
       inquiriesApi.bulkSendInquiries.mockResolvedValue({
         results: [{ id: 1, ok: true }, { id: 2, ok: false, error: 'Reply body cannot be empty.' }],
@@ -129,7 +174,8 @@ describe('ReviewQueue', () => {
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
       fireEvent.click(screen.getByRole('button', { name: /send 2/i }));
 
       await waitFor(() => {
@@ -137,15 +183,17 @@ describe('ReviewQueue', () => {
       });
       expect(screen.getByText('carrierB@example.com', { exact: false })).toBeInTheDocument();
       expect(screen.getByRole('alert')).toHaveTextContent(/1 of 2/);
+      expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
     });
 
-    test('bulk-rejecting requires confirmation, then calls bulkRejectInquiries and clears the queue', async () => {
+    test('bulk-rejecting requires confirmation, then calls bulkRejectInquiries and exits selection mode', async () => {
       inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1, INQUIRY_2]);
       inquiriesApi.bulkRejectInquiries.mockResolvedValue({ updated: 2 });
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select all pending inquiries'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
       fireEvent.click(screen.getByRole('button', { name: /reject selected/i }));
       expect(inquiriesApi.bulkRejectInquiries).not.toHaveBeenCalled();
 
@@ -157,6 +205,7 @@ describe('ReviewQueue', () => {
       await waitFor(() => {
         expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
       });
+      expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument();
     });
 
     test('canceling the bulk-reject confirmation does not call bulkRejectInquiries', async () => {
@@ -164,7 +213,8 @@ describe('ReviewQueue', () => {
       render(<ReviewQueue />);
       await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
 
-      fireEvent.click(screen.getByLabelText('Select inquiry from carrierA@example.com'));
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
       fireEvent.click(screen.getByRole('button', { name: /reject selected/i }));
       fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
 

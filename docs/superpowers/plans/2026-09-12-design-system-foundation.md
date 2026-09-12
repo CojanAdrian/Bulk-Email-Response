@@ -1269,7 +1269,12 @@ describe('ReviewQueue', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Done' }));
 
       expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      // BottomActionBar's exit animation (AnimatePresence) is asynchronous,
+      // so the "N selected" text doesn't leave the DOM synchronously --
+      // wait for it, rather than asserting immediately after the click.
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
     });
 
     test('"Clear selection" empties the selection but stays in selection mode', async () => {
@@ -1281,7 +1286,9 @@ describe('ReviewQueue', () => {
       fireEvent.click(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' }));
       fireEvent.click(screen.getByRole('button', { name: /clear selection/i }));
 
-      expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
+      });
       expect(screen.getByRole('checkbox', { name: 'Select inquiry from carrierA@example.com' })).toBeInTheDocument();
     });
 
