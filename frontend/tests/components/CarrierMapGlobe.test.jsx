@@ -92,15 +92,45 @@ describe('CarrierMapGlobe', () => {
     expect(props.globeMaterial.isMaterial).toBe(true);
   });
 
-  test('renders a state polygon per US state and a fill polygon per country', () => {
+  test('renders a state polygon per US state plus the world landmass silhouette', () => {
     render(<CarrierMapGlobe focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
     const props = globeMock.mock.calls[0][0];
     const states = props.polygonsData.filter((d) => d._kind === 'state');
-    const countries = props.polygonsData.filter((d) => d._kind === 'country');
+    const land = props.polygonsData.filter((d) => d._kind === 'land');
     expect(states.length).toBeGreaterThan(45);
     expect(states.some((d) => d.properties.name === 'Texas')).toBe(true);
-    expect(countries.length).toBeGreaterThan(100);
+    expect(land.length).toBeGreaterThan(0);
     expect(props.polygonLabel(states[0])).toBe(states[0].properties.name);
+  });
+
+  test('renders an always-on text label for every US state, positioned at its real centroid', () => {
+    render(<CarrierMapGlobe focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
+    const props = globeMock.mock.calls[0][0];
+    expect(props.labelsData.length).toBeGreaterThan(45);
+    const texas = props.labelsData.find((d) => d.text === 'Texas');
+    expect(texas).toBeDefined();
+    expect(typeof texas.lat).toBe('number');
+    expect(typeof texas.lng).toBe('number');
+  });
+
+  test('separates arc kinds onto distinct altitudes so overlapping short lanes don\'t visually fuse', () => {
+    const laneMatches = [{ carrierId: 1, carrierName: 'A', tier: 'perfect', originLat: 39.7, originLng: -104.9, destLat: 39.1, destLng: -108.5 }];
+    const history = [{ origin_lat: 40.6, origin_lng: -105.1, dest_lat: 39.7, dest_lng: -105.0 }];
+    render(
+      <CarrierMapGlobe
+        focusedLoad={FOCUSED_LOAD}
+        laneMatches={laneMatches}
+        regionalMatches={[]}
+        selectedCarrierId={1}
+        selectedCarrierHistory={history}
+      />
+    );
+    const props = globeMock.mock.calls[0][0];
+    const focusedArc = props.arcsData.find((a) => a.isFocusedLoad);
+    const currentArc = props.arcsData.find((a) => a.carrierId === 1 && !a.isHistory);
+    const historyArc = props.arcsData.find((a) => a.isHistory);
+    const altitudes = new Set([props.arcAltitude(focusedArc), props.arcAltitude(currentArc), props.arcAltitude(historyArc)]);
+    expect(altitudes.size).toBe(3);
   });
 
   describe('camera behavior', () => {
@@ -112,11 +142,23 @@ describe('CarrierMapGlobe', () => {
       );
     });
 
-    test('zooms in tighter on a selected carrier\'s own current-match lane', () => {
+    test('zooms in tighter on a selected carrier\'s own current-match lane, framed to the lane\'s length', () => {
       const laneMatches = [{ carrierId: 1, carrierName: 'A', tier: 'perfect', originLat: 32.0, originLng: -96.0, destLat: 40.0, destLng: -88.0 }];
       render(<CarrierMapGlobe focusedLoad={null} laneMatches={laneMatches} regionalMatches={[]} selectedCarrierId={1} selectedCarrierHistory={[]} />);
       const call = pointOfViewMock.mock.calls.find(([, ms]) => true);
-      expect(call[0]).toEqual(expect.objectContaining({ lat: 36, lng: -92, altitude: 0.35 }));
+      expect(call[0].lat).toBe(36);
+      expect(call[0].lng).toBe(-92);
+      // Tighter than the wider establishing view, but not so tight it's an
+      // uninterpretable close-up on a lane that (at ~700mi) isn't tiny.
+      expect(call[0].altitude).toBeGreaterThan(0.55);
+      expect(call[0].altitude).toBeLessThan(1.2);
+    });
+
+    test('a short in-state lane still gets a sane minimum zoom, not an extreme close-up', () => {
+      const laneMatches = [{ carrierId: 1, carrierName: 'A', tier: 'perfect', originLat: 39.7, originLng: -104.9, destLat: 39.75, destLng: -105.0 }];
+      render(<CarrierMapGlobe focusedLoad={null} laneMatches={laneMatches} regionalMatches={[]} selectedCarrierId={1} selectedCarrierHistory={[]} />);
+      const call = pointOfViewMock.mock.calls.find(([, ms]) => true);
+      expect(call[0].altitude).toBeGreaterThanOrEqual(0.55);
     });
 
     test('auto-rotates when nothing is focused or selected', () => {

@@ -187,7 +187,7 @@ function CarrierMapPage({ focusedLoad }) {
     : queryLane;
 
   return (
-    <div className="relative h-[calc(100vh-12rem)] min-h-[520px] w-full overflow-hidden bg-[#05060a]">
+    <div className="relative h-full min-h-[520px] w-full overflow-hidden bg-[#05060a]">
       <div className="absolute inset-0">
         <CarrierMapGlobe
           focusedLoad={globeLane}

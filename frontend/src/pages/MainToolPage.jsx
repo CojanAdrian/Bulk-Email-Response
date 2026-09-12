@@ -27,6 +27,31 @@ const TAB_TITLES = {
   carriers: 'Carriers',
 };
 
+function CarriersViewToggle({ carriersView, onChange }) {
+  return (
+    <div className="flex gap-2">
+      <button
+        type="button"
+        onClick={() => onChange('find')}
+        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+          carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+        }`}
+      >
+        Find matches
+      </button>
+      <button
+        type="button"
+        onClick={() => onChange('manage')}
+        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
+          carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+        }`}
+      >
+        All carriers
+      </button>
+    </div>
+  );
+}
+
 function MainToolPage({ username, onLogout }) {
   const [tab, setTab] = useState('loads'); // 'loads' | 'inquiries'
   const [refreshKey, setRefreshKey] = useState(0);
@@ -71,9 +96,11 @@ function MainToolPage({ username, onLogout }) {
       {inquiryAlertViewport}
       <TopNav tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
       <div className="relative z-10 min-w-0">
-        <header className="px-4 pt-6 sm:px-6">
-          <h1 className="text-2xl font-extrabold tracking-tight text-shell-text">{TAB_TITLES[tab]}</h1>
-        </header>
+        {!(tab === 'carriers' && carriersView === 'find') && (
+          <header className="px-4 pt-6 sm:px-6">
+            <h1 className="text-2xl font-extrabold tracking-tight text-shell-text">{TAB_TITLES[tab]}</h1>
+          </header>
+        )}
         <AnimatePresence>
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
@@ -108,42 +135,29 @@ function MainToolPage({ username, onLogout }) {
               <InquiriesLog refreshKey={inquiriesRefreshKey} />
             </motion.main>
           )}
-          {tab === 'carriers' && (
-            <motion.main key="carriers" {...preset.crossfade}>
-              <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-2 px-4 pb-4 sm:px-6">
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCarriersView('find')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
-                    }`}
-                  >
-                    Find matches
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setCarriersView('manage')}
-                    className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-                      carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
-                    }`}
-                  >
-                    All carriers
-                  </button>
+          {tab === 'carriers' && carriersView === 'manage' && (
+            <motion.main key="carriers-manage" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6">
+              <CarriersViewToggle carriersView={carriersView} onChange={setCarriersView} />
+              <CarriersPanel />
+            </motion.main>
+          )}
+          {tab === 'carriers' && carriersView === 'find' && (
+            <motion.main key="carriers-find" {...preset.crossfade} className="relative h-[calc(100vh-3.75rem)] w-full overflow-hidden">
+              <CarrierMapPage focusedLoad={focusedMatchLoad} />
+              {/* Floats over the globe instead of sitting in a separate header
+                  strip above it, so the whole tab reads as one continuous
+                  canvas rather than chrome-then-a-boxed-panel. */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-b from-black/50 to-transparent p-4 sm:px-6">
+                <div className="pointer-events-auto flex items-center gap-3">
+                  <h1 className="text-xl font-extrabold tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">Carriers</h1>
+                  <CarriersViewToggle carriersView={carriersView} onChange={setCarriersView} />
                 </div>
-                {carriersView === 'find' && focusedMatchLoad && (
-                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="px-3 py-1.5 text-xs">
+                {focusedMatchLoad && (
+                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="pointer-events-auto px-3 py-1.5 text-xs">
                     ← Clear load, search any lane
                   </SecondaryButton>
                 )}
               </div>
-              {carriersView === 'manage' ? (
-                <div className="mx-auto max-w-[1400px] px-4 pb-6 sm:px-6">
-                  <CarriersPanel />
-                </div>
-              ) : (
-                <CarrierMapPage focusedLoad={focusedMatchLoad} />
-              )}
             </motion.main>
           )}
         </AnimatePresence>
