@@ -102,6 +102,19 @@ describe('CarrierLaneMap', () => {
     });
   });
 
+  test('removes the drawn route from the map when the focused lane is cleared (set back to null)', async () => {
+    const { rerender } = render(<CarrierLaneMap focusedLoad={FOCUSED_LOAD} laneMatches={[]} regionalMatches={[]} />);
+    await waitFor(() => expect(DirectionsRendererMock).toHaveBeenCalled());
+    const renderer = directionsRendererInstances[0];
+    expect(renderer.setMap).not.toHaveBeenCalledWith(null);
+
+    rerender(<CarrierLaneMap focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
+
+    await waitFor(() => {
+      expect(renderer.setMap).toHaveBeenCalledWith(null);
+    });
+  });
+
   test('shows the current lane\'s distance/duration once the route resolves', async () => {
     directionsServiceInstance.route.mockResolvedValue(routeResult('812 mi', '12 hours 30 mins'));
     render(<CarrierLaneMap focusedLoad={FOCUSED_LOAD} laneMatches={[]} regionalMatches={[]} />);

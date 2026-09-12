@@ -476,9 +476,9 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         <p className="text-sm text-text-muted">No loads match "{searchText}".</p>
       )}
       {status === 'ready' && sortedLoads.length > 0 && (
-        <div className="max-h-[70vh] overflow-auto">
+        <div className="overflow-x-auto">
         <table className="w-full text-left text-sm text-text">
-          <thead className="sticky top-0 z-10 bg-surface">
+          <thead className="bg-surface">
             <tr className="border-b border-border text-text-muted">
               <th className="w-8 py-1.5 pr-2" />
               {SORT_COLUMNS.map((col) => (

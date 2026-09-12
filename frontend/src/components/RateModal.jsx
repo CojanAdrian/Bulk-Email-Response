@@ -4,7 +4,7 @@ import { updateLoad, previewLoadReply } from '../api/loads';
 import { useMotionPreset } from '../lib/motionConfig';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
-import Card from './Card';
+import ModalCard from './ModalCard';
 import CityStateAutocomplete from './CityStateAutocomplete';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
@@ -13,7 +13,7 @@ import EquipmentPicker from './EquipmentPicker';
 import DateRangeField from './DateRangeField';
 import BookingCarrierFields from './BookingCarrierFields';
 
-const MotionCard = motion(Card);
+const MotionModalCard = motion(ModalCard);
 
 const TEXT_FIELDS = [
   'origin_city', 'origin_state', 'origin_zip',
@@ -169,7 +169,7 @@ function RateModal({ load, onClose, onSaved }) {
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
-      <MotionCard className="max-h-[85vh] w-full max-w-lg overflow-y-auto" {...preset.modal.card}>
+      <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
         <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-text">
           Edit load {load.load_number}
         </h2>
@@ -424,7 +424,7 @@ function RateModal({ load, onClose, onSaved }) {
             {saving ? 'Saving...' : 'Save'}
           </PrimaryButton>
         </div>
-      </MotionCard>
+      </MotionModalCard>
     </motion.div>
   );
 }

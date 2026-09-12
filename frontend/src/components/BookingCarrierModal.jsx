@@ -1,10 +1,10 @@
 import { motion } from 'framer-motion';
 import { useMotionPreset } from '../lib/motionConfig';
 import BookingCarrierFields from './BookingCarrierFields';
-import Card from './Card';
+import ModalCard from './ModalCard';
 import SecondaryButton from './SecondaryButton';
 
-const MotionCard = motion(Card);
+const MotionModalCard = motion(ModalCard);
 
 // Pops up as soon as a load's status is switched to "booked" (see
 // LoadsTable's status dropdown) instead of the carrier-logging step being
@@ -21,7 +21,7 @@ function BookingCarrierModal({ load, onClose }) {
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
-      <MotionCard className="w-full max-w-lg" {...preset.modal.card}>
+      <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
         <h2 id="booking-carrier-modal-title" className="mb-1 text-lg font-semibold text-text">
           Who's running load {load.load_number}?
         </h2>
@@ -37,7 +37,7 @@ function BookingCarrierModal({ load, onClose }) {
         <div className="flex justify-end">
           <SecondaryButton onClick={onClose}>Close</SecondaryButton>
         </div>
-      </MotionCard>
+      </MotionModalCard>
     </motion.div>
   );
 }

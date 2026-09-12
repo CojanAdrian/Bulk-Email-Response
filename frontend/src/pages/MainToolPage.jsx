@@ -106,15 +106,19 @@ function MainToolPage({ username, onLogout }) {
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
               <LoadsStatsRow refreshKey={refreshKey} />
-              <div className="flex flex-wrap items-start gap-4">
-                <div className="min-w-[16rem] flex-1">
-                  <UploadPanel onUploadComplete={handleUploadComplete} />
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <SecondaryButton onClick={() => datExportRef.current?.openExportFlow()}>Generate DAT Export</SecondaryButton>
-                  <PrimaryButton onClick={() => setAddLoadOpen(true)}>+ Add Load</PrimaryButton>
-                </div>
-              </div>
+              <UploadPanel
+                onUploadComplete={handleUploadComplete}
+                headerActions={
+                  <div className="flex gap-2">
+                    <SecondaryButton onClick={() => datExportRef.current?.openExportFlow()} className="px-3 py-1.5 text-xs">
+                      Generate DAT Export
+                    </SecondaryButton>
+                    <PrimaryButton onClick={() => setAddLoadOpen(true)} className="px-3 py-1.5 text-xs">
+                      + Add Load
+                    </PrimaryButton>
+                  </div>
+                }
+              />
               <LoadsTable
                 refreshKey={refreshKey}
                 onSelectLoad={setSelectedLoad}

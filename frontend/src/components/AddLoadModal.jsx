@@ -4,14 +4,14 @@ import { createLoad } from '../api/loads';
 import { datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
 import { useMotionPreset } from '../lib/motionConfig';
-import Card from './Card';
+import ModalCard from './ModalCard';
 import CityStateAutocomplete from './CityStateAutocomplete';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import EquipmentPicker from './EquipmentPicker';
 import DateRangeField from './DateRangeField';
 
-const MotionCard = motion(Card);
+const MotionModalCard = motion(ModalCard);
 
 const TEXT_FIELDS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -93,7 +93,7 @@ function AddLoadModal({ onClose, onCreated }) {
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
-      <MotionCard className="max-h-[85vh] w-full max-w-lg overflow-y-auto" {...preset.modal.card}>
+      <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
         <h2 id="add-load-title" className="mb-4 text-lg font-semibold text-text">
           Add a load
         </h2>
@@ -259,7 +259,7 @@ function AddLoadModal({ onClose, onCreated }) {
             {saving ? 'Adding...' : 'Add load'}
           </PrimaryButton>
         </div>
-      </MotionCard>
+      </MotionModalCard>
     </motion.div>
   );
 }

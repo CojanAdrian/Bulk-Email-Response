@@ -4,7 +4,7 @@ import { parseMcleodRows, cleanText } from '../lib/mcleodParser';
 import { uploadLoads } from '../api/loads';
 import Card from './Card';
 
-function UploadPanel({ onUploadComplete }) {
+function UploadPanel({ onUploadComplete, headerActions }) {
   const [status, setStatus] = useState('idle'); // 'idle' | 'parsing' | 'uploading' | 'done'
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
@@ -71,7 +71,10 @@ function UploadPanel({ onUploadComplete }) {
 
   return (
     <Card>
-      <h2 className="mb-3 text-sm font-semibold text-text">Upload loads CSV</h2>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-sm font-semibold text-text">Upload loads CSV</h2>
+        {headerActions}
+      </div>
       <input
         type="file"
         accept=".csv"

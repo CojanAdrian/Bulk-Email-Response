@@ -141,4 +141,9 @@ describe('UploadPanel', () => {
       expect(screen.getByLabelText(/upload loads csv/i)).not.toBeDisabled();
     });
   });
+
+  test('renders headerActions next to the title', () => {
+    render(<UploadPanel onUploadComplete={vi.fn()} headerActions={<button>+ Add Load</button>} />);
+    expect(screen.getByRole('button', { name: /\+ add load/i })).toBeInTheDocument();
+  });
 });

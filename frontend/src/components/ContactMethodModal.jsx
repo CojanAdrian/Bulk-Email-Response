@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useMotionPreset } from '../lib/motionConfig';
-import Card from './Card';
+import ModalCard from './ModalCard';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 
-const MotionCard = motion(Card);
+const MotionModalCard = motion(ModalCard);
 
 function ContactMethodModal({ onCancel, onConfirm }) {
   const preset = useMotionPreset();
@@ -28,7 +28,7 @@ function ContactMethodModal({ onCancel, onConfirm }) {
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       {...preset.modal.backdrop}
     >
-      <MotionCard className="w-full max-w-md" {...preset.modal.card}>
+      <MotionModalCard className="w-full max-w-md" {...preset.modal.card}>
         <h2 id="contact-modal-title" className="mb-4 text-lg font-semibold text-text">
           DAT Contact Method
         </h2>
@@ -67,7 +67,7 @@ function ContactMethodModal({ onCancel, onConfirm }) {
           <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
           <PrimaryButton onClick={handleConfirm}>Continue</PrimaryButton>
         </div>
-      </MotionCard>
+      </MotionModalCard>
     </motion.div>
   );
 }

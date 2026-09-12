@@ -710,13 +710,15 @@ describe('LoadsTable', () => {
     });
   });
 
-  test('the table header is sticky so it stays visible while scrolling', async () => {
+  test('the table is not boxed into a fixed-height internal scroll area -- it grows to fit its rows, only scrolling horizontally if needed', async () => {
     loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
     await waitFor(() => screen.getByText('L1001'));
 
-    const headerRow = screen.getAllByRole('row')[0];
-    expect(headerRow.closest('thead')).toHaveClass('sticky');
+    const table = screen.getByRole('table');
+    const wrapper = table.parentElement;
+    expect(wrapper.className).not.toMatch(/max-h-|overflow-y-auto|overflow-auto\b/);
+    expect(wrapper.className).toContain('overflow-x-auto');
   });
 
   describe('inline target pay editing', () => {

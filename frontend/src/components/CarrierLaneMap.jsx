@@ -104,12 +104,17 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
 
   // The current searched/focused lane -- real driving route in lime.
   useEffect(() => {
-    if (status !== 'ready' || !focusedLoad) return;
+    if (status !== 'ready') return;
+    // Cleared unconditionally, before the early returns below -- otherwise
+    // clearing the search (focusedLoad -> null) left the previous route
+    // drawn on the map forever, since nothing ever told its renderer to go.
+    clearRenderers(currentRenderersRef);
+    setRouteInfo((prev) => ({ ...prev, current: null }));
+    if (!focusedLoad) return;
     const origin = toLatLng(focusedLoad.originLat, focusedLoad.originLng);
     const destination = toLatLng(focusedLoad.destLat, focusedLoad.destLng);
     if (!origin || !destination) return;
     let cancelled = false;
-    clearRenderers(currentRenderersRef);
     drawRoute({ directionsService: directionsServiceRef.current, map: mapObjRef.current, color: CURRENT_LANE_COLOR, origin, destination })
       .then(({ renderer, distanceText, durationText }) => {
         if (cancelled) {

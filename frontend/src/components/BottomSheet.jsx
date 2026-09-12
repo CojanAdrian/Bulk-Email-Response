@@ -28,10 +28,16 @@ function BottomSheet({ onClose, children, className = '' }) {
         animate={preset.sheet.panel.animate}
         exit={preset.sheet.panel.exit}
         transition={preset.sheet.panel.transition}
-        className={`max-h-[85vh] w-full max-w-lg overflow-y-auto rounded-t-4xl border border-border bg-surface p-6 shadow-[0_12px_40px_rgba(10,11,16,0.18)] ${className}`}
+        // overflow-hidden lives here, on the rounded shell -- overflow-y-auto
+        // and padding live on the plain (unrounded) div below instead, so a
+        // long body's scrollbar is clipped to the shell's rounded corners
+        // rather than rendering as a straight bar poking past them.
+        className={`w-full max-w-lg overflow-hidden rounded-t-4xl border border-border bg-surface shadow-[0_12px_40px_rgba(10,11,16,0.18)] ${className}`}
       >
-        <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" aria-hidden="true" />
-        {children}
+        <div className="max-h-[85vh] overflow-y-auto p-6">
+          <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+          {children}
+        </div>
       </motion.div>
     </motion.div>
   );
