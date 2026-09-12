@@ -254,6 +254,8 @@ bundled static dataset. To keep that affordable and fast:
   no live API calls happen at match-check time, ever.
 - New required env var: `GOOGLE_MAPS_API_KEY` (documented in
   `.env.example` and the README, alongside the existing Google OAuth vars).
+- New **optional** env var (added in Phase 3, not this phase):
+  `HIGHWAY_PROFILE_URL_TEMPLATE` — see Phase 3's Carrier Map section.
 
 ### Backend API
 
@@ -329,11 +331,20 @@ destLng }, equipmentType)`:
    keep the single best-tier/closest one per carrier for ranking, note the
    total count), sort perfect → strong → weak, then by distance within a
    tier.
-6. Carriers with **no** `carrier_lane_history` rows at all but with
-   `operating_states` set are returned in a separate `regionalCarriers`
-   list (not lane-distance-ranked — surfaced only when the query
-   origin/dest state is among their tagged states) for the globe's
-   state-highlight treatment.
+6. Carriers with **no** `carrier_lane_history` rows at all are matched
+   differently, in a separate `regionalCarriers` list — they have no
+   geocoded point to measure distance from, only a tagged
+   `operating_states` list, so it's a state-membership check instead of
+   mileage:
+   - **origin state tagged → regional match.**
+   - **both origin and destination states tagged → regional perfect
+     match** (mirrors the lane-history perfect-match upgrade, without
+     claiming mileage precision the state-tag data doesn't have).
+   - Not tagged at all → excluded, same as a >300mi lane-history carrier.
+   - A carrier with *both* real history and `operating_states` notes only
+     ever appears via the lane-history path — the regional path only
+     applies when a carrier has zero logged lanes, so no carrier is ever
+     double-counted across both lists.
 
 ### Backend API
 
@@ -378,21 +389,34 @@ New `CarrierMapPage.jsx`/tab:
   directly without an existing load — same matching endpoint, no
   "focused load" bold arc since there isn't one.
 - **Side panel**: matched carriers as cards (Phase 1 visual language —
-  rounded, generous spacing), tapping one both focuses the globe on just
-  that carrier's arcs/region and opens a Phase 1 `BottomSheet` with full
-  detail: company/MC/dispatcher, a tappable `tel:` phone link, full lane
-  history list, notes, and a `mailto:` "send offer" link prefilled with
-  the load's rate-offer text (reusing the existing reply-composing
-  conventions from `replyComposer.js`/`lookupMessage.js` for the body, not
-  a new template language).
+  rounded, generous spacing) split into the two groups from the matching
+  algorithm — lane-history carriers show their tier and distance ("Strong
+  match — 42mi from origin"), regional carriers show their tag instead
+  ("No booked lanes — tagged TX, OK, AR"). Tapping a card both focuses the
+  globe on just that carrier's arcs/region and opens a Phase 1
+  `BottomSheet` with full detail: company/MC/dispatcher, a tappable `tel:`
+  phone link, full lane history list, notes, a `mailto:` "send offer" link
+  prefilled with the load's rate-offer text (reusing the existing
+  reply-composing conventions from `replyComposer.js`/`lookupMessage.js`
+  for the body, not a new template language), and a link to the carrier's
+  **Highway** profile (shown only when `mc_number` is on file). **Pending:
+  the exact Highway profile URL pattern** — their public site doesn't
+  document one (carrier lookup lives behind login), so this needs the
+  actual URL format from the user's own Highway account before
+  implementation; built as `HIGHWAY_PROFILE_URL_TEMPLATE` (an env var, MC
+  number interpolated in) so it's a one-line config change once known
+  rather than a code change, and simply omitted from the sheet if unset.
 
 ### Testing
 
 `carrierMatching.js` is a pure function once given coordinates — easy,
 thorough unit tests with fixed lat/lngs covering each tier boundary
 (exactly 150mi, exactly 300mi, both-ends-close upgrade to perfect,
-equipment-mismatch flagging without exclusion). Route tests for the three
-new endpoints mirror existing integration-test conventions. The globe
+equipment-mismatch flagging without exclusion) plus the regional-carrier
+path (origin-state-only tag, both-states-tagged perfect upgrade, untagged
+exclusion, and the "never double-counted" rule when a carrier has both
+history and tags). Route tests for the three new endpoints mirror existing
+integration-test conventions. The globe
 component itself (WebGL) isn't meaningfully unit-testable — covered by a
 smoke test that it mounts without throwing given mocked match data, plus
 manual verification, consistent with how visually-driven pieces are
