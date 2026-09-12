@@ -10,6 +10,7 @@ import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
 import EquipmentPicker from './EquipmentPicker';
 import DateRangeField from './DateRangeField';
+import BookingCarrierFields from './BookingCarrierFields';
 
 const MotionCard = motion(Card);
 
@@ -395,6 +396,16 @@ function RateModal({ load, onClose, onSaved }) {
             </select>
           </div>
         </div>
+
+        {status === 'booked' && (
+          <BookingCarrierFields
+            loadId={load.id}
+            originCity={fields.origin_city}
+            originState={fields.origin_state}
+            destCity={fields.dest_city}
+            destState={fields.dest_state}
+          />
+        )}
 
         {error && (
           <p role="alert" className="mb-4 text-sm text-error">
