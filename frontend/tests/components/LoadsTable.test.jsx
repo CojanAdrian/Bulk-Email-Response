@@ -363,27 +363,36 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      expect(screen.queryByRole('button', { name: /carriers match/i })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^\d+ matches?$/i })).not.toBeInTheDocument();
     });
 
-    test('shows a colored badge with the match count when matches exist', async () => {
+    test('shows a colored tag with the match count when matches exist', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
       carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [SAMPLE_LOAD.id]: { tier: 'perfect', count: 3 } });
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
       expect(carrierMatchesApi.bulkCarrierMatches).toHaveBeenCalledWith([SAMPLE_LOAD.id]);
-      expect(screen.getByRole('button', { name: /3 carriers match/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /^3 matches$/i })).toBeInTheDocument();
     });
 
-    test('clicking the badge calls onViewMatches with the load', async () => {
+    test('a single match reads "1 match", not "1 matches"', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [SAMPLE_LOAD.id]: { tier: 'strong', count: 1 } });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      expect(screen.getByRole('button', { name: /^1 match$/i })).toBeInTheDocument();
+    });
+
+    test('clicking the tag calls onViewMatches with the load', async () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
       carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [SAMPLE_LOAD.id]: { tier: 'strong', count: 2 } });
       const onViewMatches = vi.fn();
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} onViewMatches={onViewMatches} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: /2 carriers match/i }));
+      fireEvent.click(screen.getByRole('button', { name: /^2 matches$/i }));
       expect(onViewMatches).toHaveBeenCalledWith(SAMPLE_LOAD);
     });
   });

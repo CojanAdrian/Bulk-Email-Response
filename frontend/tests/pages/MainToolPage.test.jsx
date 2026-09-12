@@ -232,8 +232,8 @@ describe('MainToolPage', () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({ laneMatches: [], regionalMatches: [] });
     renderPage({ username: 'admin', onLogout: vi.fn() });
 
-    await waitFor(() => screen.getByRole('button', { name: /1 carrier.* match/i }));
-    fireEvent.click(screen.getByRole('button', { name: /1 carrier.* match/i }));
+    await waitFor(() => screen.getByRole('button', { name: /^1 match$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^1 match$/i }));
 
     await waitFor(() => {
       expect(carrierMatchesApi.getCarrierMatchesForLoad).toHaveBeenCalledWith(1);

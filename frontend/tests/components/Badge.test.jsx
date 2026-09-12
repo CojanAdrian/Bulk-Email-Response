@@ -28,11 +28,17 @@ describe('Badge', () => {
     expect(screen.getByText('Status').className).toContain('bg-tag-bg');
   });
 
-  test('never shrinks or wraps its label, even inside a cramped flex row', () => {
+  test('never shrinks below its content, even inside a cramped flex row', () => {
     render(<Badge>Needs stops added</Badge>);
     const el = screen.getByText('Needs stops added');
     expect(el.className).toContain('shrink-0');
-    expect(el.className).toContain('whitespace-nowrap');
+  });
+
+  test('does not force single-line text, so a caller can cap width and let a long label wrap', () => {
+    render(<Badge className="max-w-[5rem]">Needs stops added</Badge>);
+    const el = screen.getByText('Needs stops added');
+    expect(el.className).not.toContain('whitespace-nowrap');
+    expect(el.className).toContain('max-w-[5rem]');
   });
 
   test('forwards extra props like title', () => {

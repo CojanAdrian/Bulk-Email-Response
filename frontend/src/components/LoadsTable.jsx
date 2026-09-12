@@ -17,10 +17,11 @@ import SelectionCircle from './SelectionCircle';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
-// A compact colored dot in the row's own left-edge column (see the match
-// indicator below) instead of a wide "N carriers match" pill inline next to
-// the load number -- the pill was cramped/wrapped oddly at narrow widths.
-const MATCH_DOT_VARIANT = { perfect: 'bg-success', strong: 'bg-info', weak: 'bg-warning', regional_perfect: 'bg-success', regional: 'bg-text-muted' };
+// A compact tag in the row's own left-edge column (see the match indicator
+// below) instead of a wide "N carriers match" pill inline next to the load
+// number -- moved out of the way of Load #/Origin, but still a readable
+// tag (count + "match"/"matches"), not a bare unlabeled circle.
+const MATCH_BADGE_VARIANT = { perfect: 'success', strong: 'info', weak: 'warning', regional_perfect: 'success', regional: 'default' };
 
 const SORT_COLUMNS = [
   { key: 'load_number', label: 'Load #' },
@@ -500,7 +501,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           <tbody>
             {sortedLoads.map((load) => (
               <tr key={load.id} className="border-b border-border/60">
-                <td className="w-8 py-1.5 pr-2">
+                <td className="py-1.5 pr-2">
                   {selection.active ? (
                     <SelectionCircle
                       selected={selection.isSelected(load.id)}
@@ -509,14 +510,10 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                     />
                   ) : (
                     matchInfo[load.id] && (
-                      <button
-                        type="button"
-                        onClick={() => onViewMatches && onViewMatches(load)}
-                        aria-label={`${matchInfo[load.id].count} carrier${matchInfo[load.id].count === 1 ? '' : 's'} match — view`}
-                        title={`${matchInfo[load.id].count} carrier${matchInfo[load.id].count === 1 ? '' : 's'} match`}
-                        className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-white ${MATCH_DOT_VARIANT[matchInfo[load.id].tier] || 'bg-text-muted'}`}
-                      >
-                        {matchInfo[load.id].count}
+                      <button type="button" onClick={() => onViewMatches && onViewMatches(load)} className="cursor-pointer border-0 bg-transparent p-0">
+                        <Badge variant={MATCH_BADGE_VARIANT[matchInfo[load.id].tier] || 'default'} className="max-w-[4.5rem]">
+                          {matchInfo[load.id].count} match{matchInfo[load.id].count === 1 ? '' : 'es'}
+                        </Badge>
                       </button>
                     )
                   )}
@@ -525,8 +522,8 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                   <div className="flex items-center gap-1.5">
                     <span>{load.load_number}</span>
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
-                    {multiStopTagVariant(load) === 'error' && <Badge variant="error">Needs stops added</Badge>}
-                    {multiStopTagVariant(load) === 'info' && <Badge variant="info">Stops added</Badge>}
+                    {multiStopTagVariant(load) === 'error' && <Badge variant="error" className="max-w-[5rem]">Needs stops added</Badge>}
+                    {multiStopTagVariant(load) === 'info' && <Badge variant="info" className="max-w-[5rem]">Stops added</Badge>}
                   </div>
                 </td>
                 <td className="py-1.5 pr-4">
