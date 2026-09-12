@@ -97,7 +97,7 @@ function MatchCard({ match, onSelect }) {
 // docked variant) in the same footprint -- no full-screen popup blocking
 // the map -- and draws that carrier's lane history as real driving routes;
 // the panel's own Edit button opens CarrierSheet.
-function CarrierMapPage({ focusedLoad }) {
+function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
   const [lane, setLane] = useState(() => laneFromLoad(focusedLoad));
   const [laneMatches, setLaneMatches] = useState([]);
   const [regionalMatches, setRegionalMatches] = useState([]);
@@ -205,6 +205,24 @@ function CarrierMapPage({ focusedLoad }) {
     setSelectedCarrierHistory([]);
   }
 
+  // "Clear load, search any lane" -- not just detaching the focused load
+  // (the parent's job, via onClearFocusedLoad), but actually resetting
+  // this page back to a blank search: the old load's lane, its matches,
+  // and any open carrier detail would otherwise just sit there looking
+  // like live results for a search that no longer applies.
+  function handleClearFocusedLoad() {
+    setLane(blankLane());
+    setLaneMatches([]);
+    setRegionalMatches([]);
+    setQueryLane(null);
+    setMapNote(null);
+    setError(null);
+    setStatus('idle');
+    closeDetail();
+    setEditingCarrier(null);
+    if (onClearFocusedLoad) onClearFocusedLoad();
+  }
+
   function reRunSearch() {
     if (focusedLoad) {
       getCarrierMatchesForLoad(focusedLoad.id).then((data) => {
@@ -292,7 +310,18 @@ function CarrierMapPage({ focusedLoad }) {
             </select>
           </div>
           <div className="flex items-center justify-between gap-2">
-            {focusedLoad && <span className="text-xs text-white/40">Load {focusedLoad.load_number}</span>}
+            {focusedLoad && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-white/40">Load {focusedLoad.load_number}</span>
+                <button
+                  type="button"
+                  onClick={handleClearFocusedLoad}
+                  className="rounded-lg border border-white/20 px-2 py-1 text-xs text-white/70 hover:bg-white/10 hover:text-white"
+                >
+                  ← Clear, search any lane
+                </button>
+              </div>
+            )}
             <PrimaryButton onClick={handleSearch} disabled={status === 'loading'} className="ml-auto px-4 py-1.5 text-xs">
               {status === 'loading' ? 'Searching...' : 'Search'}
             </PrimaryButton>

@@ -47,6 +47,43 @@ describe('CarrierMapPage', () => {
     expect(screen.getByLabelText(/origin city/i)).toHaveValue('Houston');
   });
 
+  test('"Clear, search any lane" resets the search fields/results and notifies the parent to drop the focused load', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],
+      regionalMatches: [],
+    });
+    const onClearFocusedLoad = vi.fn();
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} onClearFocusedLoad={onClearFocusedLoad} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+
+    fireEvent.click(screen.getByRole('button', { name: /clear, search any lane/i }));
+
+    expect(onClearFocusedLoad).toHaveBeenCalledTimes(1);
+    expect(screen.getByLabelText(/origin city/i)).toHaveValue('');
+    expect(screen.getByLabelText(/destination city/i)).toHaveValue('');
+    expect(screen.queryByText('ABC Trucking')).not.toBeInTheDocument();
+    expect(screen.getByText(/no matches yet/i)).toBeInTheDocument();
+  });
+
+  test('clearing the focused load also closes an open carrier detail panel', async () => {
+    carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],
+      regionalMatches: [],
+    });
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
+    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} onClearFocusedLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+    fireEvent.click(screen.getByText('ABC Trucking'));
+    await waitFor(() => expect(carriersApi.getCarrier).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByRole('button', { name: /clear, search any lane/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+    });
+  });
+
   test('with a focused load, fetches and lists its matches automatically', async () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
       laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10 }],

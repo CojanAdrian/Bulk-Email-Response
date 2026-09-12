@@ -145,20 +145,18 @@ function MainToolPage({ username, onLogout }) {
           )}
           {tab === 'carriers' && carriersView === 'find' && (
             <motion.main key="carriers-find" {...preset.crossfade} className="relative h-[calc(100vh-3.75rem)] w-full overflow-hidden">
-              <CarrierMapPage focusedLoad={focusedMatchLoad} />
+              <CarrierMapPage focusedLoad={focusedMatchLoad} onClearFocusedLoad={() => setFocusedMatchLoad(null)} />
               {/* Floats over the globe instead of sitting in a separate header
                   strip above it, so the whole tab reads as one continuous
-                  canvas rather than chrome-then-a-boxed-panel. */}
-              <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex flex-wrap items-center justify-between gap-2 bg-gradient-to-b from-black/50 to-transparent p-4 sm:px-6">
-                <div className="pointer-events-auto flex items-center gap-3">
-                  <h1 className="text-xl font-extrabold tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">Carriers</h1>
+                  canvas rather than chrome-then-a-boxed-panel. Kept to just the
+                  title/toggle on the left -- the "clear load" action lives in
+                  CarrierMapPage's own search panel now, since a full-width bar
+                  here collided with the docked match list on the right. */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 z-40 flex items-center gap-3 bg-gradient-to-b from-black/50 to-transparent p-4 sm:px-6">
+                <h1 className="pointer-events-auto text-xl font-extrabold tracking-tight text-white drop-shadow-[0_1px_4px_rgba(0,0,0,0.6)]">Carriers</h1>
+                <div className="pointer-events-auto">
                   <CarriersViewToggle carriersView={carriersView} onChange={setCarriersView} />
                 </div>
-                {focusedMatchLoad && (
-                  <SecondaryButton onClick={() => setFocusedMatchLoad(null)} className="pointer-events-auto px-3 py-1.5 text-xs">
-                    ← Clear load, search any lane
-                  </SecondaryButton>
-                )}
               </div>
             </motion.main>
           )}
