@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
+import { bulkCarrierMatches } from '../api/carrierMatches';
 import { subscribe } from '../lib/liveSocket';
 import { multiStopTagVariant, buildLookupMessage } from '../lib/lookupMessage';
 import { buildPUSched } from '../lib/datExport';
@@ -11,6 +12,7 @@ import DateRangeField from './DateRangeField';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
+const MATCH_BADGE_VARIANT = { perfect: 'success', strong: 'info', weak: 'warning', regional_perfect: 'success', regional: 'default' };
 
 const SORT_COLUMNS = [
   { key: 'load_number', label: 'Load #' },
@@ -83,8 +85,9 @@ function getInitialSort() {
   return { key: null, direction: 'asc' };
 }
 
-function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
+function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   const [loads, setLoads] = useState([]);
+  const [matchInfo, setMatchInfo] = useState({});
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
   const [searchText, setSearchText] = useState('');
@@ -137,6 +140,25 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
   useEffect(() => {
     return subscribe('load:changed', () => setLiveTick((t) => t + 1));
   }, []);
+
+  useEffect(() => {
+    if (loads.length === 0) {
+      setMatchInfo({});
+      return undefined;
+    }
+    let ignore = false;
+    bulkCarrierMatches(loads.map((load) => load.id))
+      .then((data) => {
+        if (!ignore) setMatchInfo(data);
+      })
+      .catch(() => {
+        // Best-effort -- a failed match lookup shouldn't block the table
+        // itself from rendering; the badge just doesn't show.
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [loads]);
 
   useEffect(() => {
     localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
@@ -480,6 +502,17 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast }) {
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
                     {multiStopTagVariant(load) === 'error' && <Badge variant="error">Needs stops added</Badge>}
                     {multiStopTagVariant(load) === 'info' && <Badge variant="info">Stops added</Badge>}
+                    {matchInfo[load.id] && (
+                      <button
+                        type="button"
+                        onClick={() => onViewMatches && onViewMatches(load)}
+                        className="cursor-pointer border-0 bg-transparent p-0"
+                      >
+                        <Badge variant={MATCH_BADGE_VARIANT[matchInfo[load.id].tier] || 'default'}>
+                          {matchInfo[load.id].count} carrier{matchInfo[load.id].count === 1 ? '' : 's'} match
+                        </Badge>
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td className="py-1.5 pr-4">

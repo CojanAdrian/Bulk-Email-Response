@@ -2,9 +2,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import LoadsTable from '../../src/components/LoadsTable';
 import * as loadsApi from '../../src/api/loads';
+import * as carrierMatchesApi from '../../src/api/carrierMatches';
 import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/loads');
+vi.mock('../../src/api/carrierMatches');
 vi.mock('../../src/lib/liveSocket');
 
 const SAMPLE_LOAD = {
@@ -30,6 +32,7 @@ describe('LoadsTable', () => {
         delete liveHandlers[event];
       };
     });
+    carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({});
   });
 
   test('renders loads returned by the API, filtered to active by default', async () => {
@@ -309,6 +312,38 @@ describe('LoadsTable', () => {
     });
 
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(2));
+  });
+
+  describe('carrier match badge', () => {
+    test('shows no badge when a load has no matches', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({});
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      expect(screen.queryByRole('button', { name: /carriers match/i })).not.toBeInTheDocument();
+    });
+
+    test('shows a colored badge with the match count when matches exist', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [SAMPLE_LOAD.id]: { tier: 'perfect', count: 3 } });
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      expect(carrierMatchesApi.bulkCarrierMatches).toHaveBeenCalledWith([SAMPLE_LOAD.id]);
+      expect(screen.getByRole('button', { name: /3 carriers match/i })).toBeInTheDocument();
+    });
+
+    test('clicking the badge calls onViewMatches with the load', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [SAMPLE_LOAD.id]: { tier: 'strong', count: 2 } });
+      const onViewMatches = vi.fn();
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} onViewMatches={onViewMatches} />);
+      await waitFor(() => screen.getByText('L1001'));
+
+      fireEvent.click(screen.getByRole('button', { name: /2 carriers match/i }));
+      expect(onViewMatches).toHaveBeenCalledWith(SAMPLE_LOAD);
+    });
   });
 
   describe('row selection and bulk actions', () => {
