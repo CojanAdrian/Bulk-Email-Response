@@ -29,6 +29,9 @@ export default {
         info: 'var(--color-info)',
         'info-bg': 'var(--color-info-bg)',
       },
+      fontFamily: {
+        sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', 'Inter', '"Segoe UI"', 'sans-serif'],
+      },
       borderRadius: {
         '4xl': '2rem',
       },
