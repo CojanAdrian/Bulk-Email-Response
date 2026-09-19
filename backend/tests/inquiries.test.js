@@ -110,6 +110,23 @@ describe('inquiries routes', () => {
     expect(res.body[0].matched_load_stops).toBe(2);
   });
 
+  test('includes the matched load\'s load_number and equipment for the review queue\'s load header', async () => {
+    const [loadResult] = await pool.query(
+      "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, equipment, user_id, status) VALUES ('L4521', 'Dallas', 'TX', 'Chicago', 'IL', 'V', ?, 'active')",
+      [userId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status)
+       VALUES (?, ?, 'm1', 'carrier@example.com', 'Dallas load inquiry', '2026-08-01 08:00:00', ?, 'load_number', 'matched')`,
+      [userId, accountId, loadResult.insertId]
+    );
+
+    const res = await agent.get('/api/inquiries');
+    expect(res.status).toBe(200);
+    expect(res.body[0].matched_load_load_number).toBe('L4521');
+    expect(res.body[0].matched_load_equipment).toBe('V');
+  });
+
   test('includes the matched load\'s planning comment, so the frontend can detect a multi-pick/multi-drop mention', async () => {
     const [loadResult] = await pool.query(
       "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, comment, user_id, status) VALUES ('L1', 'Dallas', 'TX', 'Chicago', 'IL', '2nd pickup in Fort Worth', ?, 'active')",

@@ -6,6 +6,7 @@ const { composeReply } = require('./replyComposer');
 // fields the multi-stop badge and rate toggle use) so a live reply can be
 // recomposed from the load's CURRENT data -- see attachLiveReplyBody.
 const INQUIRY_JOIN_FIELDS = `
+    l.load_number AS matched_load_load_number, l.equipment AS matched_load_equipment,
     l.origin_city AS matched_load_origin_city, l.origin_state AS matched_load_origin_state,
     l.dest_city AS matched_load_dest_city, l.dest_state AS matched_load_dest_state,
     l.early_pu AS matched_load_early_pu, l.late_pu AS matched_load_late_pu,
