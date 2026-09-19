@@ -215,6 +215,18 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  // 'manual' records that a human chose this inquiry's match via the
+  // review queue's re-assign control -- distinguishing it from every
+  // heuristic tier matters because it is the only tier known-correct by
+  // construction (see the sub-project 1 design spec).
+  const [matchTierCol] = await conn.query(
+    `SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_inquiries' AND COLUMN_NAME = 'match_tier'`,
+    [databaseName]
+  );
+  if (matchTierCol[0] && !matchTierCol[0].COLUMN_TYPE.includes("'manual'")) {
+    await conn.query(`ALTER TABLE email_inquiries MODIFY COLUMN match_tier ENUM('load_number','city_state','city','state','manual','none') NOT NULL DEFAULT 'none'`);
+  }
+
   await conn.query(`
     CREATE TABLE IF NOT EXISTS carriers (
       id INT AUTO_INCREMENT PRIMARY KEY,

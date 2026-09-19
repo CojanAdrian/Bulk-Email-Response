@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS email_inquiries (
   body_snippet TEXT,
   received_at DATETIME,
   matched_load_id INT NULL,
-  match_tier ENUM('load_number','city_state','city','state','none') NOT NULL DEFAULT 'none',
+  match_tier ENUM('load_number','city_state','city','state','manual','none') NOT NULL DEFAULT 'none',
   status ENUM('matched','needs_review') NOT NULL DEFAULT 'needs_review',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   reply_status ENUM('none','pending_review','auto_sent','sent','rejected') NOT NULL DEFAULT 'none',
