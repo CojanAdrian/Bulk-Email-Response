@@ -6,6 +6,7 @@ import CarrierLaneMap from '../components/CarrierLaneMap';
 import CarrierDetailSheet from '../components/CarrierDetailSheet';
 import CarrierSheet from '../components/CarrierSheet';
 import CityStateAutocomplete from '../components/CityStateAutocomplete';
+import StateSelect from '../components/StateSelect';
 import PrimaryButton from '../components/PrimaryButton';
 import Badge from '../components/Badge';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
@@ -269,12 +270,12 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
               dark
             />
-            <input
-              aria-label="Origin state"
-              placeholder="Origin state"
+            <StateSelect
+              ariaLabel="Origin state"
               value={lane.originState}
-              onChange={(e) => setLane((prev) => ({ ...prev, originState: e.target.value }))}
+              onChange={(state) => setLane((prev) => ({ ...prev, originState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
+              dark
             />
             <CityStateAutocomplete
               id="lane-dest-city"
@@ -286,12 +287,12 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
               dark
             />
-            <input
-              aria-label="Destination state"
-              placeholder="Destination state"
+            <StateSelect
+              ariaLabel="Destination state"
               value={lane.destState}
-              onChange={(e) => setLane((prev) => ({ ...prev, destState: e.target.value }))}
+              onChange={(state) => setLane((prev) => ({ ...prev, destState: state }))}
               className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white placeholder:text-white/40"
+              dark
             />
           </div>
           <div className="mb-2">
