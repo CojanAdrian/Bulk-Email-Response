@@ -445,6 +445,105 @@ describe('inquiries routes', () => {
     });
   });
 
+  describe('PATCH /:id/match', () => {
+    let inquiryId;
+    let loadId;
+    let otherLoadId;
+
+    beforeEach(async () => {
+      const [loadResult] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id, status) VALUES ('L1', 'Dallas', 'TX', 'Chicago', 'IL', ?, 'active')",
+        [userId]
+      );
+      loadId = loadResult.insertId;
+      const [otherLoadResult] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id, status) VALUES ('L2', 'Miami', 'FL', 'Atlanta', 'GA', ?, 'active')",
+        [userId]
+      );
+      otherLoadId = otherLoadResult.insertId;
+      const [result] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status)
+         VALUES (?, ?, 'm1', 'carrier@example.com', 'Wrong match?', '2026-08-01 08:00:00', ?, 'city', 'matched', 'pending_review')`,
+        [userId, accountId, loadId]
+      );
+      inquiryId = result.insertId;
+    });
+
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).patch(`/api/inquiries/${inquiryId}/match`);
+      expect(res.status).toBe(401);
+    });
+
+    test('re-assigns the inquiry to a different load and marks the tier manual', async () => {
+      const res = await agent.patch(`/api/inquiries/${inquiryId}/match`).send({ matched_load_id: otherLoadId });
+      expect(res.status).toBe(200);
+      expect(res.body.matched_load_id).toBe(otherLoadId);
+      expect(res.body.match_tier).toBe('manual');
+      expect(res.body.status).toBe('matched');
+    });
+
+    test('detaches the match when matched_load_id is null', async () => {
+      const res = await agent.patch(`/api/inquiries/${inquiryId}/match`).send({ matched_load_id: null });
+      expect(res.status).toBe(200);
+      expect(res.body.matched_load_id).toBeNull();
+      expect(res.body.match_tier).toBe('none');
+      expect(res.body.status).toBe('needs_review');
+    });
+
+    test('returns 404 when the given load belongs to another user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [otherUsersLoad] = await pool.query(
+        "INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id, status) VALUES ('L9', 'X City', 'TX', 'Y City', 'TX', ?, 'active')",
+        [otherUser.insertId]
+      );
+
+      const res = await agent.patch(`/api/inquiries/${inquiryId}/match`).send({ matched_load_id: otherUsersLoad.insertId });
+      expect(res.status).toBe(404);
+
+      const [rows] = await pool.query('SELECT matched_load_id FROM email_inquiries WHERE id = ?', [inquiryId]);
+      expect(rows[0].matched_load_id).toBe(loadId);
+    });
+
+    test('returns 404 for an inquiry belonging to another user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      const [otherAccount] = await pool.query(
+        'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
+        [otherUser.insertId, 'other@example.com', 'other-refresh']
+      );
+      const [otherInquiry] = await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, received_at, match_tier, status, reply_status)
+         VALUES (?, ?, 'm-other', NOW(), 'none', 'needs_review', 'pending_review')`,
+        [otherUser.insertId, otherAccount.insertId]
+      );
+
+      const res = await agent.patch(`/api/inquiries/${otherInquiry.insertId}/match`).send({ matched_load_id: loadId });
+      expect(res.status).toBe(404);
+    });
+
+    test('returns 400 when the inquiry is not pending_review', async () => {
+      await pool.query("UPDATE email_inquiries SET reply_status = 'sent' WHERE id = ?", [inquiryId]);
+      const res = await agent.patch(`/api/inquiries/${inquiryId}/match`).send({ matched_load_id: otherLoadId });
+      expect(res.status).toBe(400);
+    });
+
+    test('emits inquiry:updated over the websocket hub', async () => {
+      const wsHub = { emitToUser: jest.fn() };
+      const hubApp = createApp(pool, wsHub);
+      const hubAgent = request.agent(hubApp);
+      await hubAgent.post('/api/auth/login').send({ username: 'testuser', password: 'correcthorse' });
+
+      await hubAgent.patch(`/api/inquiries/${inquiryId}/match`).send({ matched_load_id: otherLoadId });
+
+      expect(wsHub.emitToUser).toHaveBeenCalledTimes(1);
+      const [userIdArg, event, payload] = wsHub.emitToUser.mock.calls[0];
+      expect(userIdArg).toBe(userId);
+      expect(event).toBe('inquiry:updated');
+      expect(payload.matched_load_id).toBe(otherLoadId);
+    });
+  });
+
   describe('POST /bulk-send', () => {
     let inquiryId1;
     let inquiryId2;

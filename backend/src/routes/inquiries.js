@@ -3,7 +3,7 @@ const asyncHandler = require('../lib/asyncHandler');
 const { getAccessToken } = require('../lib/googleOAuth');
 const { sendReply, markMessageRead } = require('../lib/gmailClient');
 const { appendSignature } = require('../lib/replyComposer');
-const { INQUIRY_JOIN_FIELDS, attachLiveReplyBody } = require('../lib/inquiryQueries');
+const { INQUIRY_JOIN_FIELDS, attachLiveReplyBody, fetchInquiryWithLoad } = require('../lib/inquiryQueries');
 
 function replySubject(originalSubject) {
   const subject = originalSubject || '';
@@ -132,6 +132,42 @@ function createInquiriesRouter(pool, wsHub) {
     const [updated] = await pool.query('SELECT * FROM email_inquiries WHERE id = ?', [req.params.id]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'inquiry:updated', updated[0]);
     res.json(updated[0]);
+  }));
+
+  // Re-assigns an inquiry to a different load than whichever tier picked
+  // -- the automatic matcher (see matchingEngine.js) is a heuristic and
+  // sometimes picks wrong; this is how a human corrects it. 'manual' marks
+  // the correction as known-correct, distinct from every automatic tier.
+  router.patch('/:id/match', asyncHandler(async (req, res) => {
+    const [rows] = await pool.query('SELECT * FROM email_inquiries WHERE id = ? AND user_id = ?', [req.params.id, req.session.userId]);
+    const inquiry = rows[0];
+    if (!inquiry) {
+      return res.status(404).json({ error: 'Inquiry not found' });
+    }
+    if (inquiry.reply_status !== 'pending_review') {
+      return res.status(400).json({ error: 'Inquiry is not pending review' });
+    }
+
+    const { matched_load_id } = req.body;
+    let loadId = null;
+    if (matched_load_id !== null && matched_load_id !== undefined) {
+      const [loadRows] = await pool.query('SELECT id FROM loads WHERE id = ? AND user_id = ?', [matched_load_id, req.session.userId]);
+      if (loadRows.length === 0) {
+        return res.status(404).json({ error: 'Load not found' });
+      }
+      loadId = loadRows[0].id;
+    }
+
+    const matchTier = loadId ? 'manual' : 'none';
+    const status = loadId ? 'matched' : 'needs_review';
+    await pool.query(
+      'UPDATE email_inquiries SET matched_load_id = ?, match_tier = ?, status = ? WHERE id = ?',
+      [loadId, matchTier, status, req.params.id]
+    );
+
+    const updated = await fetchInquiryWithLoad(pool, req.params.id);
+    if (wsHub) wsHub.emitToUser(req.session.userId, 'inquiry:updated', updated);
+    res.json(updated);
   }));
 
   // Bulk-rejects a batch of selected review-queue inquiries. Scoped to
