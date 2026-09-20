@@ -66,6 +66,18 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
   const [loadLookupStatus, setLoadLookupStatus] = useState('idle'); // 'idle' | 'checking' | 'found' | 'new'
   const isMountedRef = useRef(true);
 
+  const carrierDirty = useDirtyGuard({
+    companyName, mcNumber, dispatcherName, dispatcherPhone, dispatcherEmail,
+    equipmentTypes, equipmentNotes, operatingStatesText, operatingNotes, comment,
+  });
+  const laneDraftDirty = useDirtyGuard(historyDraft);
+  const isDirty = carrierDirty || (addingHistory && laneDraftDirty);
+  const closeConfirmation = useCloseConfirmation();
+
+  function handleRequestClose() {
+    closeConfirmation.requestClose(isDirty, onClose);
+  }
+
   useEffect(() => {
     isMountedRef.current = true;
     return () => {
@@ -220,7 +232,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
 
   return (
     <AnimatePresence>
-      <BottomSheet onClose={onClose}>
+      <BottomSheet onClose={handleRequestClose}>
         <h2 className="mb-4 text-lg font-semibold text-text">{isEditing ? `Edit ${carrier.company_name}` : 'Add a carrier'}</h2>
 
         <div className="mb-4 grid grid-cols-2 gap-3">
@@ -522,12 +534,16 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             {error}
           </p>
         )}
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </PrimaryButton>
-        </div>
+        {closeConfirmation.confirming ? (
+          <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+        ) : (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </PrimaryButton>
+          </div>
+        )}
       </BottomSheet>
     </AnimatePresence>
   );

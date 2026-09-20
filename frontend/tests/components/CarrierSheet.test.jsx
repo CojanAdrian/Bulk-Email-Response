@@ -260,6 +260,43 @@ describe('CarrierSheet', () => {
     });
   });
 
+  test('editing a field then clicking Cancel asks to discard before closing', async () => {
+    const onClose = vi.fn();
+    render(<CarrierSheet carrier={null} onClose={onClose} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/company name/i), { target: { value: 'New Carrier LLC' } });
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
+  test('editing a field then clicking the backdrop asks to discard before closing', async () => {
+    const onClose = vi.fn();
+    render(<CarrierSheet carrier={null} onClose={onClose} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/company name/i), { target: { value: 'New Carrier LLC' } });
+    fireEvent.click(screen.getByRole('presentation'));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
+  test('an in-progress, unsaved lane draft also triggers the discard prompt on Cancel', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    const onClose = vi.fn();
+    render(<CarrierSheet carrier={carrier} onClose={onClose} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/^origin city$/i), { target: { value: 'Dallas' } });
+    fireEvent.click(screen.getAllByRole('button', { name: /^cancel$/i }).at(-1));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
   test('calls onClose when the backdrop is clicked', () => {
     const onClose = vi.fn();
     render(<CarrierSheet carrier={null} onClose={onClose} onSaved={vi.fn()} />);
