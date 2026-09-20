@@ -1,4 +1,5 @@
 import DateTimePopover from './DateTimePopover';
+import StateSelect from './StateSelect';
 
 function blankStop() {
   return { type: 'pickup', city: '', state: '', datetime: '' };
@@ -59,12 +60,12 @@ function ExtraStopsEditor({ stops, onChange }) {
               <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-state-${index}`}>
                 State
               </label>
-              <input
+              <StateSelect
                 id={`extra-stop-state-${index}`}
-                aria-label={`Stop ${index + 1} state`}
+                ariaLabel={`Stop ${index + 1} state`}
                 value={stop.state}
-                onChange={(e) => updateStop(index, 'state', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-2 py-2 text-sm text-text"
+                onChange={(state) => updateStop(index, 'state', state)}
+                className="rounded-lg border border-border bg-surface-alt px-2 py-2 text-sm text-text"
               />
             </div>
             <div className="w-36">
