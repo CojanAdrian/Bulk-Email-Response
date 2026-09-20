@@ -6,10 +6,14 @@ import { buildPUSched, buildDELSched } from '../lib/datExport';
 import { useMotionPreset } from '../lib/motionConfig';
 import ModalCard from './ModalCard';
 import CityStateAutocomplete from './CityStateAutocomplete';
+import StateSelect from './StateSelect';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import EquipmentPicker from './EquipmentPicker';
 import DateRangeField from './DateRangeField';
+import UnsavedChangesBar from './UnsavedChangesBar';
+import { useDirtyGuard } from '../lib/useDirtyGuard';
+import { useCloseConfirmation } from '../lib/useCloseConfirmation';
 
 const MotionModalCard = motion(ModalCard);
 
@@ -35,6 +39,13 @@ function AddLoadModal({ onClose, onCreated }) {
   const [includeRate, setIncludeRate] = useState(true);
   const [error, setError] = useState(null);
   const [saving, setSaving] = useState(false);
+
+  const isDirty = useDirtyGuard({ ...fields, targetPay, earlyPu, latePu, earlyDel, lateDel, includeRate });
+  const closeConfirmation = useCloseConfirmation();
+
+  function handleRequestClose() {
+    closeConfirmation.requestClose(isDirty, onClose);
+  }
 
   function handleFieldChange(field, value) {
     setFields((prev) => ({ ...prev, [field]: value }));
@@ -128,8 +139,13 @@ function AddLoadModal({ onClose, onCreated }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
               State
             </label>
-            <input id="origin_state" value={fields.origin_state} onChange={(e) => handleFieldChange('origin_state', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            <StateSelect
+              id="origin_state"
+              ariaLabel="Origin state"
+              value={fields.origin_state}
+              onChange={(state) => handleFieldChange('origin_state', state)}
+              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_zip">
@@ -158,8 +174,13 @@ function AddLoadModal({ onClose, onCreated }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
               State
             </label>
-            <input id="dest_state" value={fields.dest_state} onChange={(e) => handleFieldChange('dest_state', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            <StateSelect
+              id="dest_state"
+              ariaLabel="Destination state"
+              value={fields.dest_state}
+              onChange={(state) => handleFieldChange('dest_state', state)}
+              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
           </div>
           <div>
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_zip">
@@ -253,12 +274,16 @@ function AddLoadModal({ onClose, onCreated }) {
             {error}
           </p>
         )}
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleSave} disabled={saving}>
-            {saving ? 'Adding...' : 'Add load'}
-          </PrimaryButton>
-        </div>
+        {closeConfirmation.confirming ? (
+          <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+        ) : (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={handleSave} disabled={saving}>
+              {saving ? 'Adding...' : 'Add load'}
+            </PrimaryButton>
+          </div>
+        )}
       </MotionModalCard>
     </motion.div>
   );

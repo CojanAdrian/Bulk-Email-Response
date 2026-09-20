@@ -100,6 +100,32 @@ describe('AddLoadModal', () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
+  test('typing into a field then clicking Cancel asks to discard before closing', () => {
+    const onClose = vi.fn();
+    render(<AddLoadModal onClose={onClose} onCreated={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'L1001' } });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^discard$/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  test('"Keep editing" dismisses the discard prompt without closing', () => {
+    const onClose = vi.fn();
+    render(<AddLoadModal onClose={onClose} onCreated={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'L1001' } });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    fireEvent.click(screen.getByRole('button', { name: /keep editing/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByLabelText(/load #/i)).toHaveValue('L1001');
+  });
+
   test('calls onClose without creating when Cancel is clicked', () => {
     const onClose = vi.fn();
     render(<AddLoadModal onClose={onClose} onCreated={vi.fn()} />);
