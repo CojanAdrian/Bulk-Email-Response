@@ -47,7 +47,7 @@ function ReviewQueue() {
   function fetchQueue() {
     setStatus('loading');
     setError(null);
-    listInquiries('pending_review')
+    listInquiries('pending_review', { order: 'oldest' })
       .then((data) => {
         if (isMountedRef.current) {
           setInquiries(data);
@@ -71,7 +71,10 @@ function ReviewQueue() {
   useEffect(() => {
     const unsubscribeNew = subscribe('inquiry:new', (inquiry) => {
       if (inquiry.reply_status !== 'pending_review') return;
-      setInquiries((prev) => [inquiry, ...prev]);
+      // Appended, not prepended -- a newly-arrived inquiry is by
+      // definition the newest one, and this queue sorts oldest-first so
+      // the most overdue inquiry stays at the top.
+      setInquiries((prev) => [...prev, inquiry]);
       setDrafts((prev) => ({ ...prev, [inquiry.id]: draftTextFor(inquiry) }));
     });
     const unsubscribeUpdated = subscribe('inquiry:updated', (inquiry) => {

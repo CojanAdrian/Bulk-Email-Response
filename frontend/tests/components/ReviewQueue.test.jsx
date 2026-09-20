@@ -9,14 +9,26 @@ vi.mock('../../src/lib/liveSocket');
 
 const INQUIRY_1 = {
   id: 1, from_address: 'carrierA@example.com', subject: 'Dallas load?',
+  body_snippet: 'Hey, is the Dallas to Chicago van load still available?',
   reply_status: 'pending_review', reply_body: null, live_reply_body: 'PU: DALLAS, TX\nDEL: CHICAGO, IL',
+  matched_load_id: 5, match_tier: 'city_state',
+  matched_load_load_number: 'L1001', matched_load_equipment: 'V',
+  matched_load_origin_city: 'Dallas', matched_load_origin_state: 'TX',
+  matched_load_dest_city: 'Chicago', matched_load_dest_state: 'IL',
+  matched_load_early_pu: null, matched_load_late_pu: null,
   matched_load_target_pay: null, matched_load_include_rate: 1, matched_load_extra_stops: null,
   ref_mismatch: 0,
 };
 
 const INQUIRY_2 = {
   id: 2, from_address: 'carrierB@example.com', subject: 'Chicago load?',
+  body_snippet: null,
   reply_status: 'pending_review', reply_body: 'stale draft', live_reply_body: 'PU: CHICAGO, IL\nDEL: MIAMI, FL',
+  matched_load_id: null, match_tier: 'none',
+  matched_load_load_number: null, matched_load_equipment: null,
+  matched_load_origin_city: null, matched_load_origin_state: null,
+  matched_load_dest_city: null, matched_load_dest_state: null,
+  matched_load_early_pu: null, matched_load_late_pu: null,
   matched_load_target_pay: null, matched_load_include_rate: 1, matched_load_extra_stops: null,
   ref_mismatch: 0,
 };
@@ -62,6 +74,30 @@ describe('ReviewQueue', () => {
 
     await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
     expect(screen.getByLabelText('Reply').value).toBe('PU: DALLAS, TX\nDEL: CHICAGO, IL');
+  });
+
+  test('fetches the queue oldest-first', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+
+    expect(inquiriesApi.listInquiries).toHaveBeenCalledWith('pending_review', { order: 'oldest' });
+  });
+
+  test('a live-pushed new inquiry is appended to the end, not the front (it is the newest, and the queue is oldest-first)', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText('carrierA@example.com', { exact: false }));
+    await waitFor(() => expect(liveHandlers['inquiry:new']).toBeDefined());
+
+    act(() => {
+      liveHandlers['inquiry:new'](INQUIRY_2);
+    });
+
+    await waitFor(() => screen.getByText('carrierB@example.com', { exact: false }));
+    const rowTexts = screen.getAllByRole('listitem').map((row) => row.textContent);
+    expect(rowTexts[0]).toContain('carrierA@example.com');
+    expect(rowTexts[1]).toContain('carrierB@example.com');
   });
 
   test('no selection circle or bulk bar shows until "Select" is clicked', async () => {
