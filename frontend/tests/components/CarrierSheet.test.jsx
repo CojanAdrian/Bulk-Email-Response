@@ -2,8 +2,10 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import CarrierSheet from '../../src/components/CarrierSheet';
 import * as carriersApi from '../../src/api/carriers';
+import * as loadsApi from '../../src/api/loads';
 
 vi.mock('../../src/api/carriers');
+vi.mock('../../src/api/loads');
 
 describe('CarrierSheet', () => {
   beforeEach(() => {
@@ -101,6 +103,17 @@ describe('CarrierSheet', () => {
     await waitFor(() => {
       expect(screen.getByText(/Dallas, TX.*Chicago, IL/)).toBeInTheDocument();
     });
+  });
+
+  test("a listed lane's text has an explicit color class (regression: it rendered invisible)", async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([
+      { id: 10, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: '1500.00' },
+    ]);
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/Dallas, TX.*Chicago, IL/));
+    expect(screen.getByText(/Dallas, TX.*Chicago, IL/)).toHaveClass('text-text');
   });
 
   test('edit mode: adding a lane calls createCarrierHistory and appends it to the list', async () => {

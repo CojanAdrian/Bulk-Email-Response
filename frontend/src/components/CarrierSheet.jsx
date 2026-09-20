@@ -6,7 +6,13 @@ import {
 } from '../api/carriers';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
 import { US_STATES } from '../lib/usStates';
+import { useDirtyGuard } from '../lib/useDirtyGuard';
+import { useCloseConfirmation } from '../lib/useCloseConfirmation';
+import { lookupLoadByNumber } from '../api/loads';
 import BottomSheet from './BottomSheet';
+import CityStateAutocomplete from './CityStateAutocomplete';
+import StateSelect from './StateSelect';
+import UnsavedChangesBar from './UnsavedChangesBar';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 
@@ -29,7 +35,11 @@ function parseStates(text) {
 }
 
 function blankHistoryEntry() {
-  return { origin_city: '', origin_state: '', dest_city: '', dest_state: '', rate: '', gp: '', driver_name: '', driver_phone: '', comment: '', ran_at: '' };
+  return {
+    load_number: '', load_id: null,
+    origin_city: '', origin_state: '', dest_city: '', dest_state: '',
+    rate: '', gp: '', driver_name: '', driver_phone: '', comment: '', ran_at: '',
+  };
 }
 
 function CarrierSheet({ carrier, onClose, onSaved }) {
@@ -321,7 +331,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             <ul className="space-y-2">
               {history.map((entry) => (
                 <li key={entry.id} className="flex items-center justify-between rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm">
-                  <span>
+                  <span className="text-text">
                     {entry.origin_city}, {entry.origin_state} → {entry.dest_city}, {entry.dest_state}
                     {entry.rate ? ` — $${Number(entry.rate).toLocaleString()}` : ''}
                   </span>
@@ -345,32 +355,36 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                   </p>
                 )}
                 <div className="mb-2 grid grid-cols-2 gap-2">
-                  <input
-                    aria-label="Origin city"
+                  <CityStateAutocomplete
+                    id="lane-origin-city"
+                    ariaLabel="Origin city"
                     placeholder="Origin city"
                     value={historyDraft.origin_city}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, origin_city: e.target.value }))}
+                    onPlaceSelected={({ city, state }) => setHistoryDraft((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
-                  <input
-                    aria-label="Origin state"
-                    placeholder="Origin state"
+                  <StateSelect
+                    id="lane-origin-state"
+                    ariaLabel="Origin state"
                     value={historyDraft.origin_state}
-                    onChange={(e) => setHistoryDraft((prev) => ({ ...prev, origin_state: e.target.value }))}
+                    onChange={(state) => setHistoryDraft((prev) => ({ ...prev, origin_state: state }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
-                  <input
-                    aria-label="Destination city"
+                  <CityStateAutocomplete
+                    id="lane-dest-city"
+                    ariaLabel="Destination city"
                     placeholder="Destination city"
                     value={historyDraft.dest_city}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, dest_city: e.target.value }))}
+                    onPlaceSelected={({ city, state }) => setHistoryDraft((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
-                  <input
-                    aria-label="Destination state"
-                    placeholder="Destination state"
+                  <StateSelect
+                    id="lane-dest-state"
+                    ariaLabel="Destination state"
                     value={historyDraft.dest_state}
-                    onChange={(e) => setHistoryDraft((prev) => ({ ...prev, dest_state: e.target.value }))}
+                    onChange={(state) => setHistoryDraft((prev) => ({ ...prev, dest_state: state }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
                   <input
