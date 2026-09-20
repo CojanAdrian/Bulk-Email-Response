@@ -100,6 +100,46 @@ describe('ReviewQueue', () => {
     expect(rowTexts[1]).toContain('carrierB@example.com');
   });
 
+  test("shows the carrier's own message text on the card", async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText(/is the dallas to chicago van load still available/i));
+  });
+
+  test('shows a fallback when there is no captured message text', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_2]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText('carrierB@example.com', { exact: false }));
+    expect(screen.getByText(/no message text captured/i)).toBeInTheDocument();
+  });
+
+  test("shows the matched load's number, lane, and equipment", async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText(/L1001/));
+    expect(screen.getByText(/Dallas, TX.*Chicago, IL/)).toBeInTheDocument();
+    expect(screen.getByText('V')).toBeInTheDocument();
+  });
+
+  test('shows a "no load matched" message when nothing matched', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_2]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText('carrierB@example.com', { exact: false }));
+    expect(screen.getByText(/no load matched/i)).toBeInTheDocument();
+  });
+
+  test('shows how long ago the inquiry was received', async () => {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+    inquiriesApi.listInquiries.mockResolvedValue([{ ...INQUIRY_1, received_at: twoHoursAgo }]);
+    render(<ReviewQueue />);
+
+    await waitFor(() => screen.getByText(/2h ago/));
+  });
+
   test('no selection circle or bulk bar shows until "Select" is clicked', async () => {
     inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
     render(<ReviewQueue />);

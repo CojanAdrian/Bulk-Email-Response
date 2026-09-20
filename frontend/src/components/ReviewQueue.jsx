@@ -1,13 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { listInquiries, sendInquiryReply, rejectInquiry, bulkSendInquiries, bulkRejectInquiries } from '../api/inquiries';
+import { listInquiries, sendInquiryReply, rejectInquiry, reassignInquiry, bulkSendInquiries, bulkRejectInquiries } from '../api/inquiries';
 import { subscribe } from '../lib/liveSocket';
 import { detectMultiStop, multiStopTagVariant } from '../lib/lookupMessage';
+import { buildPUSched } from '../lib/datExport';
 import { useMotionPreset } from '../lib/motionConfig';
 import { useSelectionMode } from '../lib/useSelectionMode';
 import Badge from './Badge';
 import BottomActionBar from './BottomActionBar';
 import Card from './Card';
+import LoadPicker from './LoadPicker';
+import RelativeTime from './RelativeTime';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import Skeleton from './Skeleton';
@@ -20,6 +23,55 @@ import SelectionCircle from './SelectionCircle';
 // filled in, extra stops added) shows correctly here instead of stale/blank.
 function draftTextFor(inquiry) {
   return inquiry.live_reply_body ?? inquiry.reply_body ?? '';
+}
+
+const MATCH_TIER_LABELS = {
+  load_number: 'Load #', city_state: 'City + state', city: 'City', state: 'State', manual: 'Manually matched', none: 'No match',
+};
+
+// The matched load's number, lane, PU window, equipment, and target pay
+// -- shown on every card so a match can be verified at a glance instead
+// of being trusted blind or looked up in another tab.
+function MatchedLoadHeader({ inquiry }) {
+  if (!inquiry.matched_load_id) {
+    return (
+      <p className="mb-2 rounded-lg border border-dashed border-border px-3 py-2 text-xs text-text-muted">
+        No load matched — pick one below if you can tell which load this is about.
+      </p>
+    );
+  }
+  const lane = inquiry.matched_load_origin_city && inquiry.matched_load_dest_city
+    ? `${inquiry.matched_load_origin_city}, ${inquiry.matched_load_origin_state} → ${inquiry.matched_load_dest_city}, ${inquiry.matched_load_dest_state}`
+    : 'No lane on file';
+  const puWindow = buildPUSched(inquiry.matched_load_early_pu, inquiry.matched_load_late_pu);
+  return (
+    <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-surface px-3 py-2 text-xs text-text-muted">
+      <span className="font-semibold text-text">Load {inquiry.matched_load_load_number}</span>
+      <span>{lane}</span>
+      {puWindow && <span>PU {puWindow}</span>}
+      {inquiry.matched_load_equipment && <span>{inquiry.matched_load_equipment}</span>}
+      {inquiry.matched_load_target_pay !== null && inquiry.matched_load_target_pay !== undefined && (
+        <span>${Number(inquiry.matched_load_target_pay).toLocaleString()}</span>
+      )}
+      <Badge variant="default">{MATCH_TIER_LABELS[inquiry.match_tier] || inquiry.match_tier}</Badge>
+    </div>
+  );
+}
+
+// The carrier's own message, shown above the reply draft -- previously
+// stored (body_snippet) and never displayed anywhere, so every reply was
+// approved having seen a sender address and a subject line but never the
+// actual question being answered.
+function InquiryMessage({ bodySnippet }) {
+  return (
+    <div className="mb-2 rounded-lg border border-border bg-surface px-3 py-2 text-sm text-text">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-text-muted">Their message</p>
+      <p className="whitespace-pre-wrap">{bodySnippet || 'No message text captured for this inquiry.'}</p>
+      {bodySnippet && bodySnippet.length >= 500 && (
+        <p className="mt-1 text-[10px] text-text-muted">May be truncated at 500 characters, and can include quoted reply text.</p>
+      )}
+    </div>
+  );
 }
 
 function ReviewQueue() {
@@ -337,6 +389,7 @@ function ReviewQueue() {
                     </div>
                   )}
                   <span className="font-medium text-text">{inquiry.from_address}</span> — {inquiry.subject}
+                  <RelativeTime value={inquiry.received_at} className="text-xs" />
                   {Boolean(inquiry.ref_mismatch) && (
                     <Badge variant="warning">Different load? — reference # didn't match, verify</Badge>
                   )}
@@ -345,6 +398,8 @@ function ReviewQueue() {
                   )}
                   {multiStopVariant === 'info' && <Badge variant="info">Extra stops already added</Badge>}
                 </div>
+                <MatchedLoadHeader inquiry={inquiry} />
+                <InquiryMessage bodySnippet={inquiry.body_snippet} />
                 {inquiry.matched_load_target_pay !== null && inquiry.matched_load_target_pay !== undefined && (
                   <label
                     className="mb-2 flex items-center gap-2 text-xs text-text-muted"
