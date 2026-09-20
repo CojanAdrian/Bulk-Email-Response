@@ -6,12 +6,16 @@ import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
 import ModalCard from './ModalCard';
 import CityStateAutocomplete from './CityStateAutocomplete';
+import StateSelect from './StateSelect';
 import PrimaryButton from './PrimaryButton';
 import SecondaryButton from './SecondaryButton';
 import ExtraStopsEditor from './ExtraStopsEditor';
 import EquipmentPicker from './EquipmentPicker';
 import DateRangeField from './DateRangeField';
 import BookingCarrierFields from './BookingCarrierFields';
+import UnsavedChangesBar from './UnsavedChangesBar';
+import { useDirtyGuard } from '../lib/useDirtyGuard';
+import { useCloseConfirmation } from '../lib/useCloseConfirmation';
 
 const MotionModalCard = motion(ModalCard);
 
@@ -50,6 +54,16 @@ function RateModal({ load, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const isMountedRef = useRef(true);
 
+  const isDirty = useDirtyGuard({
+    ...fields, stops, targetPay, earlyPu, latePu, earlyDel, lateDel,
+    extraStops, status, useCustomReply, customReplyText,
+  });
+  const closeConfirmation = useCloseConfirmation();
+
+  function handleRequestClose() {
+    closeConfirmation.requestClose(isDirty, onClose);
+  }
+
   useEffect(() => {
     // Reset on every mount -- see GmailConnectionPanel.jsx for why this
     // matters under React 18 StrictMode's dev-only double-mount.
@@ -62,14 +76,15 @@ function RateModal({ load, onClose, onSaved }) {
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'Escape') {
-        onClose();
+        closeConfirmation.requestClose(isDirty, onClose);
       }
     }
     document.addEventListener('keydown', handleKeyDown);
     return () => {
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty, onClose]);
 
   function handleFieldChange(field, value) {
     setFields((prev) => ({ ...prev, [field]: value }));
@@ -192,11 +207,12 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
               State
             </label>
-            <input
+            <StateSelect
               id="origin_state"
+              ariaLabel="Origin state"
               value={fields.origin_state}
-              onChange={(e) => handleFieldChange('origin_state', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              onChange={(state) => handleFieldChange('origin_state', state)}
+              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>
           <div>
@@ -230,11 +246,12 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
               State
             </label>
-            <input
+            <StateSelect
               id="dest_state"
+              ariaLabel="Destination state"
               value={fields.dest_state}
-              onChange={(e) => handleFieldChange('dest_state', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              onChange={(state) => handleFieldChange('dest_state', state)}
+              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
             />
           </div>
           <div>
@@ -418,12 +435,16 @@ function RateModal({ load, onClose, onSaved }) {
             {error}
           </p>
         )}
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : 'Save'}
-          </PrimaryButton>
-        </div>
+        {closeConfirmation.confirming ? (
+          <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+        ) : (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={handleSave} disabled={saving}>
+              {saving ? 'Saving...' : 'Save'}
+            </PrimaryButton>
+          </div>
+        )}
       </MotionModalCard>
     </motion.div>
   );

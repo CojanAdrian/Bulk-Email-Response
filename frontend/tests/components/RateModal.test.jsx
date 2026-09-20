@@ -196,6 +196,28 @@ describe('RateModal', () => {
     });
   });
 
+  test('editing a field then clicking Cancel asks to discard before closing', () => {
+    const onClose = vi.fn();
+    render(<RateModal load={LOAD} onClose={onClose} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/^weight$/i), { target: { value: '48000' } });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
+  test('editing a field then pressing Escape asks to discard before closing', () => {
+    const onClose = vi.fn();
+    render(<RateModal load={LOAD} onClose={onClose} onSaved={vi.fn()} />);
+
+    fireEvent.change(screen.getByLabelText(/^weight$/i), { target: { value: '48000' } });
+    fireEvent.keyDown(document, { key: 'Escape' });
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
   test('closes when the Escape key is pressed', () => {
     const onClose = vi.fn();
     render(<RateModal load={LOAD} onClose={onClose} onSaved={vi.fn()} />);
