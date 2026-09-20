@@ -101,6 +101,13 @@ describe('multiStopTagVariant', () => {
 });
 
 describe('buildLookupMessage', () => {
+  test('omits the PU/DEL line entirely for a side with no city, rather than printing "undefined"', () => {
+    const msg = buildLookupMessage(load({ origin_city: '', origin_state: '', dest_city: '', dest_state: '' }), true);
+    expect(msg).not.toContain('undefined');
+    expect(msg).not.toContain('PU:');
+    expect(msg).not.toContain('DEL:');
+  });
+
   test('includes PU/DEL lines built from real datetime columns when present', () => {
     const msg = buildLookupMessage(load(), true);
     expect(msg).toContain('PU: Chicago, IL – 08/10/2026 8am appt');

@@ -83,31 +83,43 @@ export function multiStopTagVariant(load) {
   return null;
 }
 
+function formatLookupCityState(city, state, zip) {
+  if (!city && !state) return null;
+  const parts = [city, state].filter(Boolean);
+  return `${parts.join(', ')}${zip ? ' ' + zip : ''}`;
+}
+
 export function buildLookupMessage(load, showRate) {
   const lines = [];
   const comment = load.comment || '';
 
-  let puLine = `PU: ${load.origin_city}, ${load.origin_state}${load.origin_zip ? ' ' + load.origin_zip : ''}`;
-  if (load.early_pu || load.late_pu) {
-    const puSched = buildPUSched(load.early_pu, load.late_pu);
-    if (puSched) puLine += ' – ' + puSched;
-  } else {
-    const puDate = formatShortDateRange(formatDateOnly(load.early_pu), formatDateOnly(load.late_pu));
-    const puSchedAlt = extractSched(comment, 'pu');
-    if (puDate) puLine += ' – ' + puDate;
-    if (puSchedAlt) puLine += ' – ' + puSchedAlt;
+  const originLoc = formatLookupCityState(load.origin_city, load.origin_state, load.origin_zip);
+  if (originLoc) {
+    let puLine = `PU: ${originLoc}`;
+    if (load.early_pu || load.late_pu) {
+      const puSched = buildPUSched(load.early_pu, load.late_pu);
+      if (puSched) puLine += ' – ' + puSched;
+    } else {
+      const puDate = formatShortDateRange(formatDateOnly(load.early_pu), formatDateOnly(load.late_pu));
+      const puSchedAlt = extractSched(comment, 'pu');
+      if (puDate) puLine += ' – ' + puDate;
+      if (puSchedAlt) puLine += ' – ' + puSchedAlt;
+    }
+    lines.push(puLine);
   }
-  lines.push(puLine);
 
-  let delLine = `DEL: ${load.dest_city}, ${load.dest_state}${load.dest_zip ? ' ' + load.dest_zip : ''}`;
-  if (load.early_del || load.late_del) {
-    const delSched = buildDELSched(load.early_del, load.late_del);
-    if (delSched) delLine += ' – ' + delSched;
-  } else {
-    const delSchedAlt = extractSched(comment, 'del');
-    if (delSchedAlt) delLine += ' – ' + delSchedAlt;
+  const destLoc = formatLookupCityState(load.dest_city, load.dest_state, load.dest_zip);
+  if (destLoc) {
+    let delLine = `DEL: ${destLoc}`;
+    if (load.early_del || load.late_del) {
+      const delSched = buildDELSched(load.early_del, load.late_del);
+      if (delSched) delLine += ' – ' + delSched;
+    } else {
+      const delSchedAlt = extractSched(comment, 'del');
+      if (delSchedAlt) delLine += ' – ' + delSchedAlt;
+    }
+    lines.push(delLine);
   }
-  lines.push(delLine);
 
   const commodity = load.commodity || parseLookupCommodity(comment);
   if (commodity) lines.push(`Commodity: ${commodity}`);
