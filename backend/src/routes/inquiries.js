@@ -14,7 +14,7 @@ function createInquiriesRouter(pool, wsHub) {
   const router = express.Router();
 
   router.get('/', asyncHandler(async (req, res) => {
-    const { reply_status } = req.query;
+    const { reply_status, order } = req.query;
     const params = [req.session.userId];
     let sql = `
       SELECT ei.*, ${INQUIRY_JOIN_FIELDS}
@@ -25,7 +25,11 @@ function createInquiriesRouter(pool, wsHub) {
       sql += ' AND ei.reply_status = ?';
       params.push(reply_status);
     }
-    sql += ' ORDER BY ei.received_at DESC';
+    // The review queue (a work queue) requests oldest-first so the most
+    // overdue inquiry sorts to the top; every other caller (the inquiry
+    // log) keeps the default newest-first, since that's a log meant to be
+    // read most-recent-first.
+    sql += order === 'oldest' ? ' ORDER BY ei.received_at ASC' : ' ORDER BY ei.received_at DESC';
     const [rows] = await pool.query(sql, params);
     res.json(rows.map(attachLiveReplyBody));
   }));

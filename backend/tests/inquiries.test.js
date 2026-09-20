@@ -76,6 +76,25 @@ describe('inquiries routes', () => {
     expect(res.body[1].subject).toBe('Older inquiry');
   });
 
+  test('supports order=oldest for the review queue, without changing the default newest-first order', async () => {
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)
+       VALUES (?, ?, 'm1', 'a@example.com', 'Older', '2026-08-01 08:00:00', 'none', 'needs_review')`,
+      [userId, accountId]
+    );
+    await pool.query(
+      `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)
+       VALUES (?, ?, 'm2', 'b@example.com', 'Newer', '2026-08-02 08:00:00', 'none', 'needs_review')`,
+      [userId, accountId]
+    );
+
+    const defaultRes = await agent.get('/api/inquiries');
+    expect(defaultRes.body.map((r) => r.subject)).toEqual(['Newer', 'Older']);
+
+    const oldestRes = await agent.get('/api/inquiries?order=oldest');
+    expect(oldestRes.body.map((r) => r.subject)).toEqual(['Older', 'Newer']);
+  });
+
   test('filters by reply_status when the query param is given', async () => {
     await pool.query(
       `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status, reply_status)
