@@ -2,9 +2,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import ReviewQueue from '../../src/components/ReviewQueue';
 import * as inquiriesApi from '../../src/api/inquiries';
+import * as loadsApi from '../../src/api/loads';
 import * as liveSocket from '../../src/lib/liveSocket';
 
 vi.mock('../../src/api/inquiries');
+vi.mock('../../src/api/loads');
 vi.mock('../../src/lib/liveSocket');
 
 const INQUIRY_1 = {
@@ -138,6 +140,44 @@ describe('ReviewQueue', () => {
     render(<ReviewQueue />);
 
     await waitFor(() => screen.getByText(/2h ago/));
+  });
+
+  test('"Change match" opens a load picker; selecting a load re-assigns the inquiry', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    loadsApi.listLoads.mockResolvedValue([
+      { id: 5, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL' },
+      { id: 7, load_number: 'L2002', origin_city: 'Miami', origin_state: 'FL', dest_city: 'Atlanta', dest_state: 'GA' },
+    ]);
+    inquiriesApi.reassignInquiry.mockResolvedValue({
+      ...INQUIRY_1, matched_load_id: 7, match_tier: 'manual',
+      matched_load_load_number: 'L2002', matched_load_origin_city: 'Miami', matched_load_origin_state: 'FL',
+      matched_load_dest_city: 'Atlanta', matched_load_dest_state: 'GA',
+      live_reply_body: 'PU: MIAMI, FL\nDEL: ATLANTA, GA',
+    });
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText(/L1001/));
+
+    fireEvent.click(screen.getByRole('button', { name: /change match/i }));
+    await waitFor(() => screen.getByRole('button', { name: /L2002/ }));
+    fireEvent.click(screen.getByRole('button', { name: /L2002/ }));
+
+    await waitFor(() => {
+      expect(inquiriesApi.reassignInquiry).toHaveBeenCalledWith(1, 7);
+    });
+    await waitFor(() => screen.getByText(/Miami, FL.*Atlanta, GA/, { selector: 'span' }));
+    expect(screen.getByLabelText('Reply').value).toBe('PU: MIAMI, FL\nDEL: ATLANTA, GA');
+  });
+
+  test('clicking "Change match" does not toggle row selection', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([INQUIRY_1]);
+    loadsApi.listLoads.mockResolvedValue([]);
+    render(<ReviewQueue />);
+    await waitFor(() => screen.getByText(/L1001/));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+    fireEvent.click(screen.getByRole('button', { name: /change match/i }));
+
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument();
   });
 
   test('no selection circle or bulk bar shows until "Select" is clicked', async () => {

@@ -85,6 +85,7 @@ function ReviewQueue() {
   const selection = useSelectionMode();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [confirmingBulkReject, setConfirmingBulkReject] = useState(false);
+  const [reassigningId, setReassigningId] = useState(null);
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -188,6 +189,22 @@ function ReviewQueue() {
       .finally(() => {
         if (isMountedRef.current) {
           setActioningId(null);
+        }
+      });
+  }
+
+  function handleReassign(inquiryId, loadId) {
+    setError(null);
+    reassignInquiry(inquiryId, loadId)
+      .then((updated) => {
+        if (!isMountedRef.current) return;
+        setInquiries((prev) => prev.map((inquiry) => (inquiry.id === inquiryId ? updated : inquiry)));
+        setDrafts((prev) => ({ ...prev, [inquiryId]: draftTextFor(updated) }));
+        setReassigningId(null);
+      })
+      .catch((err) => {
+        if (isMountedRef.current) {
+          setError(err.message || 'Failed to change the matched load.');
         }
       });
   }
@@ -400,6 +417,32 @@ function ReviewQueue() {
                 </div>
                 <MatchedLoadHeader inquiry={inquiry} />
                 <InquiryMessage bodySnippet={inquiry.body_snippet} />
+                <div className="mb-2" onClick={(e) => e.stopPropagation()}>
+                  {reassigningId === inquiry.id ? (
+                    <div className="rounded-lg border border-border p-2">
+                      <LoadPicker
+                        ariaLabel={`Search loads to re-assign the inquiry from ${inquiry.from_address}`}
+                        autoFocus
+                        onSelect={(load) => handleReassign(inquiry.id, load.id)}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setReassigningId(null)}
+                        className="mt-2 text-xs text-text-muted hover:underline"
+                      >
+                        Close
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setReassigningId(inquiry.id)}
+                      className="text-xs font-medium text-accent hover:underline"
+                    >
+                      Wrong load? Change match
+                    </button>
+                  )}
+                </div>
                 {inquiry.matched_load_target_pay !== null && inquiry.matched_load_target_pay !== undefined && (
                   <label
                     className="mb-2 flex items-center gap-2 text-xs text-text-muted"
