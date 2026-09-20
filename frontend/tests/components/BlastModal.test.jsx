@@ -92,6 +92,40 @@ describe('BlastModal', () => {
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 
+  test('editing the subject then clicking Cancel asks to discard before closing', () => {
+    const onClose = vi.fn();
+    render(<BlastModal load={LOAD} initialShowRate={false} onClose={onClose} />);
+
+    fireEvent.change(screen.getByLabelText(/subject/i), { target: { value: 'Edited subject' } });
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
+  test('editing the subject then clicking the backdrop asks to discard before closing', () => {
+    const onClose = vi.fn();
+    render(<BlastModal load={LOAD} initialShowRate={false} onClose={onClose} />);
+
+    fireEvent.change(screen.getByLabelText(/subject/i), { target: { value: 'Edited subject' } });
+    fireEvent.click(screen.getByRole('dialog'));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByText(/discard changes/i)).toBeInTheDocument();
+  });
+
+  test('refuses to build a blast for a load with no origin or destination', () => {
+    const onClose = vi.fn();
+    const bareLoad = { ...LOAD, origin_city: '', origin_state: '', dest_city: '', dest_state: '' };
+    render(<BlastModal load={bareLoad} initialShowRate={false} onClose={onClose} />);
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/missing its origin or destination/i);
+    expect(screen.queryByLabelText(/subject/i)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   test('calls onClose when clicking the modal backdrop', () => {
     const onClose = vi.fn();
     render(<BlastModal load={LOAD} initialShowRate={false} onClose={onClose} />);

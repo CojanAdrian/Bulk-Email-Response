@@ -2,8 +2,11 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { buildLookupMessage } from '../lib/lookupMessage';
 import { useMotionPreset } from '../lib/motionConfig';
+import { useDirtyGuard } from '../lib/useDirtyGuard';
+import { useCloseConfirmation } from '../lib/useCloseConfirmation';
 import Card from './Card';
 import SecondaryButton from './SecondaryButton';
+import UnsavedChangesBar from './UnsavedChangesBar';
 
 const MotionCard = motion(Card);
 
@@ -40,7 +43,20 @@ function BlastModal({ load, initialShowRate, onClose }) {
   const [invalidFlash, setInvalidFlash] = useState(false);
   const [fileError, setFileError] = useState(null);
 
+  const isDirty = useDirtyGuard({ subject, body, showRate, emailsText });
+  const closeConfirmation = useCloseConfirmation();
+
+  function handleRequestClose() {
+    closeConfirmation.requestClose(isDirty, onClose);
+  }
+
   const validEmails = parseBlastEmails(emailsText);
+
+  // A load with no city on either end (e.g. quick-added with just a load
+  // number) has nothing to build a real blast message from -- refuse to
+  // open the normal form rather than send something reading
+  // "PU: undefined, undefined" to a whole carrier list.
+  const missingLane = !load.origin_city || !load.origin_state || !load.dest_city || !load.dest_state;
 
   function handleRateToggle(e) {
     setShowRate(e.target.checked);
@@ -81,6 +97,34 @@ function BlastModal({ load, initialShowRate, onClose }) {
     reader.readAsText(file);
   }
 
+  if (missingLane) {
+    return (
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="blast-modal-title"
+        className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+        {...preset.modal.backdrop}
+      >
+        <MotionCard className="w-full max-w-md" {...preset.modal.card}>
+          <h2 id="blast-modal-title" className="mb-3 text-lg font-semibold text-text">
+            Blast Email
+          </h2>
+          <p role="alert" className="text-sm text-error">
+            Load {load.load_number} is missing its origin or destination, so a blast message can't be built yet. Add
+            the lane in Edit before blasting this load.
+          </p>
+          <div className="mt-4 flex justify-end">
+            <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+          </div>
+        </MotionCard>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       role="dialog"
@@ -88,7 +132,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
       aria-labelledby="blast-modal-title"
       className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
       onClick={(e) => {
-        if (e.target === e.currentTarget) onClose();
+        if (e.target === e.currentTarget) handleRequestClose();
       }}
       {...preset.modal.backdrop}
     >
@@ -97,7 +141,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
           <h2 id="blast-modal-title" className="text-lg font-semibold text-text">
             Blast Email
           </h2>
-          <button onClick={onClose} aria-label="Close" className="text-text-muted hover:text-text">
+          <button onClick={handleRequestClose} aria-label="Close" className="text-text-muted hover:text-text">
             ✕
           </button>
         </div>
@@ -167,14 +211,20 @@ function BlastModal({ load, initialShowRate, onClose }) {
         )}
 
         <div className="mt-5 flex justify-end gap-2">
-          <SecondaryButton onClick={onClose}>Cancel</SecondaryButton>
-          {/* Gmail's own brand blue, deliberately not the app's lime accent — matches the original tool's identical choice for this one external-service button. */}
-          <button
-            onClick={handleOpenGmail}
-            className="rounded-lg bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
-          >
-            Open in Gmail →
-          </button>
+          {closeConfirmation.confirming ? (
+            <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+          ) : (
+            <>
+              <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+              {/* Gmail's own brand blue, deliberately not the app's lime accent — matches the original tool's identical choice for this one external-service button. */}
+              <button
+                onClick={handleOpenGmail}
+                className="rounded-lg bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+              >
+                Open in Gmail →
+              </button>
+            </>
+          )}
         </div>
       </MotionCard>
     </motion.div>
