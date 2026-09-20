@@ -2414,14 +2414,9 @@ Immediately after the closing brace of `handleDrop` (right before the component'
         {...preset.modal.backdrop}
       >
         <MotionCard className="w-full max-w-md" {...preset.modal.card}>
-          <div className="mb-3 flex items-start justify-between">
-            <h2 id="blast-modal-title" className="text-lg font-semibold text-text">
-              Blast Email
-            </h2>
-            <button onClick={onClose} aria-label="Close" className="text-text-muted hover:text-text">
-              ✕
-            </button>
-          </div>
+          <h2 id="blast-modal-title" className="mb-3 text-lg font-semibold text-text">
+            Blast Email
+          </h2>
           <p role="alert" className="text-sm text-error">
             Load {load.load_number} is missing its origin or destination, so a blast message can't be built yet. Add
             the lane in Edit before blasting this load.
