@@ -1,5 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listInquiries, sendInquiryReply, rejectInquiry } from '../../src/api/inquiries';
+import { listInquiries, sendInquiryReply, rejectInquiry, reassignInquiry } from '../../src/api/inquiries';
 
 describe('inquiries api', () => {
   beforeEach(() => {
@@ -19,6 +19,29 @@ describe('inquiries api', () => {
     await listInquiries('pending_review');
     const [url] = global.fetch.mock.calls[0];
     expect(url).toContain('/api/inquiries?reply_status=pending_review');
+  });
+
+  test('listInquiries adds &order=oldest when given an order option', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve([]) });
+    await listInquiries('pending_review', { order: 'oldest' });
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/inquiries?reply_status=pending_review&order=oldest');
+  });
+
+  test('reassignInquiry patches /api/inquiries/:id/match with the new load id', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
+    await reassignInquiry(1, 42);
+    const [url, options] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/inquiries/1/match');
+    expect(options.method).toBe('PATCH');
+    expect(JSON.parse(options.body)).toEqual({ matched_load_id: 42 });
+  });
+
+  test('reassignInquiry can detach the match by passing null', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve({ id: 1 }) });
+    await reassignInquiry(1, null);
+    const [, options] = global.fetch.mock.calls[0];
+    expect(JSON.parse(options.body)).toEqual({ matched_load_id: null });
   });
 
   test('sendInquiryReply posts /api/inquiries/:id/send with a body override', async () => {

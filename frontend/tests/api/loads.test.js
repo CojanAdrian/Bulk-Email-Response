@@ -1,9 +1,16 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
-import { listLoads, getLoad, previewLoadReply, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus, createLoad, bulkSetIncludeRate } from '../../src/api/loads';
+import { listLoads, getLoad, previewLoadReply, updateLoad, deleteLoad, uploadLoads, bulkDeleteLoads, bulkUpdateLoadStatus, createLoad, bulkSetIncludeRate, lookupLoadByNumber } from '../../src/api/loads';
 
 describe('loads api', () => {
   beforeEach(() => {
     global.fetch = vi.fn();
+  });
+
+  test('lookupLoadByNumber gets /api/loads/lookup with the load number', async () => {
+    global.fetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(null) });
+    await lookupLoadByNumber('L1001');
+    const [url] = global.fetch.mock.calls[0];
+    expect(url).toContain('/api/loads/lookup?load_number=L1001');
   });
 
   test('listLoads gets /api/loads with no filter when called with no argument', async () => {

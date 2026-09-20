@@ -13,6 +13,10 @@ export function previewLoadReply(id) {
   return get(`/api/loads/${id}/preview-reply`);
 }
 
+export function lookupLoadByNumber(loadNumber) {
+  return get(`/api/loads/lookup?load_number=${encodeURIComponent(loadNumber)}`);
+}
+
 export function updateLoad(id, data) {
   return patch(`/api/loads/${id}`, data);
 }
