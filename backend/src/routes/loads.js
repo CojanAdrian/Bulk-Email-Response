@@ -162,6 +162,27 @@ function createLoadsRouter(pool, wsHub) {
     res.status(201).json(rows[0]);
   }));
 
+  // Exact load-number lookup for the carrier lane-history form (see
+  // CarrierSheet.jsx) -- typing a load number that exists autofills the
+  // lane's origin/destination/rate/date instead of retyping them.
+  // Registered before GET /:id so "lookup" isn't parsed as an id, same as
+  // GET /stats above.
+  router.get('/lookup', asyncHandler(async (req, res) => {
+    const loadNumber = String(req.query.load_number || '').trim();
+    if (!loadNumber) {
+      return res.status(400).json({ error: 'load_number is required' });
+    }
+    const isAdmin = req.session.role === 'admin';
+    const conditions = ['load_number = ?'];
+    const params = [loadNumber];
+    if (!isAdmin) {
+      conditions.push('user_id = ?');
+      params.push(req.session.userId);
+    }
+    const [rows] = await pool.query(`SELECT * FROM loads WHERE ${conditions.join(' AND ')}`, params);
+    res.json(rows[0] || null);
+  }));
+
   router.get('/:id', asyncHandler(async (req, res) => {
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
     const load = rows[0];

@@ -763,6 +763,49 @@ describe('loads routes', () => {
     expect(res.body).toEqual({ error: 'Internal server error' });
   });
 
+  describe('GET /lookup', () => {
+    test('rejects unauthenticated requests', async () => {
+      const res = await request(app).get('/api/loads/lookup?load_number=L1001');
+      expect(res.status).toBe(401);
+    });
+
+    test('returns the matching load for the current user', async () => {
+      await pool.query(
+        'INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, target_pay, user_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        ['L1001', 'Dallas', 'TX', 'Chicago', 'IL', 1500, userId]
+      );
+
+      const res = await agent.get('/api/loads/lookup?load_number=L1001');
+      expect(res.status).toBe(200);
+      expect(res.body.origin_city).toBe('Dallas');
+      expect(Number(res.body.target_pay)).toBe(1500);
+    });
+
+    test('returns null when no load matches', async () => {
+      const res = await agent.get('/api/loads/lookup?load_number=NOPE');
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+
+    test('returns null for a load belonging to another user', async () => {
+      const passwordHash = await bcrypt.hash('otherpw', 10);
+      const [otherUser] = await pool.query("INSERT INTO users (username, password_hash, role) VALUES ('otheruser', ?, 'user')", [passwordHash]);
+      await pool.query(
+        'INSERT INTO loads (load_number, origin_city, origin_state, dest_city, dest_state, user_id) VALUES (?, ?, ?, ?, ?, ?)',
+        ['L2002', 'Miami', 'FL', 'Atlanta', 'GA', otherUser.insertId]
+      );
+
+      const res = await agent.get('/api/loads/lookup?load_number=L2002');
+      expect(res.status).toBe(200);
+      expect(res.body).toBeNull();
+    });
+
+    test('returns 400 when load_number is missing', async () => {
+      const res = await agent.get('/api/loads/lookup');
+      expect(res.status).toBe(400);
+    });
+  });
+
   describe('GET /stats', () => {
     test('rejects unauthenticated requests', async () => {
       const res = await request(app).get('/api/loads/stats');
