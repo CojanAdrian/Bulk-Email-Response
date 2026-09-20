@@ -63,6 +63,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
   const [historyDraft, setHistoryDraft] = useState(blankHistoryEntry());
   const [historyError, setHistoryError] = useState(null);
   const [historyBusy, setHistoryBusy] = useState(false);
+  const [loadLookupStatus, setLoadLookupStatus] = useState('idle'); // 'idle' | 'checking' | 'found' | 'new'
   const isMountedRef = useRef(true);
 
   useEffect(() => {
@@ -133,6 +134,42 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
       });
   }
 
+  // Typing a load number and tabbing out looks it up against the loads
+  // database: an existing load autofills the rest of the draft instead of
+  // making the user retype it -- the same "don't fight what they typed"
+  // rule BookingCarrierFields' MC lookup already follows, so only blank
+  // fields are ever filled in.
+  function handleLoadNumberBlur() {
+    const loadNumber = historyDraft.load_number.trim();
+    if (!loadNumber) {
+      setLoadLookupStatus('idle');
+      return;
+    }
+    setLoadLookupStatus('checking');
+    lookupLoadByNumber(loadNumber)
+      .then((load) => {
+        if (!isMountedRef.current) return;
+        if (load) {
+          setHistoryDraft((prev) => ({
+            ...prev,
+            load_id: load.id,
+            origin_city: prev.origin_city || load.origin_city || '',
+            origin_state: prev.origin_state || load.origin_state || '',
+            dest_city: prev.dest_city || load.dest_city || '',
+            dest_state: prev.dest_state || load.dest_state || '',
+            rate: prev.rate || (load.target_pay !== null && load.target_pay !== undefined ? String(load.target_pay) : ''),
+            ran_at: prev.ran_at || (load.early_pu ? String(load.early_pu).slice(0, 10) : ''),
+          }));
+          setLoadLookupStatus('found');
+        } else {
+          setLoadLookupStatus('new');
+        }
+      })
+      .catch(() => {
+        if (isMountedRef.current) setLoadLookupStatus('idle');
+      });
+  }
+
   function handleAddHistory() {
     setHistoryError(null);
     if (!historyDraft.origin_city.trim() || !historyDraft.origin_state.trim() || !historyDraft.dest_city.trim() || !historyDraft.dest_state.trim()) {
@@ -141,6 +178,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
     }
     setHistoryBusy(true);
     createCarrierHistory(carrier.id, {
+      load_id: historyDraft.load_id || null,
       origin_city: historyDraft.origin_city.trim(),
       origin_state: historyDraft.origin_state.trim(),
       dest_city: historyDraft.dest_city.trim(),
@@ -157,6 +195,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
           setHistory((prev) => [created, ...prev]);
           setHistoryDraft(blankHistoryEntry());
           setAddingHistory(false);
+          setLoadLookupStatus('idle');
         }
       })
       .catch((err) => {
@@ -354,6 +393,32 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                     {historyError}
                   </p>
                 )}
+                <div className="mb-2">
+                  <label className="mb-1 block text-[10px] text-text-muted" htmlFor="lane-load-number">
+                    Load # (optional — autofills the lane below)
+                  </label>
+                  <input
+                    id="lane-load-number"
+                    aria-label="Load number"
+                    placeholder="Load #"
+                    value={historyDraft.load_number}
+                    onChange={(e) => {
+                      setHistoryDraft((prev) => ({ ...prev, load_number: e.target.value, load_id: null }));
+                      setLoadLookupStatus('idle');
+                    }}
+                    onBlur={handleLoadNumberBlur}
+                    className="w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                  />
+                  {loadLookupStatus === 'checking' && (
+                    <p className="mt-1 text-xs text-text-muted">Checking load {historyDraft.load_number.trim()}...</p>
+                  )}
+                  {loadLookupStatus === 'found' && (
+                    <p className="mt-1 text-xs font-medium text-success">Load found — lane details filled in below.</p>
+                  )}
+                  {loadLookupStatus === 'new' && (
+                    <p className="mt-1 text-xs text-text-muted">No load with that number on file.</p>
+                  )}
+                </div>
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <CityStateAutocomplete
                     id="lane-origin-city"
@@ -437,6 +502,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                       setAddingHistory(false);
                       setHistoryDraft(blankHistoryEntry());
                       setHistoryError(null);
+                      setLoadLookupStatus('idle');
                     }}
                     className="px-3 py-1 text-xs"
                   >

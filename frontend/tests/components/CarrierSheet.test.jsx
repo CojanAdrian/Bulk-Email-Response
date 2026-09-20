@@ -159,6 +159,88 @@ describe('CarrierSheet', () => {
     });
   });
 
+  test('edit mode: entering a load number that exists autofills the lane draft', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    loadsApi.lookupLoadByNumber.mockResolvedValue({
+      id: 99, load_number: 'L4521', origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL', target_pay: 1800, early_pu: '2026-08-10T08:00:00.000Z',
+    });
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/load number/i), { target: { value: 'L4521' } });
+    fireEvent.blur(screen.getByLabelText(/load number/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/load found/i)).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText(/^origin city$/i)).toHaveValue('Dallas');
+    expect(screen.getByLabelText(/^origin state$/i)).toHaveValue('TX');
+    expect(screen.getByLabelText(/^destination city$/i)).toHaveValue('Chicago');
+    expect(screen.getByLabelText(/^destination state$/i)).toHaveValue('IL');
+    expect(screen.getByLabelText(/^rate$/i)).toHaveValue('1800');
+  });
+
+  test('edit mode: an unrecognized load number shows "new" instead of autofilling', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    loadsApi.lookupLoadByNumber.mockResolvedValue(null);
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/load number/i), { target: { value: 'NOPE' } });
+    fireEvent.blur(screen.getByLabelText(/load number/i));
+
+    await waitFor(() => {
+      expect(screen.getByText(/no load with that number/i)).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText(/^origin city$/i)).toHaveValue('');
+  });
+
+  test('edit mode: autofill never overwrites a field the user already typed', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    loadsApi.lookupLoadByNumber.mockResolvedValue({
+      id: 99, load_number: 'L4521', origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL', target_pay: 1800, early_pu: null,
+    });
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/^rate$/i), { target: { value: '2000' } });
+    fireEvent.change(screen.getByLabelText(/load number/i), { target: { value: 'L4521' } });
+    fireEvent.blur(screen.getByLabelText(/load number/i));
+
+    await waitFor(() => screen.getByText(/load found/i));
+    expect(screen.getByLabelText(/^rate$/i)).toHaveValue('2000');
+  });
+
+  test("edit mode: a found load's id is sent as load_id when the lane is saved", async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    loadsApi.lookupLoadByNumber.mockResolvedValue({
+      id: 99, load_number: 'L4521', origin_city: 'Dallas', origin_state: 'TX',
+      dest_city: 'Chicago', dest_state: 'IL', target_pay: 1800, early_pu: null,
+    });
+    carriersApi.createCarrierHistory.mockResolvedValue({ id: 11, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL' });
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/load number/i), { target: { value: 'L4521' } });
+    fireEvent.blur(screen.getByLabelText(/load number/i));
+    await waitFor(() => screen.getByText(/load found/i));
+    fireEvent.click(screen.getByRole('button', { name: /^add lane$/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.createCarrierHistory).toHaveBeenCalledWith(5, expect.objectContaining({ load_id: 99 }));
+    });
+  });
+
   test('edit mode: removing a lane calls deleteCarrierHistory and removes it from the list', async () => {
     const carrier = { id: 5, company_name: 'ABC Trucking' };
     carriersApi.listCarrierHistory.mockResolvedValue([
