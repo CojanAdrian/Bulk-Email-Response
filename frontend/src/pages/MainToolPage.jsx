@@ -51,7 +51,7 @@ function CarriersViewToggle({ carriersView, onChange }) {
         onClick={() => onChange('find')}
         aria-pressed={carriersView === 'find'}
         className={`min-h-[36px] rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-xl transition ${
-          carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-white/15 bg-black/40 text-white/80 hover:text-white'
+          carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-shell-border bg-surface-alt text-text-muted hover:text-text'
         }`}
       >
         Find matches
@@ -61,7 +61,7 @@ function CarriersViewToggle({ carriersView, onChange }) {
         onClick={() => onChange('manage')}
         aria-pressed={carriersView === 'manage'}
         className={`min-h-[36px] rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
-          carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border bg-surface-alt text-text-muted hover:text-text'
+          carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-white/15 bg-black/40 text-white/80 backdrop-blur-xl hover:text-white'
         }`}
       >
         All carriers

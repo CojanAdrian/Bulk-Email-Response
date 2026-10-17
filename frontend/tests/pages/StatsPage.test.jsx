@@ -64,7 +64,7 @@ describe('StatsPage', () => {
 
     expect(await screen.findByText('L-100')).toBeInTheDocument();
     expect(screen.getByText('Acme Trucking')).toBeInTheDocument();
-    const row2 = screen.getByText('L-101').closest('tr');
+    const row2 = screen.getByText('L-101').closest('li');
     expect(within(row2).getByText('—')).toBeInTheDocument();
   });
 

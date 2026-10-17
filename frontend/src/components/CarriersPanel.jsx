@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { listCarriers, deleteCarrier } from '../api/carriers';
 import Card from './Card';
+import { SearchIcon } from './icons';
 import CarrierDetailSheet from './CarrierDetailSheet';
 import CarrierSheet from './CarrierSheet';
 import PrimaryButton from './PrimaryButton';
@@ -66,18 +67,25 @@ function CarriersPanel() {
 
   return (
     <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-text">Carriers</h2>
-        <div className="flex items-center gap-2">
-          <input
-            type="search"
-            aria-label="Search carriers"
-            placeholder="Search company, MC, dispatcher..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-48 rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text sm:w-64"
-          />
-          <PrimaryButton onClick={() => setSheetTarget('new')} className="px-3 py-1.5 text-xs">
+      <div className="mb-3 flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-base font-semibold text-text">
+          Carriers {status === 'ready' && <span className="ml-1 text-sm font-medium tabular-nums text-text-muted">{carriers.length}</span>}
+        </h2>
+        <div className="flex min-w-0 items-center gap-2">
+          <label className="relative min-w-0 flex-1 sm:w-72 sm:flex-none">
+            <span className="sr-only">Search carriers</span>
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
+              type="search"
+              aria-label="Search carriers"
+              data-hotkey-search
+              placeholder="Search company, MC, dispatcher"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full rounded-full border border-border bg-surface-alt py-2 pl-9 pr-3 text-sm text-text placeholder:text-text-muted focus:border-focus focus:outline-none"
+            />
+          </label>
+          <PrimaryButton onClick={() => setSheetTarget('new')} className="shrink-0 px-4 py-2 text-xs">
             + Add carrier
           </PrimaryButton>
         </div>
@@ -89,21 +97,32 @@ function CarriersPanel() {
           {error}
         </p>
       )}
-      {status === 'ready' && carriers.length === 0 && <p className="text-sm text-text-muted">No carriers yet.</p>}
+      {status === 'ready' && carriers.length === 0 && (
+        <p className="py-8 text-center text-sm text-text-muted">No carriers yet. Add your first one, or book a load and save the carrier from there.</p>
+      )}
       {status === 'ready' && carriers.length > 0 && (
-        <ul className="divide-y divide-border">
+        <ul className="-mx-2 space-y-0.5">
           {carriers.map((carrier) => (
-            <li key={carrier.id} className="flex items-center justify-between gap-2 py-2.5 text-sm">
-              <button type="button" onClick={() => setDetailCarrierId(carrier.id)} className="min-w-0 flex-1 truncate text-left text-text hover:underline">
-                <span className="font-medium">{carrier.company_name}</span>
-                {carrier.mc_number && <span className="ml-2 text-text-muted">MC {carrier.mc_number}</span>}
+            <li key={carrier.id} className="group flex min-w-0 items-center justify-between gap-2 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-surface-alt">
+              <button type="button" onClick={() => setDetailCarrierId(carrier.id)} className="flex min-w-0 flex-1 items-center gap-3 py-1 text-left text-text">
+                <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-surface-alt text-xs font-bold text-text-muted group-hover:bg-surface">
+                  {String(carrier.company_name || '?').trim().slice(0, 2).toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block truncate font-semibold" title={carrier.company_name}>{carrier.company_name}</span>
+                  <span className="block truncate text-xs text-text-muted">
+                    {[carrier.mc_number && `MC ${carrier.mc_number}`, carrier.dispatcher_name, Array.isArray(carrier.equipment_types) && carrier.equipment_types.length ? carrier.equipment_types.join(' · ') : null]
+                      .filter(Boolean)
+                      .join(' · ') || 'No details yet'}
+                  </span>
+                </span>
               </button>
               {confirmingDeleteId === carrier.id ? (
                 <span className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => handleDelete(carrier.id)} className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90">
+                  <button onClick={() => handleDelete(carrier.id)} className="rounded-full bg-error px-3 py-1 text-xs font-semibold text-surface hover:opacity-90">
                     Confirm
                   </button>
-                  <button onClick={() => setConfirmingDeleteId(null)} className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface">
+                  <button onClick={() => setConfirmingDeleteId(null)} className="rounded-full border border-border px-3 py-1 text-xs text-text hover:bg-surface">
                     Cancel
                   </button>
                 </span>
@@ -112,7 +131,7 @@ function CarriersPanel() {
                   type="button"
                   onClick={() => setConfirmingDeleteId(carrier.id)}
                   aria-label={`Delete ${carrier.company_name}`}
-                  className="shrink-0 rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg"
+                  className="shrink-0 rounded-full px-3 py-1 text-xs font-semibold text-text-muted transition hover:bg-error-bg hover:text-error focus-visible:text-error"
                 >
                   Delete
                 </button>

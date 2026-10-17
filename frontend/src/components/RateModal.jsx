@@ -438,16 +438,20 @@ function RateModal({ load, onClose, onSaved }) {
             {error}
           </p>
         )}
-        {closeConfirmation.confirming ? (
-          <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
-        ) : (
-          <div className="flex justify-end gap-2">
-            <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
-            <PrimaryButton onClick={handleSave} disabled={saving}>
-              {saving ? 'Saving...' : 'Save'}
-            </PrimaryButton>
-          </div>
-        )}
+        {/* Sticky so Save/Cancel stay reachable on a long form (the
+            sheet scrolls under it), instead of hiding below the fold. */}
+        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-2 border-t border-border bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6">
+          {closeConfirmation.confirming ? (
+            <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+          ) : (
+            <div className="flex justify-end gap-2">
+              <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+              <PrimaryButton onClick={handleSave} disabled={saving}>
+                {saving ? 'Saving...' : 'Save'}
+              </PrimaryButton>
+            </div>
+          )}
+        </div>
       </MotionModalCard>
     </motion.div>
   );

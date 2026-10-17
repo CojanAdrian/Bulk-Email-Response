@@ -2,16 +2,8 @@ import { useEffect, useState } from 'react';
 import { listInquiries } from '../api/inquiries';
 import { getGmailStatus } from '../api/gmail';
 import { subscribe } from '../lib/liveSocket';
-import Card from './Card';
+import StatTile from './StatTile';
 
-function StatBlock({ label, value, accentClassName }) {
-  return (
-    <Card className="!p-4 flex-1">
-      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-extrabold ${accentClassName}`}>{value}</p>
-    </Card>
-  );
-}
 
 function InquiriesStatsRow({ refreshKey }) {
   const [counts, setCounts] = useState(null);
@@ -65,10 +57,10 @@ function InquiriesStatsRow({ refreshKey }) {
   if (!counts) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-      <StatBlock label="Pending review" value={counts.pending_review} accentClassName="text-warning" />
-      <StatBlock label="Auto-sent" value={counts.auto_sent} accentClassName="text-success" />
-      <StatBlock
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
+      <StatTile label="Pending review" value={counts.pending_review} accentClassName="text-warning" />
+      <StatTile label="Auto-sent" value={counts.auto_sent} accentClassName="text-success" />
+      <StatTile
         label="Gmail account"
         value={connected === null ? '—' : connected ? 'Connected' : 'Not connected'}
         accentClassName={connected ? 'text-success' : 'text-error'}
