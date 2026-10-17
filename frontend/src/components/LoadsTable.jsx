@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import { listLoads, updateLoad, deleteLoad, bulkDeleteLoads, bulkUpdateLoadStatus, bulkSetIncludeRate } from '../api/loads';
-import { bulkCarrierMatches } from '../api/carrierMatches';
+import { bulkCarrierMatches, getProvenCarriers } from '../api/carrierMatches';
 import { subscribe } from '../lib/liveSocket';
 import { multiStopTagVariant, buildLookupMessage } from '../lib/lookupMessage';
 import { buildPUSched } from '../lib/datExport';
@@ -14,6 +14,11 @@ import Card from './Card';
 import Skeleton from './Skeleton';
 import DateRangeField from './DateRangeField';
 import SelectionCircle from './SelectionCircle';
+import LoadRow from './LoadRow';
+import SegmentedControl from './SegmentedControl';
+import { SearchIcon } from './icons';
+import { formatMoney } from '../lib/formatMoney';
+import { usePersistentState } from '../lib/usePersistentState';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
@@ -59,9 +64,13 @@ function sortValue(load, key) {
   }
 }
 
+function hasNoRate(load) {
+  return load.target_pay === null || load.target_pay === undefined || load.target_pay === '';
+}
+
 function matchesSearch(load, query) {
   if (!query) return true;
-  const haystack = `${load.load_number ?? ''} ${load.origin_city ?? ''} ${load.origin_state ?? ''} ${load.dest_city ?? ''} ${load.dest_state ?? ''}`.toLowerCase();
+  const haystack = `${load.load_number ?? ''} ${load.origin_city ?? ''} ${load.origin_state ?? ''} ${load.dest_city ?? ''} ${load.dest_state ?? ''} ${load.customer ?? ''}`.toLowerCase();
   return haystack.includes(query);
 }
 
@@ -97,6 +106,9 @@ function getInitialSort() {
 function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   const [loads, setLoads] = useState([]);
   const [matchInfo, setMatchInfo] = useState({});
+  const [provenInfo, setProvenInfo] = useState({});
+  const [expandedId, setExpandedId] = useState(null);
+  const [quickFilter, setQuickFilter] = usePersistentState('loadsTable.quickFilter', 'all');
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   const [statusFilter, setStatusFilter] = useState('active');
   const [searchText, setSearchText] = useState('');
@@ -170,14 +182,42 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
     };
   }, [loads]);
 
+  // Gold "proven lane" lookup -- carriers who already ran each load's exact
+  // lane. Best-effort like the match badge: a failure just means no gold.
   useEffect(() => {
-    localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+    if (loads.length === 0) {
+      setProvenInfo({});
+      return undefined;
+    }
+    let ignore = false;
+    Promise.resolve(getProvenCarriers(loads.map((load) => load.id)))
+      .then((data) => {
+        if (!ignore) setProvenInfo(data || {});
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
+  }, [loads]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_STORAGE_KEY, JSON.stringify(sort));
+    } catch {
+      // Not persisted; the sort still applies for this visit.
+    }
   }, [sort]);
+
+  const provenLoadCount = useMemo(() => loads.filter((load) => provenInfo[load.id]?.length).length, [loads, provenInfo]);
+  const needsRateCount = useMemo(() => loads.filter(hasNoRate).length, [loads]);
 
   const filteredLoads = useMemo(() => {
     const q = searchText.trim().toLowerCase();
-    return q ? loads.filter((load) => matchesSearch(load, q)) : loads;
-  }, [loads, searchText]);
+    let result = q ? loads.filter((load) => matchesSearch(load, q)) : loads;
+    if (quickFilter === 'proven') result = result.filter((load) => provenInfo[load.id]?.length);
+    if (quickFilter === 'needs_rate') result = result.filter(hasNoRate);
+    return result;
+  }, [loads, searchText, quickFilter, provenInfo]);
 
   const sortedLoads = useMemo(() => sortLoads(filteredLoads, sort), [filteredLoads, sort]);
 
@@ -338,54 +378,60 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
     });
   }
 
+  const smallButton =
+    'inline-flex min-h-[36px] items-center justify-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-text transition hover:bg-surface-alt disabled:opacity-60 sm:min-h-0';
+
   return (
-    <Card>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-text">Loads</h2>
-          {sortedLoads.length > 0 && (
-            selection.active ? (
+    <Card className="p-3 sm:p-5">
+      <div className="mb-3 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <h2 className="mr-1 text-base font-semibold text-text">Board</h2>
+          <SegmentedControl
+            ariaLabel="Quick filter"
+            size="sm"
+            value={quickFilter}
+            onChange={setQuickFilter}
+            options={[
+              { value: 'all', label: 'All', count: loads.length },
+              { value: 'proven', label: '★ Proven', count: provenLoadCount },
+              { value: 'needs_rate', label: 'Needs rate', count: needsRateCount },
+            ]}
+          />
+          {sortedLoads.length > 0 &&
+            (selection.active ? (
               <div className="flex items-center gap-2 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => selection.selectAll(sortedLoads.map((l) => l.id))}
-                  className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
-                >
+                <button type="button" onClick={() => selection.selectAll(sortedLoads.map((l) => l.id))} className={smallButton}>
                   Select All
                 </button>
-                <button
-                  type="button"
-                  onClick={selection.exit}
-                  className="rounded-lg border border-border bg-surface px-3 py-1 text-text hover:bg-surface-alt"
-                >
+                <button type="button" onClick={selection.exit} className={smallButton}>
                   Done
                 </button>
               </div>
             ) : (
-              <button
-                type="button"
-                onClick={selection.enter}
-                className="rounded-lg border border-border bg-surface px-3 py-1 text-xs font-semibold text-text hover:bg-surface-alt"
-              >
+              <button type="button" onClick={selection.enter} className={smallButton}>
                 Select
               </button>
-            )
-          )}
+            ))}
         </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="search"
-            aria-label="Search loads"
-            placeholder="Search load #, city, state..."
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="w-48 rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text sm:w-64"
-          />
+        <div className="flex min-w-0 items-center gap-2">
+          <label className="relative min-w-0 flex-1 lg:w-72 lg:flex-none">
+            <span className="sr-only">Search loads</span>
+            <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+            <input
+              type="search"
+              aria-label="Search loads"
+              data-hotkey-search
+              placeholder="Search load #, city, state, customer"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full rounded-full border border-border bg-surface-alt py-2 pl-9 pr-3 text-sm text-text placeholder:text-text-muted focus:border-focus focus:outline-none"
+            />
+          </label>
           <select
             aria-label="Filter by status"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text"
+            className="shrink-0 rounded-full border border-border bg-surface-alt px-3 py-2 text-sm font-medium text-text focus:border-focus focus:outline-none"
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>
@@ -395,14 +441,38 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           </select>
         </div>
       </div>
-      {status === 'loading' && <Skeleton count={4} height="1.75rem" />}
+
+      {status === 'ready' && loads.length > 1 && (
+        <div role="group" aria-label="Sort loads" className="mb-3 flex min-w-0 flex-wrap items-center gap-1.5 text-xs">
+          <span className="mr-0.5 text-text-muted">Sort</span>
+          {SORT_COLUMNS.map((col) => {
+            const active = sort.key === col.key;
+            return (
+              <button
+                key={col.key}
+                type="button"
+                onClick={() => handleSortClick(col.key)}
+                aria-pressed={active}
+                className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 font-semibold transition ${
+                  active ? 'bg-text text-surface' : 'text-text-muted hover:bg-surface-alt hover:text-text'
+                }`}
+              >
+                {col.label}
+                {active && <span aria-hidden="true">{sort.direction === 'asc' ? '↑' : '↓'}</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {status === 'loading' && <Skeleton count={4} height="6.5rem" className="rounded-2xl" />}
       {status === 'error' && (
         <p role="alert" className="text-sm text-error">
           {error}
         </p>
       )}
       {actionError && (
-        <p role="alert" className="mb-3 text-sm text-error">
+        <p role="alert" className="mb-3 rounded-xl bg-error-bg px-3 py-2 text-sm text-error">
           {actionError}
         </p>
       )}
@@ -412,7 +482,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           defaultValue=""
           onChange={handleBulkStatusChange}
           disabled={bulkBusy}
-          className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text disabled:opacity-60"
         >
           <option value="" disabled>
             Mark as...
@@ -428,7 +498,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           defaultValue=""
           onChange={handleBulkIncludeRate}
           disabled={bulkBusy}
-          className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text disabled:opacity-60"
+          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text disabled:opacity-60"
         >
           <option value="" disabled>
             Rate...
@@ -442,14 +512,14 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
             <button
               onClick={handleBulkDelete}
               disabled={bulkBusy}
-              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
+              className="rounded-full bg-error px-3 py-1.5 text-xs font-semibold text-surface hover:opacity-90 disabled:opacity-60"
             >
               {bulkBusy ? 'Deleting...' : 'Confirm'}
             </button>
             <button
               onClick={() => setConfirmingBulkDelete(false)}
               disabled={bulkBusy}
-              className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+              className="rounded-full border border-border px-3 py-1.5 text-xs hover:bg-surface disabled:opacity-60"
             >
               Cancel
             </button>
@@ -458,7 +528,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
           <button
             onClick={() => setConfirmingBulkDelete(true)}
             disabled={bulkBusy}
-            className="rounded-lg border border-error/40 px-2 py-1 text-xs text-error hover:bg-error-bg disabled:opacity-60"
+            className="rounded-full border border-error/40 px-3 py-1.5 text-xs text-error hover:bg-error-bg disabled:opacity-60"
           >
             Delete selected
           </button>
@@ -466,73 +536,69 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         <button
           onClick={selection.clear}
           disabled={bulkBusy}
-          className="ml-auto rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface disabled:opacity-60"
+          className="ml-auto rounded-full border border-border px-3 py-1.5 text-xs hover:bg-surface disabled:opacity-60"
         >
           Clear selection
         </button>
       </BottomActionBar>
-      {status === 'ready' && loads.length === 0 && <p className="text-sm text-text-muted">No loads found.</p>}
+
+      {status === 'ready' && loads.length === 0 && (
+        <div className="flex flex-col items-center gap-1 px-4 py-10 text-center">
+          <p className="text-base font-semibold text-text">No loads found.</p>
+          <p className="max-w-sm text-sm text-text-muted">
+            {statusFilter === 'active'
+              ? 'Upload a McLeod CSV above, or add a load by hand. Press N to add one.'
+              : `Nothing is marked ${STATUS_LABELS[statusFilter].toLowerCase()} yet.`}
+          </p>
+        </div>
+      )}
       {status === 'ready' && loads.length > 0 && sortedLoads.length === 0 && (
-        <p className="text-sm text-text-muted">No loads match "{searchText}".</p>
+        <p className="px-1 py-6 text-center text-sm text-text-muted">
+          {searchText.trim() ? `No loads match "${searchText}".` : quickFilter === 'proven' ? 'No proven lanes in this view yet.' : 'Every load here has a rate.'}
+        </p>
       )}
       {status === 'ready' && sortedLoads.length > 0 && (
-        <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-text">
-          <thead className="bg-surface">
-            <tr className="border-b border-border text-text-muted">
-              <th className="w-8 py-1.5 pr-2" />
-              {SORT_COLUMNS.map((col) => (
-                <th key={col.key} className="py-1.5 pr-4">
-                  <button
-                    type="button"
-                    onClick={() => handleSortClick(col.key)}
-                    className="flex items-center gap-1 font-medium text-text-muted hover:text-text"
-                  >
-                    {col.label}
-                    {sort.key === col.key && <span aria-hidden="true">{sort.direction === 'asc' ? '↑' : '↓'}</span>}
-                  </button>
-                </th>
-              ))}
-              <th className="py-1.5 pr-4">Rate</th>
-              <th className="py-1.5 pr-4">Status</th>
-              <th className="py-1.5"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedLoads.map((load) => (
-              <tr key={load.id} className="border-b border-border/60">
-                <td className="py-1.5 pr-2">
-                  {selection.active ? (
+        <ul aria-label="Loads" className="space-y-2.5">
+          {sortedLoads.map((load) => {
+            const match = matchInfo[load.id];
+            const busy = busyLoadId === load.id;
+            const stopTag = multiStopTagVariant(load);
+            return (
+              <LoadRow
+                key={load.id}
+                load={load}
+                proven={provenInfo[load.id]}
+                expanded={expandedId === load.id}
+                onToggleExpand={() => setExpandedId((prev) => (prev === load.id ? null : load.id))}
+                leadingSlot={
+                  selection.active ? (
                     <SelectionCircle
                       selected={selection.isSelected(load.id)}
                       onToggle={() => selection.toggle(load.id)}
                       ariaLabel={`Select ${load.load_number}`}
                     />
-                  ) : (
-                    matchInfo[load.id] && (
-                      <button type="button" onClick={() => onViewMatches && onViewMatches(load)} className="cursor-pointer border-0 bg-transparent p-0">
-                        <Badge variant={MATCH_BADGE_VARIANT[matchInfo[load.id].tier] || 'default'} className="max-w-[4.5rem]">
-                          {matchInfo[load.id].count} match{matchInfo[load.id].count === 1 ? '' : 'es'}
+                  ) : null
+                }
+                badges={
+                  <>
+                    {match && (
+                      <button
+                        type="button"
+                        onClick={() => onViewMatches && onViewMatches(load)}
+                        className="cursor-pointer rounded-full border-0 bg-transparent p-0"
+                        title="See matching carriers on the map"
+                      >
+                        <Badge variant={MATCH_BADGE_VARIANT[match.tier] || 'default'}>
+                          {match.count} match{match.count === 1 ? '' : 'es'}
                         </Badge>
                       </button>
-                    )
-                  )}
-                </td>
-                <td className="py-1.5 pr-4">
-                  <div className="flex items-center gap-1.5">
-                    <span>{load.load_number}</span>
+                    )}
                     {Boolean(load.custom_reply_body) && <Badge variant="warning">Modified</Badge>}
-                    {multiStopTagVariant(load) === 'error' && <Badge variant="error" className="max-w-[5rem]">Needs stops added</Badge>}
-                    {multiStopTagVariant(load) === 'info' && <Badge variant="info" className="max-w-[5rem]">Stops added</Badge>}
-                  </div>
-                </td>
-                <td className="py-1.5 pr-4">
-                  {load.origin_city}, {load.origin_state}
-                </td>
-                <td className="py-1.5 pr-4">
-                  {load.dest_city}, {load.dest_state}
-                </td>
-                <td className="py-1.5 pr-4 whitespace-nowrap">
+                    {stopTag === 'error' && <Badge variant="error">Needs stops added</Badge>}
+                    {stopTag === 'info' && <Badge variant="info">Stops added</Badge>}
+                  </>
+                }
+                puField={
                   <DateRangeField
                     legend="PU"
                     showLegend={false}
@@ -544,12 +610,12 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                     onLateChange={(value) => handlePuChange(load, 'late_pu', value)}
                     formatRange={buildPUSched}
                   />
-                </td>
-                <td className="py-1.5 pr-4">{load.equipment}</td>
-                <td className="py-1.5 pr-4">
-                  {editingTargetPayId === load.id ? (
+                }
+                rateField={
+                  editingTargetPayId === load.id ? (
                     <input
                       type="number"
+                      inputMode="decimal"
                       step="0.01"
                       autoFocus
                       aria-label={`Target pay for ${load.load_number}`}
@@ -557,102 +623,94 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                       onChange={(e) => setTargetPayDraft(e.target.value)}
                       onBlur={() => saveTargetPay(load)}
                       onKeyDown={(e) => handleTargetPayKeyDown(e, load)}
-                      className="w-24 rounded-lg border border-border bg-surface-alt px-2 py-1 text-sm text-text"
+                      className="w-28 rounded-xl border border-focus bg-surface-alt px-2 py-1 text-right text-sm font-semibold tabular-nums text-text focus:outline-none"
                     />
                   ) : (
                     <button
                       type="button"
                       onClick={() => startEditTargetPay(load)}
-                      className="rounded-lg border border-transparent px-2 py-1 text-left hover:border-border hover:bg-surface-alt"
+                      aria-label={`Edit rate for ${load.load_number}, currently ${formatMoney(load.target_pay)}`}
+                      title="Click to edit the rate"
+                      className={`rounded-lg px-1.5 py-0.5 text-[15px] font-semibold tabular-nums transition hover:bg-surface-alt sm:text-base ${
+                        load.target_pay === null || load.target_pay === undefined || load.target_pay === '' ? 'text-warning' : 'text-text'
+                      }`}
                     >
-                      {load.target_pay ?? '—'}
+                      {load.target_pay === null || load.target_pay === undefined || load.target_pay === '' ? 'Add rate' : formatMoney(load.target_pay)}
                     </button>
-                  )}
-                </td>
-                <td className="py-1.5 pr-4">
-                  <input
-                    type="checkbox"
-                    aria-label={`Include rate for ${load.load_number}`}
-                    checked={Boolean(load.include_rate)}
-                    onChange={(e) => handleIncludeRateChange(load, e.target.checked)}
-                    disabled={busyLoadId === load.id}
-                  />
-                </td>
-                <td className="py-1.5 pr-4">
-                  <select
-                    aria-label={`Status for ${load.load_number}`}
-                    value={load.status}
-                    onChange={(e) => handleStatusChange(load, e.target.value)}
-                    disabled={busyLoadId === load.id}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1 text-xs text-text disabled:opacity-60"
-                  >
-                    {STATUS_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {STATUS_LABELS[option]}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td className="py-1.5">
-                  {confirmingDeleteId === load.id ? (
-                    <div className="flex items-center justify-end gap-2">
+                  )
+                }
+                controls={
+                  <>
+                    <select
+                      aria-label={`Status for ${load.load_number}`}
+                      value={load.status}
+                      onChange={(e) => handleStatusChange(load, e.target.value)}
+                      disabled={busy}
+                      className="min-h-[36px] rounded-full border border-border bg-surface-alt px-3 py-1 text-xs font-semibold text-text disabled:opacity-60 sm:min-h-0"
+                    >
+                      {STATUS_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {STATUS_LABELS[option]}
+                        </option>
+                      ))}
+                    </select>
+                    <label className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-semibold text-text-muted sm:min-h-0">
+                      <input
+                        type="checkbox"
+                        aria-label={`Include rate for ${load.load_number}`}
+                        checked={Boolean(load.include_rate)}
+                        onChange={(e) => handleIncludeRateChange(load, e.target.checked)}
+                        disabled={busy}
+                        className="h-3.5 w-3.5 accent-[rgb(var(--color-focus))]"
+                      />
+                      <span aria-hidden="true">Rate in reply</span>
+                    </label>
+                  </>
+                }
+                actions={
+                  confirmingDeleteId === load.id ? (
+                    <>
                       <span className="text-xs text-error">Delete?</span>
                       <button
                         onClick={() => handleDelete(load)}
-                        disabled={busyLoadId === load.id}
-                        className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
+                        disabled={busy}
+                        className="rounded-full bg-error px-3 py-1 text-xs font-semibold text-surface hover:opacity-90 disabled:opacity-60"
                       >
-                        {busyLoadId === load.id ? 'Deleting...' : 'Confirm'}
+                        {busy ? 'Deleting...' : 'Confirm'}
                       </button>
-                      <button
-                        onClick={() => setConfirmingDeleteId(null)}
-                        disabled={busyLoadId === load.id}
-                        className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface-alt disabled:opacity-60"
-                      >
+                      <button onClick={() => setConfirmingDeleteId(null)} disabled={busy} className={smallButton}>
                         Cancel
                       </button>
-                    </div>
+                    </>
                   ) : (
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => handleCopy(load)}
-                        className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
-                      >
+                    <>
+                      <button onClick={() => handleCopy(load)} className={smallButton}>
                         {copiedId === load.id ? 'Copied!' : 'Copy'}
                       </button>
                       {onOpenBlast && (
-                        <button
-                          onClick={() => onOpenBlast(load)}
-                          className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
-                        >
+                        <button onClick={() => onOpenBlast(load)} className={smallButton}>
                           Blast
                         </button>
                       )}
-                      <button
-                        onClick={() => onSelectLoad(load)}
-                        className="rounded-lg border border-border px-3 py-1 text-xs hover:bg-surface-alt"
-                      >
+                      <button onClick={() => onSelectLoad(load)} className={smallButton}>
                         Edit
                       </button>
                       <button
                         onClick={() => setConfirmingDeleteId(load.id)}
-                        className="rounded-lg border border-error/40 px-3 py-1 text-xs text-error hover:bg-error-bg"
+                        className="inline-flex min-h-[36px] items-center rounded-full border border-error/40 px-3 py-1 text-xs font-semibold text-error transition hover:bg-error-bg sm:min-h-0"
                       >
                         Delete
                       </button>
-                    </div>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
+                    </>
+                  )
+                }
+              />
+            );
+          })}
+        </ul>
       )}
       <AnimatePresence>
-        {bookingModalLoad && (
-          <BookingCarrierModal load={bookingModalLoad} onClose={() => setBookingModalLoad(null)} />
-        )}
+        {bookingModalLoad && <BookingCarrierModal load={bookingModalLoad} onClose={() => setBookingModalLoad(null)} />}
       </AnimatePresence>
     </Card>
   );

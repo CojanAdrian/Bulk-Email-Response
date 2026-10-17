@@ -597,7 +597,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^load #/i }));
 
-      const rows = screen.getAllByRole('row').slice(1); // skip header row
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('A2002')).toBeInTheDocument();
       expect(within(rows[1]).getByText('L1001')).toBeInTheDocument();
     });
@@ -611,7 +611,7 @@ describe('LoadsTable', () => {
       fireEvent.click(header);
       fireEvent.click(header);
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
       expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
     });
@@ -626,7 +626,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^pu$/i }));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('EARLIER')).toBeInTheDocument();
       expect(within(rows[1]).getByText('LATER')).toBeInTheDocument();
     });
@@ -641,7 +641,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^pu$/i }));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('NOPU')).toBeInTheDocument();
       expect(within(rows[1]).getByText('HASPU')).toBeInTheDocument();
     });
@@ -656,7 +656,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /target pay/i }));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('SMALL')).toBeInTheDocument();
       expect(within(rows[1]).getByText('BIG')).toBeInTheDocument();
     });
@@ -671,7 +671,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: /^origin$/i }));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('GALOAD')).toBeInTheDocument();
       expect(within(rows[1]).getByText('TXLOAD')).toBeInTheDocument();
     });
@@ -693,7 +693,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
       expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /^load #/i })).toHaveTextContent('↓');
@@ -704,21 +704,93 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      const rows = screen.getAllByRole('row').slice(1);
+      const rows = screen.getAllByTestId('load-row');
       expect(within(rows[0]).getByText('L1001')).toBeInTheDocument();
       expect(within(rows[1]).getByText('A2002')).toBeInTheDocument();
     });
   });
 
-  test('the table is not boxed into a fixed-height internal scroll area -- it grows to fit its rows, only scrolling horizontally if needed', async () => {
+  // The board used to be a wide <table> in an overflow-x-auto box -- on a
+  // laptop-width or phone screen that meant scrolling sideways. Rows now
+  // reflow instead, and nothing is boxed into an internal scroll area.
+  test('renders loads as reflowing rows with no horizontal or fixed-height scroll container', async () => {
     loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
     await waitFor(() => screen.getByText('L1001'));
 
-    const table = screen.getByRole('table');
-    const wrapper = table.parentElement;
-    expect(wrapper.className).not.toMatch(/max-h-|overflow-y-auto|overflow-auto\b/);
-    expect(wrapper.className).toContain('overflow-x-auto');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    const list = screen.getByRole('list', { name: /^loads$/i });
+    expect(list.className).not.toMatch(/overflow-x-auto|max-h-|overflow-y-auto|overflow-auto/);
+    expect(screen.getByTestId('load-row').className).toContain('min-w-0');
+  });
+
+  describe('proven lanes (gold rows)', () => {
+    const PROVEN = { [SAMPLE_LOAD.id]: [
+      { carrierId: 7, carrierName: 'Swift Haul LLC', runs: 3, lastRanAt: '2026-08-02', lastRate: 1450 },
+      { carrierId: 8, carrierName: 'Blue Line', runs: 1, lastRanAt: '2026-06-01', lastRate: null },
+    ] };
+
+    test('asks for proven carriers for the loaded ids and marks the row gold with a badge', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+      await waitFor(() => expect(screen.getByLabelText(/proven lane: 2 carriers ran this/i)).toBeInTheDocument());
+      expect(carrierMatchesApi.getProvenCarriers).toHaveBeenCalledWith([1, 2]);
+      const [first, second] = screen.getAllByTestId('load-row');
+      expect(first.className).toContain('glass-gold');
+      expect(first.className).toContain('gold-sweep');
+      expect(first).toHaveAttribute('data-proven', 'true');
+      expect(second.className).not.toContain('glass-gold');
+    });
+
+    test('"Who ran it" expands the carriers in place, with runs and last rate', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+      const toggle = await screen.findByRole('button', { name: /who ran it/i });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      fireEvent.click(toggle);
+
+      expect(screen.getByRole('button', { name: /hide carriers/i })).toHaveAttribute('aria-expanded', 'true');
+      const list = screen.getByRole('list', { name: /carriers who ran l1001/i });
+      expect(within(list).getByText('Swift Haul LLC')).toBeInTheDocument();
+      expect(within(list).getByText('$1,450')).toBeInTheDocument();
+      expect(within(list).getByText('—')).toBeInTheDocument();
+    });
+
+    test('the Proven quick filter shows only gold rows', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
+      carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await screen.findByLabelText(/proven lane/i);
+
+      fireEvent.click(screen.getByRole('radio', { name: /proven/i }));
+      expect(screen.getAllByTestId('load-row')).toHaveLength(1);
+      expect(screen.getByText('L1001')).toBeInTheDocument();
+      expect(screen.queryByText('A2002')).not.toBeInTheDocument();
+    });
+
+    test('a failed proven lookup leaves the board working with no gold', async () => {
+      loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+      carrierMatchesApi.getProvenCarriers.mockRejectedValue(new Error('nope'));
+      render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+      await waitFor(() => screen.getByText('L1001'));
+      expect(screen.getByTestId('load-row').className).not.toContain('glass-gold');
+    });
+  });
+
+  test('the Needs rate quick filter shows only loads without a target pay', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, { ...SAMPLE_LOAD_2, target_pay: null }]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    await waitFor(() => screen.getByText('L1001'));
+
+    expect(screen.getByRole('radio', { name: /needs rate/i })).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('radio', { name: /needs rate/i }));
+    expect(screen.getAllByTestId('load-row')).toHaveLength(1);
+    expect(screen.getByText('A2002')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /edit rate for a2002, currently —/i })).toHaveTextContent('Add rate');
   });
 
   describe('inline target pay editing', () => {
@@ -727,7 +799,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      fireEvent.click(screen.getByRole('button', { name: /edit rate for l1001/i }));
       expect(screen.getByLabelText(/target pay for l1001/i)).toBeInTheDocument();
     });
 
@@ -737,7 +809,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      fireEvent.click(screen.getByRole('button', { name: /edit rate for l1001/i }));
       const input = screen.getByLabelText(/target pay for l1001/i);
       fireEvent.change(input, { target: { value: '1800' } });
       fireEvent.blur(input);
@@ -753,7 +825,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      fireEvent.click(screen.getByRole('button', { name: /edit rate for l1001/i }));
       const input = screen.getByLabelText(/target pay for l1001/i);
       fireEvent.change(input, { target: { value: '1800' } });
       fireEvent.keyDown(input, { key: 'Enter' });
@@ -768,7 +840,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      fireEvent.click(screen.getByRole('button', { name: /edit rate for l1001/i }));
       const input = screen.getByLabelText(/target pay for l1001/i);
       fireEvent.change(input, { target: { value: '999' } });
       fireEvent.keyDown(input, { key: 'Escape' });
@@ -783,7 +855,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: '1500.00' }));
+      fireEvent.click(screen.getByRole('button', { name: /edit rate for l1001/i }));
       const input = screen.getByLabelText(/target pay for l1001/i);
       fireEvent.change(input, { target: { value: '' } });
       fireEvent.blur(input);
