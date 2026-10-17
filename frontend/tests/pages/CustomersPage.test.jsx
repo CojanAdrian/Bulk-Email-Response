@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { chooseOption } from '../helpers/select';
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import CustomersPage from '../../src/pages/CustomersPage';
 import * as customersApi from '../../src/api/customers';
@@ -56,7 +57,7 @@ describe('CustomersPage', () => {
     await waitFor(() => {
       expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: '' });
     });
-    fireEvent.change(screen.getByRole('combobox'), { target: { value: 'R' } });
+    chooseOption(/equipment/i, 'Reefer R');
     await waitFor(() => {
       expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: 'R' });
     });

@@ -12,6 +12,7 @@ import Skeleton from '../components/Skeleton';
 import CarrierDetailSheet from '../components/CarrierDetailSheet';
 import CarrierSheet from '../components/CarrierSheet';
 import { SearchIcon, UsersIcon, TruckIcon } from '../components/icons';
+import Select from '../components/Select';
 
 const RANGE_OPTIONS = [
   { value: '30', label: '30 days' },
@@ -234,21 +235,16 @@ function CustomersPage() {
             </div>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <SegmentedControl ariaLabel="Time range" options={RANGE_OPTIONS} value={range} onChange={setRange} className="sm:w-auto" />
-              <label className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
-                <span className="shrink-0">Equipment</span>
-                <select
+              <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
+                <span aria-hidden="true" className="shrink-0">Equipment</span>
+                <Select
+                  ariaLabel="Equipment"
                   value={equipment}
-                  onChange={(e) => setEquipment(e.target.value)}
-                  className="min-w-0 flex-1 rounded-xl border border-border bg-surface-alt px-3 py-2 text-sm text-text focus:border-focus focus:outline-none sm:flex-none"
-                >
-                  <option value="">Any</option>
-                  {EQUIPMENT_OPTIONS.map((o) => (
-                    <option key={o.code} value={o.code}>
-                      {o.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                  onChange={setEquipment}
+                  options={[{ value: '', label: 'Any equipment' }, ...EQUIPMENT_OPTIONS.map((o) => ({ value: o.code, label: o.label, hint: o.code }))]}
+                  className="min-w-0 flex-1 sm:w-56 sm:flex-none"
+                />
+              </div>
             </div>
           </Card>
         )}

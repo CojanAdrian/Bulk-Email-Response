@@ -10,6 +10,7 @@ import StateSelect from '../components/StateSelect';
 import PrimaryButton from '../components/PrimaryButton';
 import Badge from '../components/Badge';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
+import Select from '../components/Select';
 
 const TIER_BADGE_VARIANT = { perfect: 'success', strong: 'info', weak: 'warning', regional_perfect: 'success', regional: 'default' };
 const TIER_LABEL = { perfect: 'Perfect match', strong: 'Strong match', weak: 'Weak match (deadhead)', regional_perfect: 'Regional (both ends)', regional: 'Regional' };
@@ -299,19 +300,14 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
             />
           </div>
           <div className="mb-2">
-            <select
-              aria-label="Equipment"
+            <Select
+              ariaLabel="Equipment"
               value={lane.equipment}
-              onChange={(e) => setLane((prev) => ({ ...prev, equipment: e.target.value }))}
-              className="w-full rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-sm text-white [&>option]:bg-[#05060a]"
-            >
-              <option value="">Any equipment</option>
-              {EQUIPMENT_OPTIONS.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.code} — {option.label}
-                </option>
-              ))}
-            </select>
+              onChange={(value) => setLane((prev) => ({ ...prev, equipment: value }))}
+              options={[{ value: '', label: 'Any equipment' }, ...EQUIPMENT_OPTIONS.map((option) => ({ value: option.code, label: option.code, hint: option.label }))]}
+              variant="onDark"
+              className="w-full"
+            />
           </div>
           <div className="flex items-center justify-between gap-2">
             {focusedLoad && (

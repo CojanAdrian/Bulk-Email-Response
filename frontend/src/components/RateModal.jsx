@@ -17,6 +17,7 @@ import BookingCarrierFields from './BookingCarrierFields';
 import UnsavedChangesBar from './UnsavedChangesBar';
 import { useDirtyGuard } from '../lib/useDirtyGuard';
 import { useCloseConfirmation } from '../lib/useCloseConfirmation';
+import Select from './Select';
 
 const MotionModalCard = motion(ModalCard);
 
@@ -409,16 +410,18 @@ function RateModal({ load, onClose, onSaved }) {
             <label className="mb-1 block text-sm text-text-muted" htmlFor="status">
               Status
             </label>
-            <select
+            <Select
               id="status"
+              ariaLabel="Status"
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text"
-            >
-              <option value="active">Active</option>
-              <option value="booked">Booked</option>
-              <option value="covered">Covered</option>
-            </select>
+              onChange={setStatus}
+              options={[
+                { value: 'active', label: 'Active' },
+                { value: 'booked', label: 'Booked' },
+                { value: 'covered', label: 'Covered' },
+              ]}
+              className="w-full"
+            />
           </div>
         </div>
 

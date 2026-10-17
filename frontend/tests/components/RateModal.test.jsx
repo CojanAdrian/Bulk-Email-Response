@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { StrictMode } from 'react';
+import { chooseOption } from '../helpers/select';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import RateModal from '../../src/components/RateModal';
 import * as loadsApi from '../../src/api/loads';
@@ -35,7 +36,7 @@ describe('RateModal', () => {
     render(<RateModal load={LOAD} onClose={onClose} onSaved={onSaved} />);
 
     fireEvent.change(screen.getByLabelText(/target pay/i), { target: { value: '1700' } });
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: 'booked' } });
+    chooseOption(/^status$/i, 'Booked');
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
@@ -55,7 +56,7 @@ describe('RateModal', () => {
     render(<RateModal load={fullLoad} onClose={vi.fn()} onSaved={vi.fn()} />);
 
     fireEvent.change(screen.getByLabelText(/dest city/i), { target: { value: 'Milwaukee' } });
-    fireEvent.change(screen.getByLabelText(/^status$/i), { target: { value: 'covered' } });
+    chooseOption(/^status$/i, 'Covered');
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
@@ -148,7 +149,7 @@ describe('RateModal', () => {
     loadsApi.updateLoad.mockResolvedValue({ ...blankRateLoad, status: 'booked' });
     render(<RateModal load={blankRateLoad} onClose={vi.fn()} onSaved={vi.fn()} />);
 
-    fireEvent.change(screen.getByLabelText(/status/i), { target: { value: 'booked' } });
+    chooseOption(/^status$/i, 'Booked');
     fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() => {
@@ -393,7 +394,7 @@ describe('RateModal', () => {
     render(<RateModal load={loadWithStops} onClose={vi.fn()} onSaved={vi.fn()} />);
 
     expect(screen.getByLabelText(/stop 1 city/i)).toHaveValue('Joliet');
-    expect(screen.getByLabelText(/stop 1 type/i)).toHaveValue('delivery');
+    expect(screen.getByRole('combobox', { name: /stop 1 type/i })).toHaveTextContent('Delivery');
   });
 
   // Regression test: see GmailConnectionPanel.test.jsx's StrictMode test for

@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { chooseOption } from '../helpers/select';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import CarrierMapPage from '../../src/pages/CarrierMapPage';
 import * as carrierMatchesApi from '../../src/api/carrierMatches';
@@ -153,7 +154,7 @@ describe('CarrierMapPage', () => {
     fireEvent.change(screen.getByLabelText(/origin state/i), { target: { value: 'TX' } });
     fireEvent.change(screen.getByLabelText(/destination city/i), { target: { value: 'Chicago' } });
     fireEvent.change(screen.getByLabelText(/destination state/i), { target: { value: 'IL' } });
-    fireEvent.change(screen.getByLabelText(/^equipment$/i), { target: { value: 'R' } });
+    chooseOption(/^equipment$/i, 'R Reefer');
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
 
     await waitFor(() => {

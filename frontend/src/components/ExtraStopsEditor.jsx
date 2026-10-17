@@ -1,5 +1,6 @@
 import DateTimePopover from './DateTimePopover';
 import StateSelect from './StateSelect';
+import Select from './Select';
 
 function blankStop() {
   return { type: 'pickup', city: '', state: '', datetime: '' };
@@ -33,16 +34,17 @@ function ExtraStopsEditor({ stops, onChange }) {
               <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-type-${index}`}>
                 Type
               </label>
-              <select
+              <Select
                 id={`extra-stop-type-${index}`}
-                aria-label={`Stop ${index + 1} type`}
+                ariaLabel={`Stop ${index + 1} type`}
                 value={stop.type}
-                onChange={(e) => updateStop(index, 'type', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-2 py-2 text-sm text-text"
-              >
-                <option value="pickup">Pickup</option>
-                <option value="delivery">Delivery</option>
-              </select>
+                onChange={(value) => updateStop(index, 'type', value)}
+                options={[
+                  { value: 'pickup', label: 'Pickup' },
+                  { value: 'delivery', label: 'Delivery' },
+                ]}
+                className="w-full"
+              />
             </div>
             <div className="min-w-[6rem] flex-1">
               <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-city-${index}`}>

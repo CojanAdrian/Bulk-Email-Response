@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
+import { chooseOption } from '../helpers/select';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ExtraStopsEditor from '../../src/components/ExtraStopsEditor';
 
@@ -53,7 +54,7 @@ describe('ExtraStopsEditor', () => {
     const onChange = vi.fn();
     const stops = [{ type: 'pickup', city: 'Fort Worth', state: 'TX', datetime: '' }];
     render(<ExtraStopsEditor stops={stops} onChange={onChange} />);
-    fireEvent.change(screen.getByLabelText(/stop 1 type/i), { target: { value: 'delivery' } });
+    chooseOption(/stop 1 type/i, 'Delivery');
     expect(onChange).toHaveBeenCalledWith([{ type: 'delivery', city: 'Fort Worth', state: 'TX', datetime: '' }]);
   });
 

@@ -16,12 +16,18 @@ import DateRangeField from './DateRangeField';
 import SelectionCircle from './SelectionCircle';
 import LoadRow from './LoadRow';
 import SegmentedControl from './SegmentedControl';
+import Select from './Select';
 import { SearchIcon } from './icons';
 import { formatMoney } from '../lib/formatMoney';
 import { usePersistentState } from '../lib/usePersistentState';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
+const STATUS_SELECT_OPTIONS = STATUS_OPTIONS.map((value) => ({ value, label: STATUS_LABELS[value] }));
+const BULK_RATE_OPTIONS = [
+  { value: 'include', label: 'Include rate' },
+  { value: 'exclude', label: 'Exclude rate' },
+];
 // A compact tag in the row's own left-edge column (see the match indicator
 // below) instead of a wide "N carriers match" pill inline next to the load
 // number -- moved out of the way of Load #/Origin, but still a readable
@@ -257,8 +263,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
       });
   }
 
-  function handleBulkStatusChange(e) {
-    const newStatus = e.target.value;
+  function handleBulkStatusChange(newStatus) {
     if (!newStatus) return;
     setActionError(null);
     setBulkBusy(true);
@@ -269,7 +274,6 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
       .catch((err) => setActionError(err.message || 'Failed to update selected loads.'))
       .finally(() => {
         setBulkBusy(false);
-        e.target.value = '';
       });
   }
 
@@ -285,8 +289,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
       });
   }
 
-  function handleBulkIncludeRate(e) {
-    const value = e.target.value;
+  function handleBulkIncludeRate(value) {
     if (!value) return;
     setActionError(null);
     setBulkBusy(true);
@@ -297,7 +300,6 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
       .catch((err) => setActionError(err.message || 'Failed to update rate for selected loads.'))
       .finally(() => {
         setBulkBusy(false);
-        e.target.value = '';
       });
   }
 
@@ -427,18 +429,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
               className="w-full rounded-full border border-border bg-surface-alt py-2 pl-9 pr-3 text-sm text-text placeholder:text-text-muted focus:border-focus focus:outline-none"
             />
           </label>
-          <select
-            aria-label="Filter by status"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="shrink-0 rounded-full border border-border bg-surface-alt px-3 py-2 text-sm font-medium text-text focus:border-focus focus:outline-none"
-          >
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {STATUS_LABELS[option]}
-              </option>
-            ))}
-          </select>
+          <Select ariaLabel="Filter by status" value={statusFilter} onChange={setStatusFilter} options={STATUS_SELECT_OPTIONS} className="shrink-0" />
         </div>
       </div>
 
@@ -477,35 +468,8 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
         </p>
       )}
       <BottomActionBar count={selection.selectedIds.size}>
-        <select
-          aria-label="Mark selected as"
-          defaultValue=""
-          onChange={handleBulkStatusChange}
-          disabled={bulkBusy}
-          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text disabled:opacity-60"
-        >
-          <option value="" disabled>
-            Mark as...
-          </option>
-          {STATUS_OPTIONS.map((option) => (
-            <option key={option} value={option}>
-              {STATUS_LABELS[option]}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="Rate for selected"
-          defaultValue=""
-          onChange={handleBulkIncludeRate}
-          disabled={bulkBusy}
-          className="rounded-full border border-border bg-surface px-3 py-1.5 text-xs text-text disabled:opacity-60"
-        >
-          <option value="" disabled>
-            Rate...
-          </option>
-          <option value="include">Include rate</option>
-          <option value="exclude">Exclude rate</option>
-        </select>
+        <Select ariaLabel="Mark selected as" value="" placeholder="Mark as…" onChange={handleBulkStatusChange} options={STATUS_SELECT_OPTIONS} disabled={bulkBusy} size="sm" />
+        <Select ariaLabel="Rate for selected" value="" placeholder="Rate…" onChange={handleBulkIncludeRate} options={BULK_RATE_OPTIONS} disabled={bulkBusy} size="sm" />
         {confirmingBulkDelete ? (
           <>
             <span className="text-xs text-error">Delete {selection.selectedIds.size}?</span>
@@ -641,19 +605,14 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                 }
                 controls={
                   <>
-                    <select
-                      aria-label={`Status for ${load.load_number}`}
+                    <Select
+                      ariaLabel={`Status for ${load.load_number}`}
                       value={load.status}
-                      onChange={(e) => handleStatusChange(load, e.target.value)}
+                      onChange={(value) => handleStatusChange(load, value)}
+                      options={STATUS_SELECT_OPTIONS}
                       disabled={busy}
-                      className="min-h-[36px] rounded-full border border-border bg-surface-alt px-3 py-1 text-xs font-semibold text-text disabled:opacity-60 sm:min-h-0"
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option} value={option}>
-                          {STATUS_LABELS[option]}
-                        </option>
-                      ))}
-                    </select>
+                      size="sm"
+                    />
                     <label className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-semibold text-text-muted sm:min-h-0">
                       <input
                         type="checkbox"

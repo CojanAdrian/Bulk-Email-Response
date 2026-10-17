@@ -1,4 +1,5 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { chooseOption } from '../helpers/select';
 import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
 import LoadsTable from '../../src/components/LoadsTable';
 import * as loadsApi from '../../src/api/loads';
@@ -137,7 +138,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+    chooseOption(/status for l1001/i, 'Booked');
 
     await waitFor(() => {
       expect(loadsApi.updateLoad).toHaveBeenCalledWith(1, { status: 'booked' });
@@ -150,7 +151,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+    chooseOption(/status for l1001/i, 'Booked');
 
     await waitFor(() => {
       expect(screen.getByText(/who's running load l1001/i)).toBeInTheDocument();
@@ -163,7 +164,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'covered' } });
+    chooseOption(/status for l1001/i, 'Covered');
 
     await waitFor(() => {
       expect(loadsApi.updateLoad).toHaveBeenCalled();
@@ -177,7 +178,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'booked' } });
+    chooseOption(/status for l1001/i, 'Booked');
     await waitFor(() => screen.getByText(/who's running load l1001/i));
 
     fireEvent.click(screen.getByRole('button', { name: /^close$/i }));
@@ -192,7 +193,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
     await waitFor(() => screen.getByText('L1001'));
-    fireEvent.change(screen.getByLabelText(/status for l1001/i), { target: { value: 'covered' } });
+    chooseOption(/status for l1001/i, 'Covered');
 
     await waitFor(() => {
       expect(screen.getByText('Update failed')).toBeInTheDocument();
@@ -294,7 +295,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('active'));
 
-    fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'booked' } });
+    chooseOption(/filter by status/i, 'Booked');
 
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('booked'));
   });
@@ -304,7 +305,7 @@ describe('LoadsTable', () => {
     render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('active'));
 
-    fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'covered' } });
+    chooseOption(/filter by status/i, 'Covered');
 
     await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('covered'));
   });
@@ -331,7 +332,7 @@ describe('LoadsTable', () => {
 
     const BOOKED_LOAD = { ...SAMPLE_LOAD, id: 2, load_number: 'L2002', status: 'booked' };
     loadsApi.listLoads.mockResolvedValueOnce([BOOKED_LOAD]);
-    fireEvent.change(screen.getByLabelText(/filter by status/i), { target: { value: 'booked' } });
+    chooseOption(/filter by status/i, 'Booked');
 
     await waitFor(() => {
       expect(screen.getByText('L2002')).toBeInTheDocument();
@@ -517,7 +518,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Select' }));
       fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
-      fireEvent.change(screen.getByLabelText(/mark selected as/i), { target: { value: 'covered' } });
+      chooseOption(/mark selected as/i, 'Covered');
 
       await waitFor(() => {
         expect(loadsApi.bulkUpdateLoadStatus).toHaveBeenCalledWith([1, 2], 'covered');
@@ -532,7 +533,7 @@ describe('LoadsTable', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Select' }));
       fireEvent.click(screen.getByRole('button', { name: 'Select All' }));
-      fireEvent.change(screen.getByLabelText(/rate for selected/i), { target: { value: 'exclude' } });
+      chooseOption(/rate for selected/i, 'Exclude rate');
 
       await waitFor(() => {
         expect(loadsApi.bulkSetIncludeRate).toHaveBeenCalledWith([1, 2], false);

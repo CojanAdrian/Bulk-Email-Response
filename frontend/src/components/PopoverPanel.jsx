@@ -33,14 +33,31 @@ function computePosition(anchorEl, panelEl) {
 // off a popover anchored near the container's edge. Invisible on the very
 // first paint (before its own size is known), then repositioned in the
 // same layout pass to avoid a visible jump.
-const PopoverPanel = forwardRef(function PopoverPanel({ anchorEl, children, className, role, ariaLabel }, forwardedRef) {
+//
+// `matchWidth` makes the panel at least as wide as its anchor (dropdown
+// lists), and the panel follows its anchor while anything scrolls or the
+// window resizes, instead of drifting away from it.
+const PopoverPanel = forwardRef(function PopoverPanel(
+  { anchorEl, children, className, role, ariaLabel, id, matchWidth = false, onMouseDown },
+  forwardedRef
+) {
   const [node, setNode] = useState(null);
   const [style, setStyle] = useState({ position: 'fixed', top: 0, left: 0, visibility: 'hidden' });
 
   useLayoutEffect(() => {
-    if (!anchorEl || !node) return;
-    setStyle({ position: 'fixed', ...computePosition(anchorEl, node), visibility: 'visible' });
-  }, [anchorEl, node]);
+    if (!anchorEl || !node) return undefined;
+    function place() {
+      const widthStyle = matchWidth ? { minWidth: anchorEl.getBoundingClientRect().width } : {};
+      setStyle({ position: 'fixed', zIndex: 60, ...widthStyle, ...computePosition(anchorEl, node), visibility: 'visible' });
+    }
+    place();
+    window.addEventListener('scroll', place, true);
+    window.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('scroll', place, true);
+      window.removeEventListener('resize', place);
+    };
+  }, [anchorEl, node, matchWidth]);
 
   function setRefs(el) {
     setNode(el);
@@ -49,7 +66,7 @@ const PopoverPanel = forwardRef(function PopoverPanel({ anchorEl, children, clas
   }
 
   return createPortal(
-    <div ref={setRefs} role={role} aria-label={ariaLabel} style={style} className={className}>
+    <div ref={setRefs} id={id} role={role} aria-label={ariaLabel} style={style} className={className} onMouseDown={onMouseDown}>
       {children}
     </div>,
     document.body
