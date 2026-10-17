@@ -34,6 +34,12 @@ describe('ModalCard', () => {
     expect(body.nextElementSibling).toBe(footer);
   });
 
+  test('keeps its max height even when an animation passes its own style', () => {
+    render(<ModalCard maxHeight="80vh" style={{ opacity: 0.5 }}>Hello</ModalCard>);
+    const shell = screen.getByText('Hello').parentElement;
+    expect(shell).toHaveStyle({ maxHeight: '80vh', opacity: '0.5' });
+  });
+
   test('forwards a ref to the outer shell', () => {
     let ref;
     render(<ModalCard ref={(el) => { ref = el; }}>Hello</ModalCard>);

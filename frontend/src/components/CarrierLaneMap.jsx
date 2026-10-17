@@ -204,7 +204,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
         <div className="absolute inset-0 flex items-center justify-center bg-[#05060a] p-6 text-center">
           <p className="max-w-sm text-sm text-white/60">
             Set <code className="rounded bg-white/10 px-1.5 py-0.5 text-white/80">VITE_GOOGLE_MAPS_API_KEY</code> to a browser-restricted Google Maps
-            API key (Maps JavaScript API + Directions API enabled) to show the live map here.
+            API key (Maps JavaScript API, Places API (New) and Routes API enabled) to show the live map here.
           </p>
         </div>
       )}

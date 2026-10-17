@@ -46,7 +46,8 @@ function ListboxPanel({ id, anchorEl, options, activeIndex, selectedValue, onPic
             >
               <span className="min-w-0 flex-1 truncate">
                 <span className="font-medium">{option.label}</span>
-                {option.hint && <span className={`ml-1.5 ${active ? 'text-accent-ink/70' : 'text-text-muted'}`}>{option.hint}</span>}
+                {option.hint && ' '}
+                {option.hint && <span className={`ml-1 ${active ? 'text-accent-ink/70' : 'text-text-muted'}`}>{option.hint}</span>}
               </span>
               {selected && <CheckIcon aria-hidden="true" className="h-4 w-4 shrink-0" />}
             </li>

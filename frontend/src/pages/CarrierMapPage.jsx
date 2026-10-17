@@ -311,7 +311,7 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
               ariaLabel="Equipment"
               value={lane.equipment}
               onChange={(value) => setLane((prev) => ({ ...prev, equipment: value }))}
-              options={[{ value: '', label: 'Any equipment' }, ...EQUIPMENT_OPTIONS.map((option) => ({ value: option.code, label: option.code, hint: option.label }))]}
+              options={[{ value: '', label: 'Any equipment' }, ...EQUIPMENT_OPTIONS.map((option) => ({ value: option.code, label: `${option.code} — ${option.label}` }))]}
               variant="onDark"
               className="w-full"
             />

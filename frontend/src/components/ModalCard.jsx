@@ -11,12 +11,15 @@ import { forwardRef } from 'react';
 // `footer` (Save / Cancel) is rendered OUTSIDE the scrolling body, pinned
 // to the bottom of the card on its own solid background -- the form
 // scrolls above it instead of showing through behind the buttons.
-const ModalCard = forwardRef(function ModalCard({ children, className = '', bodyClassName = '', maxHeight = '85vh', footer = null, ...rest }, ref) {
+// `style` is merged, not replaced: motion(ModalCard) passes its animation
+// styles through it, which used to wipe out maxHeight -- a long form then
+// grew past the screen and pushed Save / Cancel out of reach.
+const ModalCard = forwardRef(function ModalCard({ children, className = '', bodyClassName = '', maxHeight = '85vh', footer = null, style, ...rest }, ref) {
   return (
     <div
       ref={ref}
       className={`flex w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-surface text-text shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:rounded-3xl ${className}`}
-      style={{ maxHeight }}
+      style={{ ...style, maxHeight }}
       {...rest}
     >
       <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 ${footer ? '' : 'pb-[max(1.25rem,env(safe-area-inset-bottom))]'} ${bodyClassName}`}>

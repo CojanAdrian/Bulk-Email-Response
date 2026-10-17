@@ -154,7 +154,7 @@ describe('CarrierMapPage', () => {
     fireEvent.change(screen.getByLabelText(/origin state/i), { target: { value: 'TX' } });
     fireEvent.change(screen.getByLabelText(/destination city/i), { target: { value: 'Chicago' } });
     fireEvent.change(screen.getByLabelText(/destination state/i), { target: { value: 'IL' } });
-    chooseOption(/^equipment$/i, 'R Reefer');
+    chooseOption(/^equipment$/i, 'R — Reefer');
     fireEvent.click(screen.getByRole('button', { name: /search/i }));
 
     await waitFor(() => {
