@@ -303,4 +303,24 @@ describe('CarrierSheet', () => {
     fireEvent.click(screen.getByRole('presentation'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  test('edit mode: a manually-added lane can record the customer it was for', async () => {
+    const carrier = { id: 5, company_name: 'ABC Trucking' };
+    carriersApi.listCarrierHistory.mockResolvedValue([]);
+    carriersApi.createCarrierHistory.mockResolvedValue({ id: 1, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL' });
+    render(<CarrierSheet carrier={carrier} onClose={vi.fn()} onSaved={vi.fn()} />);
+
+    await waitFor(() => screen.getByText(/no lanes logged yet/i));
+    fireEvent.click(screen.getByRole('button', { name: /\+ add a lane/i }));
+    fireEvent.change(screen.getByLabelText(/^origin city$/i), { target: { value: 'Dallas' } });
+    fireEvent.change(screen.getByLabelText(/^origin state$/i), { target: { value: 'TX' } });
+    fireEvent.change(screen.getByLabelText(/^destination city$/i), { target: { value: 'Chicago' } });
+    fireEvent.change(screen.getByLabelText(/^destination state$/i), { target: { value: 'IL' } });
+    fireEvent.change(screen.getByLabelText(/^customer$/i), { target: { value: 'ALDI, Inc' } });
+    fireEvent.click(screen.getByRole('button', { name: /^add lane$/i }));
+
+    await waitFor(() => {
+      expect(carriersApi.createCarrierHistory).toHaveBeenCalledWith(5, expect.objectContaining({ customer: 'ALDI, Inc' }));
+    });
+  });
 });

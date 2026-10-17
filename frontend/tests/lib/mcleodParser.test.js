@@ -195,3 +195,20 @@ describe('cleanText', () => {
     expect(cleanText(undefined)).toBe('');
   });
 });
+
+describe('parseMcleodRows customer column', () => {
+  test('reads the McLeod Customer column', () => {
+    const { loads } = parseMcleodRows([...FIELDS, 'Customer'], [row({ Customer: ' ALDIDOIL - ALDI, Inc ' })]);
+    expect(loads[0].customer).toBe('ALDIDOIL - ALDI, Inc');
+  });
+
+  test('a blank customer cell becomes null', () => {
+    const { loads } = parseMcleodRows([...FIELDS, 'Customer'], [row({ Customer: '' })]);
+    expect(loads[0].customer).toBeNull();
+  });
+
+  test('omits customer entirely when the CSV has no Customer column', () => {
+    const { loads } = parseMcleodRows(FIELDS, [row()]);
+    expect(loads[0]).not.toHaveProperty('customer');
+  });
+});

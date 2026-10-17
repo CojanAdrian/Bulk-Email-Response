@@ -5,6 +5,7 @@ import { datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
 import { useMotionPreset } from '../lib/motionConfig';
 import ModalCard from './ModalCard';
+import CustomerField from './CustomerField';
 import CityStateAutocomplete from './CityStateAutocomplete';
 import StateSelect from './StateSelect';
 import PrimaryButton from './PrimaryButton';
@@ -20,7 +21,7 @@ const MotionModalCard = motion(ModalCard);
 const TEXT_FIELDS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip',
-  'equipment', 'weight', 'commodity', 'temperature', 'comment',
+  'equipment', 'weight', 'commodity', 'temperature', 'comment', 'customer',
 ];
 
 function blankToNull(value) {
@@ -109,16 +110,19 @@ function AddLoadModal({ onClose, onCreated }) {
           Add a load
         </h2>
 
-        <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="load_number">
-            Load #
-          </label>
-          <input
-            id="load_number"
-            value={fields.load_number}
-            onChange={(e) => handleFieldChange('load_number', e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-          />
+        <div className="mb-4 grid gap-2 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="load_number">
+              Load #
+            </label>
+            <input
+              id="load_number"
+              value={fields.load_number}
+              onChange={(e) => handleFieldChange('load_number', e.target.value)}
+              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            />
+          </div>
+          <CustomerField value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
         </div>
 
         <div className="mb-4 grid grid-cols-3 gap-2">

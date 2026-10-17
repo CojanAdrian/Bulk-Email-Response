@@ -5,6 +5,7 @@ import { useMotionPreset } from '../lib/motionConfig';
 import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { buildPUSched, buildDELSched } from '../lib/datExport';
 import ModalCard from './ModalCard';
+import CustomerField from './CustomerField';
 import CityStateAutocomplete from './CityStateAutocomplete';
 import StateSelect from './StateSelect';
 import PrimaryButton from './PrimaryButton';
@@ -22,7 +23,7 @@ const MotionModalCard = motion(ModalCard);
 const TEXT_FIELDS = [
   'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip',
-  'equipment', 'weight', 'commodity', 'temperature', 'comment',
+  'equipment', 'weight', 'commodity', 'temperature', 'comment', 'customer',
 ];
 
 function blankToNull(value) {
@@ -309,6 +310,8 @@ function RateModal({ load, onClose, onSaved }) {
             />
           </div>
         </div>
+
+        <CustomerField className="mb-4" value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
 
         <div className="mb-4 grid grid-cols-3 gap-2">
           <div>

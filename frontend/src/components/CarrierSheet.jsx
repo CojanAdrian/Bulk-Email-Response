@@ -38,7 +38,7 @@ function blankHistoryEntry() {
   return {
     load_number: '', load_id: null,
     origin_city: '', origin_state: '', dest_city: '', dest_state: '',
-    rate: '', gp: '', driver_name: '', driver_phone: '', comment: '', ran_at: '',
+    rate: '', gp: '', driver_name: '', driver_phone: '', comment: '', ran_at: '', customer: '',
   };
 }
 
@@ -171,6 +171,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             dest_state: prev.dest_state || load.dest_state || '',
             rate: prev.rate || (load.target_pay !== null && load.target_pay !== undefined ? String(load.target_pay) : ''),
             ran_at: prev.ran_at || (load.early_pu ? String(load.early_pu).slice(0, 10) : ''),
+            customer: prev.customer || load.customer || '',
           }));
           setLoadLookupStatus('found');
         } else {
@@ -201,6 +202,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
       driver_phone: blankToNull(historyDraft.driver_phone),
       comment: blankToNull(historyDraft.comment),
       ran_at: blankToNull(historyDraft.ran_at),
+      customer: blankToNull(historyDraft.customer),
     })
       .then((created) => {
         if (isMountedRef.current) {
@@ -483,6 +485,13 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                     type="date"
                     value={historyDraft.ran_at}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, ran_at: e.target.value }))}
+                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                  />
+                  <input
+                    aria-label="Customer"
+                    placeholder="Customer (optional)"
+                    value={historyDraft.customer}
+                    onChange={(e) => setHistoryDraft((prev) => ({ ...prev, customer: e.target.value }))}
                     className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
                   />
                   <input

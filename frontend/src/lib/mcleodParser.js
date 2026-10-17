@@ -16,6 +16,7 @@ export const OPTIONAL_COLS = {
   lateDel: ['late del dt', 'late del', 'late delivery dt', 'delivery date', 'del dt'],
   stops: ['stops', 'stop count', 'num stops', 'number of stops'],
   origZip: ['origin zip', 'origin postal code', 'orig zip', 'orig zip code', 'pickup zip', 'pu zip', 'origin postal', 'origin zip code'],
+  customer: ['customer', 'customer name', 'bill to', 'bill to name'],
   destZip: ['dest zip', 'destination zip', 'dest postal code', 'dest zip code', 'delivery zip', 'del zip', 'drop zip', 'destination postal', 'destination postal code', 'destination zip code'],
 };
 
@@ -165,6 +166,9 @@ function mapRowToLoad(row, colMap) {
     commodity: parseLookupCommodity(rawComment),
     temperature: parseTemp(rawComment, equipment),
     comment: rawComment,
+    // Only sent when the CSV has a Customer column, so re-uploading an
+    // export without one never wipes customers already saved on loads.
+    ...(colMap.customer ? { customer: cleanText(row[colMap.customer]) || null } : {}),
   };
 }
 

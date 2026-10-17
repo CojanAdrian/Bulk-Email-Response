@@ -18,7 +18,7 @@ const LOAD = { id: 1, load_number: 'L1001', target_pay: '1500.00', status: 'acti
 const BLANK_EXTRA_FIELDS = {
   origin_city: null, origin_state: null, origin_zip: null,
   dest_city: null, dest_state: null, dest_zip: null,
-  equipment: null, weight: null, commodity: null, temperature: null, comment: null,
+  equipment: null, weight: null, commodity: null, temperature: null, comment: null, customer: null,
   stops: null, custom_reply_body: null,
   early_pu: null, late_pu: null, early_del: null, late_del: null, extra_stops: [],
 };
@@ -62,7 +62,7 @@ describe('RateModal', () => {
       expect(loadsApi.updateLoad).toHaveBeenCalledWith(5, {
         origin_city: 'Dallas', origin_state: 'TX', origin_zip: '75201',
         dest_city: 'Milwaukee', dest_state: 'IL', dest_zip: '60601',
-        equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead',
+        equipment: 'V', weight: '40000', commodity: 'General', temperature: null, comment: 'Call ahead', customer: null,
         stops: 0, target_pay: 1500, status: 'covered', custom_reply_body: null,
         early_pu: null, late_pu: null, early_del: null, late_del: null, extra_stops: [],
       });

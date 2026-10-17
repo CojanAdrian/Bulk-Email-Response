@@ -2,8 +2,11 @@ import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import AddLoadModal from '../../src/components/AddLoadModal';
 import * as loadsApi from '../../src/api/loads';
+import * as customersApi from '../../src/api/customers';
+import { resetCustomerNameCache } from '../../src/components/CustomerField';
 
 vi.mock('../../src/api/loads');
+vi.mock('../../src/api/customers');
 const capturedOnPlaceSelected = {};
 vi.mock('../../src/components/CityStateAutocomplete', () => ({
   default: (props) => {
@@ -15,6 +18,24 @@ vi.mock('../../src/components/CityStateAutocomplete', () => ({
 describe('AddLoadModal', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    resetCustomerNameCache();
+    customersApi.listCustomers.mockResolvedValue([{ name: 'ALDI, Inc' }, { name: 'Kroger' }]);
+  });
+
+  test('sends the customer, and suggests customers already in the system', async () => {
+    loadsApi.createLoad.mockResolvedValue({ id: 1, load_number: 'L1001' });
+    const { container } = render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    await waitFor(() => {
+      expect(container.querySelectorAll('datalist option')).toHaveLength(2);
+    });
+
+    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'L1001' } });
+    fireEvent.change(screen.getByLabelText(/^customer$/i), { target: { value: '  ALDI, Inc ' } });
+    fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
+
+    await waitFor(() => {
+      expect(loadsApi.createLoad).toHaveBeenCalledWith(expect.objectContaining({ load_number: 'L1001', customer: 'ALDI, Inc' }));
+    });
   });
 
   test('shows an error and does not call the API when load # is blank', async () => {
