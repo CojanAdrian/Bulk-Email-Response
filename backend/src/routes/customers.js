@@ -135,6 +135,27 @@ function createCustomersRouter(pool) {
     res.json(result);
   }));
 
+  // "Delete" a customer: clears that customer name from every load and
+  // lane-history entry. The loads and carrier runs themselves are kept --
+  // nothing a broker needs is lost, the customer just disappears from the
+  // Customers list (until a later CSV upload names it again).
+  router.delete('/', asyncHandler(async (req, res) => {
+    const name = String(req.query.name ?? '').trim();
+    if (name === '') {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const userId = req.session.userId;
+    const [loadResult] = await pool.query(
+      'UPDATE loads SET customer = NULL WHERE user_id = ? AND LOWER(TRIM(customer)) = LOWER(?)',
+      [userId, name]
+    );
+    const [historyResult] = await pool.query(
+      'UPDATE carrier_lane_history SET customer = NULL WHERE user_id = ? AND LOWER(TRIM(customer)) = LOWER(?)',
+      [userId, name]
+    );
+    res.json({ loadsCleared: loadResult.affectedRows, historyCleared: historyResult.affectedRows });
+  }));
+
   return router;
 }
 

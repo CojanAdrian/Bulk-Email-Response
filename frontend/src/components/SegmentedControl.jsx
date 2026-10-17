@@ -27,7 +27,7 @@ function SegmentedControl({ options, value, onChange, ariaLabel, size = 'md', cl
       role="radiogroup"
       aria-label={ariaLabel}
       onKeyDown={handleKeyDown}
-      className={`isolate flex min-w-0 max-w-full gap-0.5 overflow-x-auto rounded-xl bg-surface-alt p-1 [scrollbar-width:none] ${className}`}
+      className={`isolate flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full border border-field-border bg-field p-1 [scrollbar-width:none] ${className}`}
     >
       {options.map((option, index) => {
         const selected = index === selectedIndex;
@@ -42,7 +42,7 @@ function SegmentedControl({ options, value, onChange, ariaLabel, size = 'md', cl
             aria-checked={selected}
             tabIndex={selected ? 0 : -1}
             onClick={() => onChange(option.value)}
-            className={`relative flex min-h-[36px] flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg font-semibold transition-colors duration-200 sm:min-h-0 ${pad} ${
+            className={`relative flex min-h-[36px] flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full font-semibold transition-colors duration-200 sm:min-h-[32px] ${pad} ${
               selected ? 'text-text' : 'text-text-muted hover:text-text'
             }`}
           >
@@ -50,14 +50,14 @@ function SegmentedControl({ options, value, onChange, ariaLabel, size = 'md', cl
               <motion.span
                 layoutId={preset.reduced ? undefined : thumbId}
                 aria-hidden="true"
-                className="absolute inset-0 -z-10 rounded-lg bg-surface shadow-[0_1px_4px_rgba(0,0,0,0.18)] ring-1 ring-border"
+                className="absolute inset-0 -z-10 rounded-full border border-control-border bg-control shadow-[0_2px_8px_rgba(0,0,0,0.35)]"
                 transition={{ type: 'spring', stiffness: 500, damping: 38 }}
               />
             )}
             {option.icon}
             <span>{option.label}</span>
             {option.count !== undefined && (
-              <span className={`tabular-nums ${selected ? 'text-text-muted' : 'text-text-muted/80'}`}>{option.count}</span>
+              <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${selected ? 'bg-accent text-accent-ink' : 'bg-control/70 text-text-muted'}`}>{option.count}</span>
             )}
           </button>
         );

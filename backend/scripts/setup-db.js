@@ -338,6 +338,17 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  // Strip McLeod's "<CODE> - " prefix from customers saved before names were
+  // cleaned on import (see src/lib/customerName.js). Case-sensitive match
+  // ('c'), so only an all-caps code is ever removed. Safe to re-run.
+  for (const table of ['loads', 'carrier_lane_history']) {
+    await conn.query(
+      `UPDATE ${table}
+       SET customer = TRIM(SUBSTRING(customer, LOCATE(' - ', customer) + 3))
+       WHERE customer IS NOT NULL AND REGEXP_LIKE(customer, '^[A-Z0-9]{3,15}[[:space:]]+-[[:space:]]+[^[:space:]]', 'c')`
+    );
+  }
+
   await conn.end();
 }
 

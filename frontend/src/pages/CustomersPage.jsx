@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { listCustomers, getCustomerCarriers } from '../api/customers';
+import { listCustomers, getCustomerCarriers, deleteCustomer } from '../api/customers';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
 import { formatMoney } from '../lib/formatMoney';
 import { formatDayAgo, formatDayFull } from '../lib/formatDay';
@@ -11,7 +11,7 @@ import SegmentedControl from '../components/SegmentedControl';
 import Skeleton from '../components/Skeleton';
 import CarrierDetailSheet from '../components/CarrierDetailSheet';
 import CarrierSheet from '../components/CarrierSheet';
-import { SearchIcon, UsersIcon, TruckIcon } from '../components/icons';
+import { SearchIcon, UsersIcon, TruckIcon, TrashIcon } from '../components/icons';
 import Select from '../components/Select';
 
 const RANGE_OPTIONS = [
@@ -213,6 +213,9 @@ function CustomersPage() {
   const [detailCarrierId, setDetailCarrierId] = useState(null);
   const [editingCarrier, setEditingCarrier] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -258,6 +261,26 @@ function CustomersPage() {
 
   const selectedCustomer = customers.find((c) => c.name === effectiveSelected);
 
+  // Switching customers cancels a half-finished "remove?" prompt.
+  useEffect(() => {
+    setConfirmingDelete(false);
+    setDeleteError(null);
+  }, [effectiveSelected]);
+
+  function handleDelete() {
+    if (!selectedCustomer) return;
+    setDeleting(true);
+    setDeleteError(null);
+    deleteCustomer(selectedCustomer.name)
+      .then(() => {
+        setCustomers((prev) => prev.filter((c) => c.name !== selectedCustomer.name));
+        setSelected(null);
+        setConfirmingDelete(false);
+      })
+      .catch((err) => setDeleteError(err.message || "Couldn't remove this customer."))
+      .finally(() => setDeleting(false));
+  }
+
   return (
     <div className="grid min-w-0 gap-4 md:grid-cols-[minmax(0,300px)_minmax(0,1fr)] md:items-start lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
       <CustomerList
@@ -274,6 +297,7 @@ function CustomersPage() {
       <section aria-label="Carriers for this customer" className="min-w-0 space-y-4">
         {selectedCustomer && (
           <Card className="space-y-4">
+            <div className="flex min-w-0 items-start justify-between gap-3">
             <div className="min-w-0">
               <h2 className="break-words font-display text-xl font-bold tracking-tight text-text sm:text-2xl">{selectedCustomer.name}</h2>
               <p className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
@@ -284,6 +308,46 @@ function CustomersPage() {
                 <TypeTag type={selectedCustomer.loadType} />
               </p>
             </div>
+              {!confirmingDelete && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingDelete(true)}
+                  aria-label={`Remove ${selectedCustomer.name}`}
+                  title="Remove this customer"
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-error/40 px-3 py-1.5 text-xs font-semibold text-error transition hover:bg-error-bg"
+                >
+                  <TrashIcon aria-hidden="true" className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Remove</span>
+                </button>
+              )}
+            </div>
+            {confirmingDelete && (
+              <div role="alertdialog" aria-label="Remove customer" className="rounded-2xl border border-error/40 bg-error-bg p-3 text-sm text-text">
+                <p>
+                  Remove <strong>{selectedCustomer.name}</strong>? Its {plural(selectedCustomer.loadCount, 'load')} and carrier runs stay — only the
+                  customer name is cleared from them. A future CSV that names this customer will bring it back.
+                </p>
+                {deleteError && <p className="mt-1 text-error">{deleteError}</p>}
+                <div className="mt-2 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setConfirmingDelete(false)}
+                    disabled={deleting}
+                    className="rounded-full border border-control-border bg-control px-3 py-1.5 text-xs font-semibold text-text hover:bg-control-hover"
+                  >
+                    Keep it
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                    className="rounded-full bg-error px-3 py-1.5 text-xs font-bold text-surface hover:opacity-90 disabled:opacity-60"
+                  >
+                    {deleting ? 'Removing…' : 'Remove customer'}
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <SegmentedControl ariaLabel="Time range" options={RANGE_OPTIONS} value={range} onChange={setRange} className="sm:w-auto" />
               <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">

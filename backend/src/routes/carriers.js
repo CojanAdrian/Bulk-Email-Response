@@ -1,6 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
+const { cleanCustomerName } = require('../lib/customerName');
 const { geocodeCityState } = require('../lib/geocoding');
 
 const CARRIER_FIELDS = [
@@ -184,7 +185,7 @@ function createCarriersRouter(pool) {
         destCity, destState, dest ? dest.lat : null, dest ? dest.lng : null,
         req.body.rate ?? null, req.body.gp ?? null, req.body.driver_name || null, req.body.driver_phone || null,
         req.body.comment || null, req.body.ran_at || null,
-        req.body.customer ? String(req.body.customer).trim() || null : null,
+        cleanCustomerName(req.body.customer),
       ]
     );
     // A run tied to a real load teaches us what this carrier pulls: the
@@ -232,7 +233,7 @@ function createCarriersRouter(pool) {
     for (const field of ['rate', 'gp', 'driver_name', 'driver_phone', 'comment', 'ran_at', 'customer']) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(req.body[field]);
+        values.push(field === 'customer' ? cleanCustomerName(req.body[field]) : req.body[field]);
       }
     }
     if (updates.length === 0) {

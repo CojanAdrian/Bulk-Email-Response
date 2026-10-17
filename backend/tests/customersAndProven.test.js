@@ -182,4 +182,36 @@ describe('proven lanes and customers routes', () => {
       expect(res.body.map((c) => c.carrierName)).toEqual(['Spot Hauler']);
     });
   });
+
+  describe('DELETE /api/customers', () => {
+    test('clears the customer from its loads and runs, keeps the loads, and leaves other users alone', async () => {
+      const mine = await makeLoad({ load_number: 'D1', customer: 'ALDI, Inc' });
+      await makeLoad({ load_number: 'D2', customer: 'Kroger' });
+      const carrier = await makeCarrier('Swift Haul');
+      await makeRun(carrier, { customer: 'aldi, inc' });
+      await pool.query("INSERT INTO loads (user_id, load_number, customer) VALUES (?, 'THEIRS', 'ALDI, Inc')", [otherUserId]);
+
+      const res = await agent.delete('/api/customers').query({ name: 'Aldi, Inc' });
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ loadsCleared: 1, historyCleared: 1 });
+
+      const [rows] = await pool.query('SELECT id, customer FROM loads WHERE id = ?', [mine]);
+      expect(rows[0]).toEqual({ id: mine, customer: null });
+      const list = await agent.get('/api/customers');
+      expect(list.body.map((c) => c.name)).toEqual(['Kroger']);
+      const [theirs] = await pool.query("SELECT customer FROM loads WHERE load_number = 'THEIRS'");
+      expect(theirs[0].customer).toBe('ALDI, Inc');
+    });
+
+    test('400 without a name', async () => {
+      const res = await agent.delete('/api/customers');
+      expect(res.status).toBe(400);
+    });
+  });
+
+  test('uploads drop the McLeod customer code', async () => {
+    await agent.post('/api/loads/upload').send({ loads: [{ load_number: 'MC1', customer: 'ALDIDOIL - ALDI, Inc' }] });
+    const [rows] = await pool.query("SELECT customer FROM loads WHERE load_number = 'MC1'");
+    expect(rows[0].customer).toBe('ALDI, Inc');
+  });
 });

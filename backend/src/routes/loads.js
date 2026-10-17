@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { composeReply } = require('../lib/replyComposer');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
+const { cleanCustomerName } = require('../lib/customerName');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -52,8 +53,7 @@ function normalizeLoadBody(body) {
   if ('dest_city' in normalized) normalized.dest_city = titleCaseCity(normalized.dest_city);
   if ('dest_state' in normalized) normalized.dest_state = upperState(normalized.dest_state);
   if ('customer' in normalized) {
-    const trimmed = normalized.customer === null || normalized.customer === undefined ? '' : String(normalized.customer).trim();
-    normalized.customer = trimmed === '' ? null : trimmed;
+    normalized.customer = cleanCustomerName(normalized.customer);
   }
   if ('rev_code' in normalized) {
     const code = normalized.rev_code === null || normalized.rev_code === undefined ? '' : String(normalized.rev_code).trim().toUpperCase();

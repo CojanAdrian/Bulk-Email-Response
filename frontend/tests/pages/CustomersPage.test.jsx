@@ -47,7 +47,7 @@ describe('CustomersPage', () => {
     await waitFor(() => {
       expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'Kroger', range: 'all', equipment: '', loadType: 'all' });
     });
-    expect(screen.getByRole('button', { name: /kroger/i })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(screen.getByRole('list', { name: /customers/i })).getByRole('button', { name: /kroger/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
   test('changing the time range and equipment refetches with those filters', async () => {
@@ -95,5 +95,27 @@ describe('CustomersPage', () => {
     await waitFor(() => {
       expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'Kroger', range: 'all', equipment: '', loadType: 'spot' });
     });
+  });
+
+  test('a customer can be removed after confirming', async () => {
+    customersApi.deleteCustomer.mockResolvedValue({ loadsCleared: 12, historyCleared: 3 });
+    render(<CustomersPage />);
+    await screen.findByText('Swift Haul LLC');
+    fireEvent.click(screen.getByRole('button', { name: /remove aldi, inc/i }));
+    expect(screen.getByRole('alertdialog')).toHaveTextContent(/12 loads and carrier runs stay/i);
+    fireEvent.click(screen.getByRole('button', { name: /^remove customer$/i }));
+    await waitFor(() => expect(customersApi.deleteCustomer).toHaveBeenCalledWith('ALDI, Inc'));
+    const list = screen.getByRole('list', { name: /customers/i });
+    await waitFor(() => expect(within(list).queryByText('ALDI, Inc')).not.toBeInTheDocument());
+    expect(within(list).getByText('Kroger')).toBeInTheDocument();
+  });
+
+  test('"Keep it" cancels the removal', async () => {
+    render(<CustomersPage />);
+    await screen.findByText('Swift Haul LLC');
+    fireEvent.click(screen.getByRole('button', { name: /remove aldi, inc/i }));
+    fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
+    expect(customersApi.deleteCustomer).not.toHaveBeenCalled();
   });
 });
