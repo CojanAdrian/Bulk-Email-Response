@@ -7,7 +7,7 @@ const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'raw_equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
-  'commodity', 'temperature', 'comment',
+  'commodity', 'temperature', 'comment', 'customer',
 ];
 
 // Deliberately excludes load_number (the upload/matching key -- editing it here
@@ -19,7 +19,7 @@ const EDITABLE_FIELDS = [
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'early_del', 'late_del', 'stops',
   'commodity', 'temperature', 'comment', 'status', 'custom_reply_body',
-  'include_rate', 'extra_stops',
+  'include_rate', 'extra_stops', 'customer',
 ];
 
 const STATUS_VALUES = ['active', 'booked', 'covered'];
@@ -40,6 +40,10 @@ function normalizeLoadBody(body) {
   if ('origin_state' in normalized) normalized.origin_state = upperState(normalized.origin_state);
   if ('dest_city' in normalized) normalized.dest_city = titleCaseCity(normalized.dest_city);
   if ('dest_state' in normalized) normalized.dest_state = upperState(normalized.dest_state);
+  if ('customer' in normalized) {
+    const trimmed = normalized.customer === null || normalized.customer === undefined ? '' : String(normalized.customer).trim();
+    normalized.customer = trimmed === '' ? null : trimmed;
+  }
   if ('extra_stops' in normalized && Array.isArray(normalized.extra_stops)) {
     normalized.extra_stops = normalized.extra_stops.map((stop) =>
       stop && typeof stop === 'object' ? { ...stop, city: titleCaseCity(stop.city), state: upperState(stop.state) } : stop

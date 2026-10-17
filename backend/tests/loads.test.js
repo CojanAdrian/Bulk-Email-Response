@@ -1023,4 +1023,20 @@ describe('loads routes', () => {
       expect(wsHub.emitToUser).toHaveBeenCalledWith(userId, 'load:changed', { loadId: res.body.id });
     });
   });
+
+  test('upload stores a trimmed customer and a re-upload updates it', async () => {
+    await agent.post('/api/loads/upload').send({ loads: [{ load_number: 'C1', origin_city: 'Dallas', origin_state: 'TX', customer: '  ALDI, Inc ' }] });
+    let [rows] = await pool.query('SELECT customer FROM loads WHERE load_number = ?', ['C1']);
+    expect(rows[0].customer).toBe('ALDI, Inc');
+    await agent.post('/api/loads/upload').send({ loads: [{ load_number: 'C1', customer: 'Kroger' }] });
+    [rows] = await pool.query('SELECT customer FROM loads WHERE load_number = ?', ['C1']);
+    expect(rows[0].customer).toBe('Kroger');
+  });
+
+  test('POST and PATCH accept a customer, and a blank one clears it', async () => {
+    const created = await agent.post('/api/loads').send({ load_number: 'C2', customer: 'Target' });
+    expect(created.body.customer).toBe('Target');
+    const patched = await agent.patch(`/api/loads/${created.body.id}`).send({ customer: '   ' });
+    expect(patched.body.customer).toBeNull();
+  });
 });

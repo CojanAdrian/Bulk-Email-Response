@@ -244,6 +244,15 @@ describe('carriers routes', () => {
       expect(Number(res.body.gp)).toBe(300);
     });
 
+    test('POST /:id/history stores a trimmed customer, and PATCH can change it', async () => {
+      const res = await agent.post(`/api/carriers/${carrierId}/history`).send({
+        origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', customer: ' ALDI, Inc ',
+      });
+      expect(res.body.customer).toBe('ALDI, Inc');
+      const patched = await agent.patch(`/api/carriers/history/${res.body.id}`).send({ customer: 'Kroger' });
+      expect(patched.body.customer).toBe('Kroger');
+    });
+
     test('PATCH /history/:historyId can update gp', async () => {
       const createRes = await agent.post(`/api/carriers/${carrierId}/history`).send({
         origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: 1500, gp: 300,

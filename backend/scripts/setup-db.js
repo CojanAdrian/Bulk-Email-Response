@@ -316,6 +316,23 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  // Customer the load was for (McLeod CSV's "Customer" column, or typed on
+  // Add/Edit Load) -- and on lane history, for a run logged by hand that
+  // isn't linked to a load. Powers the Customers tab.
+  const customerColumns = [
+    ['loads', `ALTER TABLE loads ADD COLUMN customer VARCHAR(255) NULL`],
+    ['carrier_lane_history', `ALTER TABLE carrier_lane_history ADD COLUMN customer VARCHAR(255) NULL`],
+  ];
+  for (const [tableName, alterSql] of customerColumns) {
+    const [col] = await conn.query(
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'customer'`,
+      [databaseName, tableName]
+    );
+    if (col[0].count === 0) {
+      await conn.query(alterSql);
+    }
+  }
+
   await conn.end();
 }
 

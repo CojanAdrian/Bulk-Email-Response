@@ -9,6 +9,7 @@ const createGmailRouter = require('./routes/gmail');
 const createInquiriesRouter = require('./routes/inquiries');
 const createCarriersRouter = require('./routes/carriers');
 const createCarrierMatchesRouter = require('./routes/carrierMatches');
+const createCustomersRouter = require('./routes/customers');
 const requireAuth = require('./middleware/requireAuth');
 const { createMemoryStore } = require('./lib/sessionStore');
 
@@ -49,6 +50,7 @@ function createApp(pool, wsHub, store) {
   app.use('/api/inquiries', requireAuth, createInquiriesRouter(pool, wsHub));
   app.use('/api/carriers', requireAuth, createCarriersRouter(pool));
   app.use('/api/carrier-matches', requireAuth, createCarrierMatchesRouter(pool));
+  app.use('/api/customers', requireAuth, createCustomersRouter(pool));
 
   if (fs.existsSync(FRONTEND_INDEX_PATH)) {
     app.use(express.static(FRONTEND_DIST_PATH));

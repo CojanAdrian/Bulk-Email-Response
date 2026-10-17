@@ -2,6 +2,7 @@ const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { geocodeCityState } = require('../lib/geocoding');
 const { findMatchesForLane } = require('../lib/carrierMatching');
+const { findProvenCarriers } = require('../lib/provenLanes');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 
 // Selects every one of the user's carrier_lane_history rows joined with
@@ -165,6 +166,34 @@ function createCarrierMatchesRouter(pool) {
       }
     }
     res.json(map);
+  }));
+
+  // Exact-lane "proven" carriers for a batch of loads: carriers who already
+  // ran the same origin/destination city+state with compatible equipment.
+  // Powers the gold rows on the loads board -- see provenLanes.js.
+  router.post('/proven', asyncHandler(async (req, res) => {
+    const { loadIds } = req.body;
+    if (!Array.isArray(loadIds) || loadIds.length === 0) {
+      return res.status(400).json({ error: 'loadIds must be a non-empty array' });
+    }
+    const placeholders = loadIds.map(() => '?').join(', ');
+    const [loads] = await pool.query(
+      `SELECT id, origin_city, origin_state, dest_city, dest_state, equipment FROM loads WHERE id IN (${placeholders}) AND user_id = ?`,
+      [...loadIds, req.session.userId]
+    );
+    // Dates are formatted in SQL so a DATE never shifts a day through a
+    // JS Date's timezone conversion.
+    const [historyRows] = await pool.query(
+      `SELECT h.carrier_id, c.company_name AS carrier_name, c.equipment_types AS carrier_equipment_types,
+              l.equipment AS load_equipment, h.origin_city, h.origin_state, h.dest_city, h.dest_state, h.rate,
+              DATE_FORMAT(h.ran_at, '%Y-%m-%d') AS ran_at, DATE_FORMAT(h.created_at, '%Y-%m-%d') AS created_at
+       FROM carrier_lane_history h
+       JOIN carriers c ON c.id = h.carrier_id
+       LEFT JOIN loads l ON l.id = h.load_id
+       WHERE h.user_id = ?`,
+      [req.session.userId]
+    );
+    res.json(findProvenCarriers(loads, historyRows));
   }));
 
   return router;
