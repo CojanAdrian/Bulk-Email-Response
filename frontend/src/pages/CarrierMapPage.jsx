@@ -59,19 +59,21 @@ function MatchCard({ match, onSelect, searchedEquipment }) {
         match.equipmentMismatch ? 'border-red-400/40 bg-red-500/[0.06]' : 'border-white/10 bg-white/5'
       }`}
     >
-      <div className="mb-1.5 flex items-start justify-between gap-2">
-        <span className="font-semibold text-white">{match.carrierName}</span>
-        <div className="flex shrink-0 items-center gap-1">
-          {match.equipmentMismatch && (
-            <span
-              title={`No ${searchedLabel || 'matching equipment'} on file for this carrier -- they've only run ${(knownEquipment || []).join(', ')}`}
-              className="inline-flex shrink-0 items-center rounded-full border border-red-400/50 bg-red-500/20 px-2.5 py-0.5 text-xs font-bold text-red-200"
-            >
-              No {searchedLabel || 'match for equipment'}
-            </span>
-          )}
-          <Badge variant={TIER_BADGE_VARIANT[match.tier] || 'default'}>{TIER_LABEL[match.tier] || match.tier}</Badge>
-        </div>
+      {/* Name gets the full width (it wraps); the tags sit on their own
+          wrapping row below it, so neither can push out of the card. */}
+      <p className="font-semibold leading-snug text-white [overflow-wrap:anywhere]">{match.carrierName}</p>
+      <div className="mb-1.5 mt-1.5 flex min-w-0 flex-wrap items-center gap-1">
+        <Badge variant={TIER_BADGE_VARIANT[match.tier] || 'default'} className="max-w-full">
+          {TIER_LABEL[match.tier] || match.tier}
+        </Badge>
+        {match.equipmentMismatch && (
+          <span
+            title={`No ${searchedLabel || 'matching equipment'} on file for this carrier -- they've only run ${(knownEquipment || []).join(', ')}`}
+            className="inline-flex max-w-full items-center rounded-full border border-red-400/50 bg-red-500/20 px-2.5 py-0.5 text-xs font-bold leading-tight text-red-200"
+          >
+            No {searchedLabel || 'match for equipment'}
+          </span>
+        )}
       </div>
       <p className="mb-1.5 text-xs text-white/50">{distanceLabel}</p>
       <div className="flex flex-wrap items-center gap-1.5 text-xs text-white/70">
