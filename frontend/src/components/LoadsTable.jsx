@@ -600,7 +600,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                 }
                 puField={
                   <DateRangeField
-                    legend="PU"
+                    legend="Pickup"
                     showLegend={false}
                     earlyId={`pu-early-${load.id}`}
                     lateId={`pu-late-${load.id}`}

@@ -735,7 +735,7 @@ describe('LoadsTable', () => {
       carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
-      await waitFor(() => expect(screen.getByLabelText(/proven lane: 2 carriers ran this/i)).toBeInTheDocument());
+      await waitFor(() => expect(screen.getByRole('button', { name: /show the 2 carriers who ran this lane/i })).toBeInTheDocument());
       expect(carrierMatchesApi.getProvenCarriers).toHaveBeenCalledWith([1, 2]);
       const [first, second] = screen.getAllByTestId('load-row');
       expect(first.className).toContain('glass-gold');
@@ -749,11 +749,11 @@ describe('LoadsTable', () => {
       carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
 
-      const toggle = await screen.findByRole('button', { name: /who ran it/i });
+      const toggle = await screen.findByRole('button', { name: /show the 2 carriers who ran this lane/i });
       expect(toggle).toHaveAttribute('aria-expanded', 'false');
       fireEvent.click(toggle);
 
-      expect(screen.getByRole('button', { name: /hide carriers/i })).toHaveAttribute('aria-expanded', 'true');
+      expect(screen.getByRole('button', { name: /hide the 2 carriers who ran this lane/i })).toHaveAttribute('aria-expanded', 'true');
       const list = screen.getByRole('list', { name: /carriers who ran l1001/i });
       expect(within(list).getByText('Swift Haul LLC')).toBeInTheDocument();
       expect(within(list).getByText('$1,450')).toBeInTheDocument();
@@ -764,7 +764,7 @@ describe('LoadsTable', () => {
       loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD, SAMPLE_LOAD_2]);
       carrierMatchesApi.getProvenCarriers.mockResolvedValue(PROVEN);
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
-      await screen.findByLabelText(/proven lane/i);
+      await screen.findByRole('button', { name: /carriers who ran this lane/i });
 
       fireEvent.click(screen.getByRole('radio', { name: /proven/i }));
       expect(screen.getAllByTestId('load-row')).toHaveLength(1);
@@ -876,7 +876,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={onSelectLoad} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: /set pu window/i }));
+      fireEvent.click(screen.getByRole('button', { name: /set pickup window/i }));
       const early = within(screen.getByRole('group', { name: 'Early' }));
       fireEvent.click(early.getByRole('button', { name: '2026-08-14' }));
       fireEvent.click(early.getByRole('button', { name: /set time to 8:00 am/i }));
@@ -903,7 +903,7 @@ describe('LoadsTable', () => {
       render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
       await waitFor(() => screen.getByText('L1001'));
 
-      fireEvent.click(screen.getByRole('button', { name: /set pu window/i }));
+      fireEvent.click(screen.getByRole('button', { name: /set pickup window/i }));
       const early = within(screen.getByRole('group', { name: 'Early' }));
       fireEvent.click(early.getByRole('button', { name: '2026-08-14' }));
       fireEvent.click(early.getByRole('button', { name: /set time to 10:00 am/i }));

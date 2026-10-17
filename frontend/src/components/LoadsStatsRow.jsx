@@ -5,9 +5,9 @@ import Card from './Card';
 
 function StatBlock({ label, value, accentClassName }) {
   return (
-    <Card className="!p-4 flex-1">
-      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">{label}</p>
-      <p className={`mt-1 text-2xl font-extrabold ${accentClassName}`}>{value}</p>
+    <Card className="min-w-0 flex-1 !p-3 sm:!p-4">
+      <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-text-muted sm:text-xs">{label}</p>
+      <p className={`mt-0.5 font-display text-xl font-bold tabular-nums sm:mt-1 sm:text-2xl ${accentClassName}`}>{value}</p>
     </Card>
   );
 }
@@ -42,7 +42,7 @@ function LoadsStatsRow({ refreshKey }) {
   if (!counts) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+    <div className="grid grid-cols-3 gap-2 sm:gap-4">
       <StatBlock label="Active" value={counts.active} accentClassName="text-success" />
       <StatBlock label="Booked" value={counts.booked} accentClassName="text-tag" />
       <StatBlock label="Covered" value={counts.covered} accentClassName="text-tag" />

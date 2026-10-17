@@ -40,7 +40,7 @@ function CustomerList({ customers, status, query, onQueryChange, selected, onSel
   }, [customers, query]);
 
   return (
-    <Card className="flex min-h-0 flex-col p-3 sm:p-4 md:sticky md:top-20 md:max-h-[calc(100vh-7rem)]">
+    <Card className="flex max-h-[45vh] min-h-0 flex-col p-3 sm:p-4 md:sticky md:top-20 md:max-h-[calc(100vh-7rem)]">
       <label className="relative mb-3 block">
         <span className="sr-only">Search customers</span>
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />

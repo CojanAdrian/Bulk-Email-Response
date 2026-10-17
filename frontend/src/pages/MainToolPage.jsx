@@ -123,9 +123,16 @@ function MainToolPage({ username, onLogout }) {
       <TopNav tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
       <div className="relative z-10 min-w-0">
         {!(tab === 'carriers' && carriersView === 'find') && (
-          <header className="mx-auto w-full max-w-[1400px] px-4 pt-6 sm:px-6 sm:pt-8">
-            <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-shell-text sm:text-[32px]">{TAB_TITLES[tab]}</h1>
-            <p className="mt-0.5 text-sm text-shell-text-muted">{TAB_SUBTITLES[tab]}</p>
+          <header className="mx-auto flex w-full max-w-[1400px] items-end justify-between gap-3 px-4 pt-6 sm:px-6 sm:pt-8">
+            <div className="min-w-0">
+              <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-shell-text sm:text-[32px]">{TAB_TITLES[tab]}</h1>
+              <p className="mt-0.5 text-sm text-shell-text-muted">{TAB_SUBTITLES[tab]}</p>
+            </div>
+            {tab === 'inquiries' && (
+              <SecondaryButton onClick={() => setInquiriesRefreshKey((k) => k + 1)} className="shrink-0 px-4 py-2 text-xs">
+                Refresh
+              </SecondaryButton>
+            )}
           </header>
         )}
         <AnimatePresence>
@@ -156,11 +163,6 @@ function MainToolPage({ username, onLogout }) {
           )}
           {tab === 'inquiries' && (
             <motion.main key="inquiries" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
-              <div className="flex justify-end">
-                <SecondaryButton onClick={() => setInquiriesRefreshKey((k) => k + 1)} className="px-4 py-2 text-xs">
-                  Refresh
-                </SecondaryButton>
-              </div>
               <InquiriesStatsRow refreshKey={inquiriesRefreshKey} />
               <ReviewQueue key={`review-${inquiriesRefreshKey}`} />
               <GmailConnectionPanel />

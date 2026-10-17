@@ -83,7 +83,22 @@ function LoadRow({
                 </span>
               </>
             )}
-            {isProven && <ProvenBadge count={provenCount} />}
+            {isProven && (
+              <button
+                type="button"
+                onClick={onToggleExpand}
+                aria-expanded={expanded}
+                aria-controls={detailsId}
+                aria-label={`${expanded ? 'Hide' : 'Show'} the ${provenCount} carrier${provenCount === 1 ? '' : 's'} who ran this lane`}
+                className="inline-flex items-center gap-0.5 rounded-full transition active:scale-95"
+              >
+                <ProvenBadge count={provenCount} decorative />
+                <ChevronDownIcon
+                  aria-hidden="true"
+                  className={`h-3.5 w-3.5 text-gold-text transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+                />
+              </button>
+            )}
             {badges}
           </div>
 
@@ -91,18 +106,6 @@ function LoadRow({
             {puField && <div className="min-w-0 max-w-full sm:max-w-[17rem] sm:flex-none">{puField}</div>}
             {controls}
             <div className="flex min-w-0 flex-wrap items-center gap-1.5 sm:ml-auto">
-              {isProven && (
-                <button
-                  type="button"
-                  onClick={onToggleExpand}
-                  aria-expanded={expanded}
-                  aria-controls={detailsId}
-                  className="inline-flex min-h-[36px] items-center gap-1 rounded-full border border-gold/50 px-3 py-1 text-xs font-semibold text-gold-text transition hover:bg-gold/10 sm:min-h-0"
-                >
-                  {expanded ? 'Hide carriers' : 'Who ran it'}
-                  <ChevronDownIcon className={`h-3.5 w-3.5 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`} />
-                </button>
-              )}
               {actions}
             </div>
           </div>

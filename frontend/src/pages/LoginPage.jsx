@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { login } from '../api/auth';
 import { useGoogleAuthError } from '../lib/useGoogleAuthError';
 import Card from '../components/Card';
+import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import ThemeToggle from '../components/ThemeToggle';
@@ -42,7 +43,10 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
         <form onSubmit={handleSubmit}>
           <div className="mb-6 flex items-center gap-3">
             <img src={logoIcon} alt="" className="h-10 w-10 shrink-0" />
-            <h1 className="text-xl font-extrabold tracking-wide text-text">BulkPosting</h1>
+            <div>
+              <h1 className="font-display text-xl font-bold tracking-tight text-text">BulkPosting</h1>
+              <p className="text-xs text-text-muted">Sign in to your load board</p>
+            </div>
           </div>
 
           {displayedError && (
@@ -65,7 +69,7 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
           <input
             id="username"
             name="username"
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/50"
+            className="mb-4 w-full rounded-xl border border-border bg-surface-alt px-3 py-2.5 text-text outline-none transition focus:border-focus"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
@@ -74,11 +78,10 @@ function LoginPage({ onLoginSuccess, onSwitchToRegister }) {
           <label className="mb-1 block text-sm text-text-muted" htmlFor="password">
             Password
           </label>
-          <input
+          <PasswordInput
             id="password"
             name="password"
-            type="password"
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/50"
+            className="mb-4"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { register } from '../api/auth';
 import { useGoogleAuthError } from '../lib/useGoogleAuthError';
 import Card from '../components/Card';
+import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import ThemeToggle from '../components/ThemeToggle';
@@ -72,7 +73,7 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
           <input
             id="reg-username"
             name="username"
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/50"
+            className="mb-4 w-full rounded-xl border border-border bg-surface-alt px-3 py-2.5 text-text outline-none transition focus:border-focus"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
@@ -81,11 +82,10 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-password">
             Password
           </label>
-          <input
+          <PasswordInput
             id="reg-password"
             name="password"
-            type="password"
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/50"
+            className="mb-4"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="new-password"
@@ -94,11 +94,10 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-confirm-password">
             Confirm password
           </label>
-          <input
+          <PasswordInput
             id="reg-confirm-password"
             name="confirmPassword"
-            type="password"
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text outline-none focus:border-accent focus:ring-2 focus:ring-accent/50"
+            className="mb-4"
             value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)}
             autoComplete="new-password"
