@@ -4,6 +4,7 @@ import { subscribe } from '../lib/liveSocket';
 import { STATS_PRESETS, rangeForPreset } from '../lib/statsDateRanges';
 import Card from '../components/Card';
 import StatTile from '../components/StatTile';
+import DateField from '../components/DateField';
 import Skeleton from '../components/Skeleton';
 
 const SORT_COLUMNS = [
@@ -48,21 +49,9 @@ function DateRangeControls({ preset, onPresetChange, customFrom, customTo, onCus
         </button>
       ))}
       <div className="flex min-w-0 items-center gap-2 text-xs text-text-muted sm:ml-2">
-        <input
-          type="date"
-          aria-label="Custom from date"
-          value={customFrom}
-          onChange={(e) => onCustomChange('from', e.target.value)}
-          className="min-w-0 flex-1 rounded-full border border-border bg-surface-alt px-3 py-1.5 text-text sm:flex-none"
-        />
+        <DateField ariaLabel="Custom from date" value={customFrom} onChange={(v) => onCustomChange('from', v)} className="flex-1 sm:w-40 sm:flex-none" />
         <span>to</span>
-        <input
-          type="date"
-          aria-label="Custom to date"
-          value={customTo}
-          onChange={(e) => onCustomChange('to', e.target.value)}
-          className="min-w-0 flex-1 rounded-full border border-border bg-surface-alt px-3 py-1.5 text-text sm:flex-none"
-        />
+        <DateField ariaLabel="Custom to date" value={customTo} onChange={(v) => onCustomChange('to', v)} className="flex-1 sm:w-40 sm:flex-none" />
       </div>
     </div>
   );

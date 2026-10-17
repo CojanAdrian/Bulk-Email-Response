@@ -65,7 +65,7 @@ function DateRangeField({
           anchorEl={buttonRef.current}
           role="dialog"
           ariaLabel={`${legend} window`}
-          className="z-50 flex flex-col gap-3 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="z-50 flex max-h-[85vh] max-w-[calc(100vw-1rem)] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-surface p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)] sm:flex-row"
         >
           <div role="group" aria-label="Early">
             <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Early</span>
@@ -78,7 +78,7 @@ function DateRangeField({
                 type="button"
                 onClick={() => onLateChange(earlyValue)}
                 disabled={!earlyValue}
-                className="rounded-md border border-border px-1.5 py-0.5 text-[10px] font-medium text-text-muted hover:border-accent-strong hover:text-text disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-full border border-control-border bg-control px-2.5 py-0.5 text-[10px] font-semibold text-text transition hover:bg-control-hover disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Same as early (appt)
               </button>

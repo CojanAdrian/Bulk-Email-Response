@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import PopoverPanel from './PopoverPanel';
 import DateTimeCalendar from './DateTimeCalendar';
+import { CalendarIcon } from './icons';
 import { formatShort } from '../lib/dateTimeLocal';
 
 // A single-value date/time control: a button showing the picked value
@@ -51,9 +52,10 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-left text-sm text-text hover:border-accent-strong"
+        className="flex w-full items-center gap-2 rounded-xl border border-field-border bg-field px-3 py-2.5 text-left text-sm text-text transition hover:border-text-muted"
       >
-        {display || 'Set date & time'}
+        <CalendarIcon aria-hidden="true" className="h-4 w-4 shrink-0 opacity-70" />
+        <span className={`min-w-0 truncate ${display ? '' : 'text-text-muted'}`}>{display || 'Set date & time'}</span>
       </button>
       {open && (
         <PopoverPanel
@@ -61,7 +63,7 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
           anchorEl={buttonRef.current}
           role="dialog"
           ariaLabel={ariaLabel || label || 'Choose date and time'}
-          className="z-50 rounded-xl border border-border bg-surface p-3 shadow-lg"
+          className="z-50 rounded-2xl border border-border bg-surface p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
         >
           <DateTimeCalendar value={value} onChange={onChange} idPrefix={id} />
         </PopoverPanel>
