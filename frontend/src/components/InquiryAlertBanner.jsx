@@ -31,7 +31,7 @@ function InquiryAlertViewport({ alerts, onDismiss }) {
                 📩
               </span>
               <button type="button" onClick={() => onDismiss(alert.id, alert.onView)} className="flex-1 text-left">
-                <p className="text-xs font-semibold uppercase tracking-wide text-accent-strong">New inquiry</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-info">New inquiry</p>
                 <p className="text-sm font-medium text-text">{alert.message}</p>
               </button>
               <button

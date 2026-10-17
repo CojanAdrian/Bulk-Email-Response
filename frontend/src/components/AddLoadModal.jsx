@@ -101,7 +101,7 @@ function AddLoadModal({ onClose, onCreated }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-load-title"
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
       {...preset.modal.backdrop}
     >
       <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>

@@ -37,7 +37,7 @@ function NavButton({ icon, label, active, onClick, badge, count }) {
             title={`${count} inquiry${count === 1 ? '' : 'ies'} waiting for review`}
             data-testid="pending-review-badge"
             className={`ml-0.5 inline-flex h-4 min-w-[1rem] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold ${
-              active ? 'bg-accent-ink text-accent' : 'bg-warning text-white'
+              active ? 'bg-accent-ink text-accent' : 'bg-warning text-surface'
             }`}
           >
             {count}

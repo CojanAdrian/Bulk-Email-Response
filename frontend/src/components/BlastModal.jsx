@@ -103,7 +103,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="blast-modal-title"
-        className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
         onClick={(e) => {
           if (e.target === e.currentTarget) onClose();
         }}
@@ -130,7 +130,7 @@ function BlastModal({ load, initialShowRate, onClose }) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="blast-modal-title"
-      className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleRequestClose();
       }}

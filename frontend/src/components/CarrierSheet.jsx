@@ -369,7 +369,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wide text-text-muted">Lane history</label>
               {!addingHistory && (
-                <button type="button" onClick={() => setAddingHistory(true)} className="text-xs font-medium text-accent hover:underline">
+                <button type="button" onClick={() => setAddingHistory(true)} className="text-xs font-semibold text-info underline-offset-2 hover:underline">
                   + Add a lane
                 </button>
               )}

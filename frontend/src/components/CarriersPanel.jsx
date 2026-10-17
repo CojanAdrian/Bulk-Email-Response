@@ -100,7 +100,7 @@ function CarriersPanel() {
               </button>
               {confirmingDeleteId === carrier.id ? (
                 <span className="flex shrink-0 items-center gap-2">
-                  <button onClick={() => handleDelete(carrier.id)} className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90">
+                  <button onClick={() => handleDelete(carrier.id)} className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90">
                     Confirm
                   </button>
                   <button onClick={() => setConfirmingDeleteId(null)} className="rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface">

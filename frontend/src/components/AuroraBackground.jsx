@@ -1,12 +1,17 @@
-// Decorative only -- a fixed, blurred, slowly-drifting gradient layer behind
-// the shell. motion-safe: keeps every animation off when the visitor's OS
-// has prefers-reduced-motion enabled (the blobs still render, just static).
+// Decorative only -- two soft colour glows (violet top-left, teal
+// bottom-right) drifting very slowly behind the glass. motion-safe keeps
+// them static when the OS has "reduce motion" on.
 function AuroraBackground() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-      <div className="absolute -left-32 -top-40 h-96 w-96 rounded-full bg-accent/25 blur-3xl motion-safe:animate-aurora-drift-a" />
-      <div className="absolute -right-24 top-1/4 h-[28rem] w-[28rem] rounded-full bg-[#3b4b8f]/30 blur-3xl motion-safe:animate-aurora-drift-b" />
-      <div className="absolute -bottom-40 left-1/4 h-[26rem] w-[26rem] rounded-full bg-[#d4af61]/20 blur-3xl motion-safe:animate-aurora-drift-c" />
+    <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      <div
+        className="absolute -left-40 -top-48 h-[34rem] w-[34rem] rounded-full blur-3xl motion-safe:animate-aurora-drift-a"
+        style={{ background: 'var(--glow-a)' }}
+      />
+      <div
+        className="absolute -bottom-48 -right-40 h-[38rem] w-[38rem] rounded-full blur-3xl motion-safe:animate-aurora-drift-b"
+        style={{ background: 'var(--glow-b)' }}
+      />
     </div>
   );
 }

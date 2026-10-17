@@ -43,7 +43,7 @@ function CarrierDetailBody({ status, carrier, history, onClose, onEdit }) {
                 href={`tel:${carrier.dispatcher_phone.replace(/[^\d+]/g, '')}`}
                 className="flex items-center gap-2 rounded-xl border border-accent/40 bg-accent/10 px-3 py-2 text-sm font-medium text-text hover:bg-accent/20"
               >
-                <PhoneIcon className="h-4 w-4 shrink-0 text-accent-strong" />
+                <PhoneIcon className="h-4 w-4 shrink-0 text-text-muted" />
                 {carrier.dispatcher_phone}
               </a>
             )}

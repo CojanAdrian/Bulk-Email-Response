@@ -180,7 +180,7 @@ function GmailConnectionPanel() {
                 <button
                   onClick={handleDisconnect}
                   disabled={disconnecting}
-                  className="rounded-lg bg-error px-3 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+                  className="rounded-lg bg-error px-3 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
                 >
                   {disconnecting ? 'Disconnecting...' : 'Confirm disconnect'}
                 </button>

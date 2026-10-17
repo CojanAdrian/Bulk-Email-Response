@@ -22,14 +22,7 @@ describe('ThemeToggle', () => {
     document.documentElement.classList.remove('dark');
   });
 
-  test('defaults to light theme when no preference is stored and the OS prefers light', () => {
-    render(<ThemeToggle />);
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
-    expect(screen.getByRole('button', { name: /switch to dark theme/i })).toBeInTheDocument();
-  });
-
-  test('defaults to dark theme when the OS prefers dark and nothing is stored', () => {
-    mockMatchMedia(true);
+  test('defaults to dark theme when nothing is stored, even if the OS prefers light', () => {
     render(<ThemeToggle />);
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();
@@ -43,6 +36,7 @@ describe('ThemeToggle', () => {
   });
 
   test('clicking toggles the dark class on <html> and persists to localStorage', () => {
+    localStorage.setItem('theme', 'light');
     render(<ThemeToggle />);
     fireEvent.click(screen.getByRole('button'));
     expect(document.documentElement.classList.contains('dark')).toBe(true);
@@ -54,6 +48,7 @@ describe('ThemeToggle', () => {
   });
 
   test('the button always has an accessible name describing the action it performs', () => {
+    localStorage.setItem('theme', 'light');
     render(<ThemeToggle />);
     fireEvent.click(screen.getByRole('button', { name: /switch to dark theme/i }));
     expect(screen.getByRole('button', { name: /switch to light theme/i })).toBeInTheDocument();

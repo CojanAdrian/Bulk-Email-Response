@@ -4,6 +4,7 @@ const VARIANT_CLASSES = {
   error: 'bg-error-bg text-error',
   warning: 'bg-warning-bg text-warning',
   info: 'bg-info-bg text-info',
+  gold: 'gold-pill',
 };
 
 function Badge({ children, variant = 'default', className = '', ...rest }) {

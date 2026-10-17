@@ -442,7 +442,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
             <button
               onClick={handleBulkDelete}
               disabled={bulkBusy}
-              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
             >
               {bulkBusy ? 'Deleting...' : 'Confirm'}
             </button>
@@ -600,7 +600,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                       <button
                         onClick={() => handleDelete(load)}
                         disabled={busyLoadId === load.id}
-                        className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+                        className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
                       >
                         {busyLoadId === load.id ? 'Deleting...' : 'Confirm'}
                       </button>

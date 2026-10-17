@@ -10,7 +10,7 @@ describe('Card', () => {
 
   test('applies the floating rounded-card styling', () => {
     render(<Card data-testid="card">content</Card>);
-    expect(screen.getByTestId('card').className).toContain('bg-surface');
+    expect(screen.getByTestId('card').className).toContain('glass');
     expect(screen.getByTestId('card').className).toContain('rounded-3xl');
   });
 
@@ -21,6 +21,6 @@ describe('Card', () => {
       </Card>
     );
     expect(screen.getByTestId('card').className).toContain('extra-class');
-    expect(screen.getByTestId('card').className).toContain('bg-surface');
+    expect(screen.getByTestId('card').className).toContain('glass');
   });
 });

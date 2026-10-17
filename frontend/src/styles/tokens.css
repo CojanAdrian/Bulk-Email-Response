@@ -1,43 +1,101 @@
+/* Design tokens -- "neo glass".
+   Every colour is stored as space-separated RGB channels so Tailwind can
+   apply opacity modifiers (bg-accent/20, text-text/70 ...) -- see
+   tailwind.config.js's rgb(var(--x) / <alpha-value>) mapping.
+
+   Both themes define every token: cards, text and status colours all flip
+   with the theme (nothing assumes a white card any more).
+
+   Contrast rule: every *-text / *-ink token below is checked against the
+   background it sits on by tests/styles/contrast.test.js (WCAG AA, 4.5:1).
+   Lime (accent) is a FILL colour only -- never use text-accent or an
+   accent-coloured icon on a surface. */
+
 :root {
-  /* App shell (outer background + sidebar) -- this is the one thing that
-     actually flips between light/dark. Content cards are white in both
-     themes (a floating-card-on-shell look), so card-related tokens below
-     don't need per-theme overrides. */
-  --color-shell-bg: #eef6f1;
-  --color-shell-surface: #e4f0e8;
-  --color-shell-text: #12141c;
-  --color-shell-text-muted: #5b6472;
-  --color-shell-border: #d7e6dc;
+  /* App shell (page background, nav) */
+  --color-shell-bg: 245 245 247;
+  --color-shell-surface: 255 255 255;
+  --color-shell-text: 29 29 31;
+  --color-shell-text-muted: 95 99 104;
+  --color-shell-border: 222 222 228;
 
-  /* Content cards -- always white/light, in both themes */
-  --color-surface: #ffffff;
-  --color-surface-alt: #f5f6f8;
-  --color-text: #12141c;
-  --color-text-muted: #6b7280;
-  --color-border: #e7e9ee;
+  /* Cards, sheets, popovers (solid -- glass cards use the .glass utility) */
+  --color-surface: 255 255 255;
+  --color-surface-alt: 242 242 246;
+  --color-text: 29 29 31;
+  --color-text-muted: 95 99 104;
+  --color-border: 226 226 232;
 
-  /* Brand accent -- vibrant lime, constant across themes */
-  --color-accent: #d7ff3d;
-  --color-accent-strong: #b9e619;
-  --color-accent-ink: #1a2e05;
+  /* Brand accent -- vibrant lime, a FILL only */
+  --color-accent: 215 255 61;
+  --color-accent-strong: 185 230 25;
+  --color-accent-ink: 26 46 5;
+  /* Focus ring: lime is invisible on white, so light mode uses a deep green */
+  --color-focus: 77 124 15;
 
-  /* Status colors -- calibrated for white card backgrounds, constant across themes */
-  --color-success: #15803d;
-  --color-success-bg: #dcfce7;
-  --color-error: #b91c1c;
-  --color-error-bg: #fde2e2;
-  --color-warning: #92600c;
-  --color-warning-bg: #fff3d6;
-  --color-tag: #5b21b6;
-  --color-tag-bg: #ede9fe;
-  --color-info: #1d4ed8;
-  --color-info-bg: #dbeafe;
+  /* Status */
+  --color-success: 21 128 61;
+  --color-success-bg: 220 252 231;
+  --color-error: 185 28 28;
+  --color-error-bg: 253 226 226;
+  --color-warning: 146 96 12;
+  --color-warning-bg: 255 243 214;
+  --color-tag: 91 33 182;
+  --color-tag-bg: 237 233 254;
+  --color-info: 29 78 216;
+  --color-info-bg: 219 234 254;
+
+  /* Gold -- proven lanes */
+  --color-gold: 251 191 36;
+  --color-gold-soft: 253 230 138;
+  --color-gold-ink: 61 42 0;
+  --color-gold-surface: 255 248 230;
+  --color-gold-text: 133 77 14;
+
+  /* Glass */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-border: rgba(0, 0, 0, 0.06);
+  --glass-highlight: rgba(255, 255, 255, 0.9);
+  --glass-shadow: 0 1px 2px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.06);
+  --glass-shadow-hover: 0 2px 4px rgba(0, 0, 0, 0.06), 0 14px 32px rgba(0, 0, 0, 0.1);
+  --glow-a: rgba(167, 139, 250, 0.28);
+  --glow-b: rgba(45, 212, 191, 0.22);
 }
 
 .dark {
-  --color-shell-bg: #0a0b10;
-  --color-shell-surface: #14161f;
-  --color-shell-text: #f5f6fa;
-  --color-shell-text-muted: #8b93a7;
-  --color-shell-border: rgba(255, 255, 255, 0.08);
+  --color-shell-bg: 0 0 0;
+  --color-shell-surface: 18 18 22;
+  --color-shell-text: 245 245 247;
+  --color-shell-text-muted: 161 161 170;
+  --color-shell-border: 39 39 46;
+
+  --color-surface: 22 22 28;
+  --color-surface-alt: 34 34 42;
+  --color-text: 245 245 247;
+  --color-text-muted: 161 161 170;
+  --color-border: 46 46 56;
+
+  --color-focus: 215 255 61;
+
+  --color-success: 74 222 128;
+  --color-success-bg: 18 48 31;
+  --color-error: 248 113 113;
+  --color-error-bg: 58 23 23;
+  --color-warning: 251 191 36;
+  --color-warning-bg: 54 41 12;
+  --color-tag: 196 181 253;
+  --color-tag-bg: 42 33 64;
+  --color-info: 147 197 253;
+  --color-info-bg: 20 38 64;
+
+  --color-gold-surface: 43 35 18;
+  --color-gold-text: 253 230 138;
+
+  --glass-bg: rgba(40, 40, 48, 0.62);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-highlight: rgba(255, 255, 255, 0.08);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  --glass-shadow-hover: 0 14px 34px rgba(0, 0, 0, 0.5);
+  --glow-a: rgba(120, 90, 255, 0.3);
+  --glow-b: rgba(52, 199, 180, 0.22);
 }

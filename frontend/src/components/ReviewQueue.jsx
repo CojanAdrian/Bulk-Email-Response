@@ -335,7 +335,7 @@ function ReviewQueue() {
             <button
               onClick={handleBulkReject}
               disabled={bulkBusy}
-              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-white hover:opacity-90 disabled:opacity-60"
+              className="rounded-lg bg-error px-2 py-1 text-xs font-medium text-surface hover:opacity-90 disabled:opacity-60"
             >
               {bulkBusy ? 'Rejecting...' : 'Confirm'}
             </button>
@@ -437,7 +437,7 @@ function ReviewQueue() {
                     <button
                       type="button"
                       onClick={() => setReassigningId(inquiry.id)}
-                      className="text-xs font-medium text-accent hover:underline"
+                      className="text-xs font-semibold text-info underline-offset-2 hover:underline"
                     >
                       Wrong load? Change match
                     </button>

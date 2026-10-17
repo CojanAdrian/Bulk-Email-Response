@@ -12,10 +12,10 @@ const ModalCard = forwardRef(function ModalCard({ children, className = '', body
   return (
     <div
       ref={ref}
-      className={`overflow-hidden rounded-3xl border border-border bg-surface shadow-[0_8px_30px_rgba(10,11,16,0.08)] ${className}`}
+      className={`w-full overflow-hidden rounded-t-3xl border sm:rounded-3xl border-border bg-surface text-text shadow-[0_24px_60px_rgba(0,0,0,0.35)] ${className}`}
       {...rest}
     >
-      <div className={`overflow-y-auto p-6 ${bodyClassName}`} style={{ maxHeight }}>
+      <div className={`overflow-y-auto overscroll-contain p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] sm:p-6 ${bodyClassName}`} style={{ maxHeight }}>
         {children}
       </div>
     </div>
