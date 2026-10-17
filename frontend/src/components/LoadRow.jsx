@@ -1,9 +1,10 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMotionPreset } from '../lib/motionConfig';
 import { formatMoney } from '../lib/formatMoney';
 import { formatDayAgo, formatDayFull } from '../lib/formatDay';
 import ProvenBadge from './ProvenBadge';
-import { ChevronDownIcon } from './icons';
+import { ChevronDownIcon, CopyIcon, CheckIcon } from './icons';
 
 // One load on the board. Purely presentational: LoadsTable owns every bit
 // of state and passes the interactive pieces in as slots, so the row only
@@ -25,6 +26,7 @@ function LoadRow({
   actions,
 }) {
   const preset = useMotionPreset();
+  const [numberCopied, setNumberCopied] = useState(false);
   const provenCount = proven ? proven.length : 0;
   const isProven = provenCount > 0;
   const origin = [load.origin_city, load.origin_state].filter(Boolean).join(', ') || 'Origin missing';
@@ -55,12 +57,28 @@ function LoadRow({
           </div>
 
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-            <span className="font-semibold text-text">
-              <span aria-hidden="true" className="text-text-muted">
-                #
-              </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (!navigator.clipboard || !navigator.clipboard.writeText) return;
+                navigator.clipboard.writeText(String(load.load_number)).then(() => {
+                  setNumberCopied(true);
+                  setTimeout(() => setNumberCopied(false), 1500);
+                });
+              }}
+              aria-label={`Copy load number ${load.load_number}`}
+              title="Copy load number"
+              className="group inline-flex items-center gap-1.5 rounded-lg border border-control-border bg-control px-2 py-0.5 font-mono text-[13px] font-bold tracking-wide text-text transition hover:bg-control-hover active:scale-[0.97]"
+            >
+              <span aria-hidden="true" className="text-text-muted">#</span>
               <span>{load.load_number}</span>
-            </span>
+              {numberCopied ? (
+                <CheckIcon aria-hidden="true" className="h-3.5 w-3.5 text-success" />
+              ) : (
+                <CopyIcon aria-hidden="true" className="h-3.5 w-3.5 opacity-50 transition group-hover:opacity-100" />
+              )}
+              <span className="sr-only" role="status">{numberCopied ? 'Copied' : ''}</span>
+            </button>
             {load.equipment && (
               <>
                 <span aria-hidden="true">·</span>

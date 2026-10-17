@@ -149,3 +149,47 @@ export function PlusIcon(props) {
     </svg>
   );
 }
+
+export function CalendarIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="3" y="4.5" width="18" height="16" rx="3" />
+      <path d="M3 9.5h18M8 3v3M16 3v3" />
+    </svg>
+  );
+}
+
+export function CopyIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <rect x="9" y="9" width="12" height="12" rx="2.5" />
+      <path d="M5 15H4.5A1.5 1.5 0 0 1 3 13.5v-9A1.5 1.5 0 0 1 4.5 3h9A1.5 1.5 0 0 1 15 4.5V5" />
+    </svg>
+  );
+}
+
+export function SendIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M22 2 11 13" />
+      <path d="M22 2 15 22l-4-9-9-4z" />
+    </svg>
+  );
+}
+
+export function PencilIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+
+export function TrashIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
+    </svg>
+  );
+}

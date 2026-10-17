@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import PopoverPanel from './PopoverPanel';
+import { CalendarIcon } from './icons';
 import DateTimeCalendar from './DateTimeCalendar';
 
 // One popover for an entire PU or DEL window: shows both the early and late
@@ -10,7 +11,8 @@ import DateTimeCalendar from './DateTimeCalendar';
 // single fixed appointment is one click away via "Same as early". The
 // popover itself is portaled (see PopoverPanel) so it floats freely instead
 // of being clipped by a scrollable ancestor like the Edit Load modal.
-function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarlyChange, onLateChange, formatRange, showLegend = true }) {
+function DateRangeField({
+  variant = 'field', legend, earlyId, lateId, earlyValue, lateValue, onEarlyChange, onLateChange, formatRange, showLegend = true }) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef(null);
   const panelRef = useRef(null);
@@ -46,9 +48,16 @@ function DateRangeField({ legend, earlyId, lateId, earlyValue, lateValue, onEarl
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-left text-sm text-text hover:border-accent-strong"
+        className={
+          variant === 'chip'
+            ? `inline-flex min-h-[36px] max-w-full items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold transition sm:min-h-[30px] ${
+                summary ? 'border-control-border bg-control text-text hover:bg-control-hover' : 'border-dashed border-warning/60 bg-warning-bg text-warning'
+              }`
+            : 'flex w-full items-center gap-2 rounded-xl border border-field-border bg-field px-3 py-2.5 text-left text-sm text-text transition hover:border-text-muted'
+        }
       >
-        {summary || `Set ${legend.toLowerCase()} window`}
+        <CalendarIcon aria-hidden="true" className="h-4 w-4 shrink-0 opacity-70" />
+        <span className="min-w-0 truncate">{summary || `Set ${legend.toLowerCase()} window`}</span>
       </button>
       {open && (
         <PopoverPanel

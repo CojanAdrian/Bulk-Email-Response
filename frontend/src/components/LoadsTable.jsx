@@ -17,12 +17,13 @@ import SelectionCircle from './SelectionCircle';
 import LoadRow from './LoadRow';
 import SegmentedControl from './SegmentedControl';
 import Select from './Select';
-import { SearchIcon } from './icons';
+import { SearchIcon, CopyIcon, SendIcon, PencilIcon, TrashIcon, CheckIcon } from './icons';
 import { formatMoney } from '../lib/formatMoney';
 import { usePersistentState } from '../lib/usePersistentState';
 
 const STATUS_OPTIONS = ['active', 'booked', 'covered'];
 const STATUS_LABELS = { active: 'Active', booked: 'Booked', covered: 'Covered' };
+const STATUS_TONE = { active: 'success', booked: 'tag', covered: 'info' };
 const STATUS_SELECT_OPTIONS = STATUS_OPTIONS.map((value) => ({ value, label: STATUS_LABELS[value] }));
 const BULK_RATE_OPTIONS = [
   { value: 'include', label: 'Include rate' },
@@ -381,7 +382,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
   }
 
   const smallButton =
-    'inline-flex min-h-[36px] items-center justify-center rounded-full border border-border px-3 py-1 text-xs font-semibold text-text transition hover:bg-surface-alt disabled:opacity-60 sm:min-h-0';
+    'inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full border border-control-border bg-control px-3 py-1 text-xs font-semibold text-text shadow-[0_1px_2px_rgba(0,0,0,0.18)] transition hover:bg-control-hover active:scale-[0.97] disabled:opacity-60 sm:min-h-[30px]';
 
   return (
     <Card className="p-3 sm:p-5">
@@ -565,6 +566,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                 puField={
                   <DateRangeField
                     legend="Pickup"
+                    variant="chip"
                     showLegend={false}
                     earlyId={`pu-early-${load.id}`}
                     lateId={`pu-late-${load.id}`}
@@ -612,15 +614,21 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                       options={STATUS_SELECT_OPTIONS}
                       disabled={busy}
                       size="sm"
+                      tone={STATUS_TONE[load.status]}
                     />
-                    <label className="inline-flex min-h-[36px] cursor-pointer items-center gap-1.5 rounded-full border border-border px-3 py-1 text-xs font-semibold text-text-muted sm:min-h-0">
+                    <label className="inline-flex min-h-[36px] cursor-pointer select-none items-center gap-2 rounded-full px-1.5 py-1 text-xs font-semibold text-text sm:min-h-[30px]">
                       <input
                         type="checkbox"
                         aria-label={`Include rate for ${load.load_number}`}
                         checked={Boolean(load.include_rate)}
                         onChange={(e) => handleIncludeRateChange(load, e.target.checked)}
                         disabled={busy}
-                        className="h-3.5 w-3.5 accent-[rgb(var(--color-focus))]"
+                        className="peer sr-only"
+                      />
+                      {/* A real switch: track + knob, lime when on. */}
+                      <span
+                        aria-hidden="true"
+                        className="relative h-5 w-9 shrink-0 rounded-full border border-control-border bg-field transition-colors duration-200 after:absolute after:left-0.5 after:top-0.5 after:h-3.5 after:w-3.5 after:rounded-full after:bg-text-muted after:transition-transform after:duration-200 peer-checked:border-accent-strong peer-checked:bg-accent peer-checked:after:translate-x-4 peer-checked:after:bg-accent-ink peer-focus-visible:ring-2 peer-focus-visible:ring-focus peer-disabled:opacity-50"
                       />
                       <span aria-hidden="true">Rate in reply</span>
                     </label>
@@ -643,22 +651,31 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
                     </>
                   ) : (
                     <>
-                      <button onClick={() => handleCopy(load)} className={smallButton}>
+                      <button onClick={() => handleCopy(load)} className={smallButton} title="Copy the load details for a carrier">
+                        {copiedId === load.id ? <CheckIcon aria-hidden="true" className="h-3.5 w-3.5 text-success" /> : <CopyIcon aria-hidden="true" className="h-3.5 w-3.5" />}
                         {copiedId === load.id ? 'Copied!' : 'Copy'}
                       </button>
                       {onOpenBlast && (
-                        <button onClick={() => onOpenBlast(load)} className={smallButton}>
+                        <button
+                          onClick={() => onOpenBlast(load)}
+                          title="Email this load to carriers"
+                          className="inline-flex min-h-[36px] items-center justify-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-accent-ink shadow-[0_2px_10px_rgba(215,255,61,0.25)] transition hover:bg-accent-strong active:scale-[0.97] sm:min-h-[30px]"
+                        >
+                          <SendIcon aria-hidden="true" className="h-3.5 w-3.5" />
                           Blast
                         </button>
                       )}
                       <button onClick={() => onSelectLoad(load)} className={smallButton}>
+                        <PencilIcon aria-hidden="true" className="h-3.5 w-3.5" />
                         Edit
                       </button>
                       <button
                         onClick={() => setConfirmingDeleteId(load.id)}
-                        className="inline-flex min-h-[36px] items-center rounded-full border border-error/40 px-3 py-1 text-xs font-semibold text-error transition hover:bg-error-bg sm:min-h-0"
+                        aria-label="Delete"
+                        title={`Delete load ${load.load_number}`}
+                        className="inline-flex min-h-[36px] min-w-[36px] items-center justify-center rounded-full border border-error/40 px-2 py-1 text-xs font-semibold text-error transition hover:bg-error-bg sm:min-h-[30px] sm:min-w-[30px]"
                       >
-                        Delete
+                        <TrashIcon aria-hidden="true" className="h-3.5 w-3.5" />
                       </button>
                     </>
                   )

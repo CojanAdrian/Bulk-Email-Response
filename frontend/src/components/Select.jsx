@@ -26,6 +26,7 @@ function Select({
   disabled = false,
   className = '',
   variant = 'default',
+  tone = null,
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -85,10 +86,17 @@ function Select({
     }
   }
 
-  const tone =
+  // `tone` colours the trigger by meaning (e.g. a load's status), so the
+  // current value reads at a glance instead of as another grey pill.
+  const TONES = {
+    success: 'border-success/45 bg-success-bg text-success hover:border-success/70',
+    tag: 'border-tag/45 bg-tag-bg text-tag hover:border-tag/70',
+    info: 'border-info/45 bg-info-bg text-info hover:border-info/70',
+  };
+  const toneClasses =
     variant === 'onDark'
       ? 'border-white/15 bg-white/10 text-white hover:bg-white/15'
-      : 'border-border bg-surface text-text shadow-[0_1px_2px_rgba(0,0,0,0.12)] hover:border-text-muted/50';
+      : TONES[tone] || 'border-control-border bg-control text-text shadow-[0_1px_2px_rgba(0,0,0,0.18)] hover:bg-control-hover';
 
   return (
     <>
@@ -106,7 +114,7 @@ function Select({
         onClick={() => setOpen((o) => !o)}
         onKeyDown={handleKeyDown}
         onBlur={() => setOpen(false)}
-        className={`inline-flex min-w-0 max-w-full items-center justify-between gap-2 rounded-full border font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${SIZES[size]} ${tone} ${
+        className={`inline-flex min-w-0 max-w-full items-center justify-between gap-2 rounded-full border font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-50 ${SIZES[size]} ${toneClasses} ${
           open ? 'ring-2 ring-focus/60' : ''
         } ${className}`}
       >

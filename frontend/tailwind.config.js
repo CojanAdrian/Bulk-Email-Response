@@ -7,6 +7,7 @@ const token = (name) => `rgb(var(--color-${name}) / <alpha-value>)`;
 const TOKEN_NAMES = [
   'shell-bg', 'shell-surface', 'shell-text', 'shell-text-muted', 'shell-border',
   'surface', 'surface-alt', 'text', 'text-muted', 'border',
+  'field', 'field-border', 'control', 'control-border', 'control-hover',
   'accent', 'accent-strong', 'accent-ink', 'focus',
   'success', 'success-bg', 'error', 'error-bg', 'warning', 'warning-bg',
   'tag', 'tag-bg', 'info', 'info-bg',

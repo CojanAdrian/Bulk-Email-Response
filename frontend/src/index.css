@@ -38,6 +38,26 @@
     }
   }
 
+  /* Every text-like field in the app gets the same inset "field" look,
+     clearly separate from the card or sheet behind it. (Specificity beats
+     the bg-surface-alt / border-border utilities the markup still carries.) */
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
+  textarea {
+    background-color: rgb(var(--color-field));
+    border-color: rgb(var(--color-field-border));
+    transition: border-color 150ms, box-shadow 150ms;
+  }
+  input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']):focus,
+  textarea:focus {
+    border-color: rgb(var(--color-focus));
+    box-shadow: 0 0 0 3px rgb(var(--color-focus) / 0.22);
+    outline: none;
+  }
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--color-text-muted) / 0.85);
+  }
+
   ::selection {
     background: rgb(var(--color-accent) / 0.45);
     color: rgb(var(--color-text));

@@ -179,6 +179,21 @@ function RateModal({ load, onClose, onSaved }) {
       });
   }
 
+  const footer = (
+    <>
+      {closeConfirmation.confirming ? (
+        <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+      ) : (
+        <div className="flex justify-end gap-2">
+          <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+          <PrimaryButton onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save'}
+          </PrimaryButton>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <Portal>
       <motion.div
@@ -188,7 +203,7 @@ function RateModal({ load, onClose, onSaved }) {
         className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
         {...preset.modal.backdrop}
       >
-        <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
+        <MotionModalCard className="w-full max-w-lg" footer={footer} {...preset.modal.card}>
           <h2 id="rate-modal-title" className="mb-4 text-lg font-semibold text-text">
             Edit load {load.load_number}
           </h2>
@@ -443,20 +458,6 @@ function RateModal({ load, onClose, onSaved }) {
               {error}
             </p>
           )}
-          {/* Sticky so Save/Cancel stay reachable on a long form (the
-              sheet scrolls under it), instead of hiding below the fold. */}
-          <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-2 border-t border-border bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6">
-            {closeConfirmation.confirming ? (
-              <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
-            ) : (
-              <div className="flex justify-end gap-2">
-                <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
-                <PrimaryButton onClick={handleSave} disabled={saving}>
-                  {saving ? 'Saving...' : 'Save'}
-                </PrimaryButton>
-              </div>
-            )}
-          </div>
         </MotionModalCard>
       </motion.div>
     </Portal>

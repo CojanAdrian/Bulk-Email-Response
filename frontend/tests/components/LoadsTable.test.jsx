@@ -934,4 +934,14 @@ describe('LoadsTable', () => {
       });
     });
   });
+
+  test('clicking the load number copies just the number', async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    Object.assign(navigator, { clipboard: { writeText } });
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+    fireEvent.click(await screen.findByRole('button', { name: /copy load number l1001/i }));
+    expect(writeText).toHaveBeenCalledWith('L1001');
+    expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
 });
