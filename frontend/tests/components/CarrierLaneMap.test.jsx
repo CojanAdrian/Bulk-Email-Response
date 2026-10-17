@@ -34,6 +34,7 @@ let authFailureListener = null;
 vi.mock('../../src/lib/googleMapsLoader', () => ({
   loadGoogleMapsLibrary: (...args) => loadLibraryMock(...args),
   hasGoogleMapsKey: () => Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
+  googleKeyHint: () => '-key',
   onGoogleAuthFailure: (listener) => {
     authFailureListener = listener;
     return () => {};
@@ -199,9 +200,10 @@ describe('CarrierLaneMap', () => {
     render(<CarrierLaneMap focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
     await waitFor(() => expect(MapMock).toHaveBeenCalled());
     const { act } = await import('@testing-library/react');
-    act(() => authFailureListener());
-    expect(screen.getByRole('alert')).toHaveTextContent(/google rejected this app's maps api key/i);
-    expect(screen.getByRole('alert')).toHaveTextContent(/places api \(new\), routes api/i);
+    act(() => authFailureListener('RefererNotAllowedMapError'));
+    expect(screen.getByRole('alert')).toHaveTextContent(/google refused to load the map \(RefererNotAllowedMapError\)/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/allowed websites/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/key in this build ends in …-key/i);
   });
 
   test('draws the lane with the current Routes API when it is available', async () => {
@@ -219,5 +221,17 @@ describe('CarrierLaneMap', () => {
     await waitFor(() => expect(screen.getByText(/920 mi · 14 hours/)).toBeInTheDocument());
     expect(polyline.setMap).toHaveBeenCalledWith(mapInstance);
     expect(directionsServiceInstance.route).not.toHaveBeenCalled();
+  });
+
+  test('says so when Google never responds, instead of a silent blank map', async () => {
+    vi.useFakeTimers();
+    loadLibraryMock.mockImplementation(() => new Promise(() => {}));
+    const { act } = await import('@testing-library/react');
+    render(<CarrierLaneMap focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(16000);
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(/google maps didn't respond/i);
+    vi.useRealTimers();
   });
 });

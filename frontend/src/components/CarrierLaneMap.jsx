@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadGoogleMapsLibrary, hasGoogleMapsKey, onGoogleAuthFailure } from '../lib/googleMapsLoader';
+import { loadGoogleMapsLibrary, hasGoogleMapsKey, onGoogleAuthFailure, googleKeyHint } from '../lib/googleMapsLoader';
 import { createRouteDrawer } from '../lib/mapRoutes';
 
 const CURRENT_LANE_COLOR = '#d7ff3d';
@@ -24,6 +24,31 @@ function loadMapsLibraries() {
   }));
 }
 
+const LOAD_TIMEOUT_MS = 15000;
+
+// What each Google refusal code means for whoever manages the key.
+function explainGoogleError(code) {
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'this site';
+  switch (code) {
+    case 'RefererNotAllowedMapError':
+      return `This site's address isn't in the key's allowed websites. In Google Cloud Console > Credentials > the key > Website restrictions, add ${origin}/*`;
+    case 'ApiNotActivatedMapError':
+      return "Maps JavaScript API isn't enabled on the key's project.";
+    case 'ApiTargetBlockedMapError':
+      return "The key's API restrictions don't allow the Maps JavaScript API. Add it (and Places / Routes) under the key's API restrictions.";
+    case 'BillingNotEnabledMapError':
+      return "Billing isn't enabled on the key's Google Cloud project.";
+    case 'InvalidKeyMapError':
+      return 'Google says this key does not exist -- the key in this build is not the one in your Google Cloud project.';
+    case 'ExpiredKeyMapError':
+      return 'This key has expired. Create a new one and redeploy with it.';
+    case 'DeletedApiProjectMapError':
+      return "The key's Google Cloud project was deleted.";
+    default:
+      return 'Make sure the key\'s project has billing on, Maps JavaScript API enabled, and this site in its allowed websites.';
+  }
+}
+
 function toLatLng(lat, lng) {
   if (lat === null || lat === undefined || lng === null || lng === undefined) return null;
   const parsedLat = Number(lat);
@@ -44,7 +69,8 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
   const currentRenderersRef = useRef([]);
   const historyRenderersRef = useRef([]);
   const matchMarkersRef = useRef([]);
-  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error' | 'missing-key' | 'auth-failed'
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error' | 'missing-key' | 'auth-failed' | 'timeout'
+  const [errorCode, setErrorCode] = useState(null);
   const [routeInfo, setRouteInfo] = useState({ current: null, history: [] });
 
   useEffect(() => {
@@ -53,9 +79,16 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
       return;
     }
     let cancelled = false;
-    const stopListening = onGoogleAuthFailure(() => {
-      if (!cancelled) setStatus('auth-failed');
+    const stopListening = onGoogleAuthFailure((code) => {
+      if (cancelled) return;
+      setStatus('auth-failed');
+      setErrorCode(code || null);
     });
+    // Google's script being blocked (ad/privacy blocker, firewall) or never
+    // answering used to leave a silent black box; say so instead.
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) setStatus((prev) => (prev === 'loading' ? 'timeout' : prev));
+    }, LOAD_TIMEOUT_MS);
     loadMapsLibraries()
       .then(({ Map, routesLib }) => {
         if (cancelled || !containerRef.current) return;
@@ -69,6 +102,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
         });
         drawRouteRef.current = createRouteDrawer(routesLib);
         setStatus((prev) => (prev === 'auth-failed' ? prev : 'ready'));
+        clearTimeout(timeoutId);
       })
       .catch(() => {
         if (!cancelled) setStatus('error');
@@ -76,6 +110,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
     return () => {
       cancelled = true;
       stopListening();
+      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -208,20 +243,28 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
           </p>
         </div>
       )}
-      {status === 'error' && (
-        <div className="absolute inset-0 flex items-center justify-center bg-[#05060a] p-6 text-center">
-          <p className="max-w-sm text-sm text-error">Couldn&apos;t load Google Maps. Check your connection and reload the page.</p>
-        </div>
-      )}
-      {status === 'auth-failed' && (
+      {(status === 'error' || status === 'timeout' || status === 'auth-failed') && (
         <div role="alert" className="absolute inset-0 flex items-center justify-center bg-[#05060a] p-6 text-center">
           <div className="max-w-md space-y-2 text-sm text-white/70">
-            <p className="font-semibold text-white">Google rejected this app&apos;s Maps API key.</p>
-            <p>
-              In Google Cloud Console, make sure the key&apos;s project has billing on and these APIs enabled:{' '}
-              <span className="text-white">Maps JavaScript API, Places API (New), Routes API</span> &mdash; and that this site&apos;s
-              address is in the key&apos;s allowed websites.
-            </p>
+            {status === 'auth-failed' && (
+              <>
+                <p className="font-semibold text-white">Google refused to load the map{errorCode ? ` (${errorCode})` : ''}.</p>
+                <p>{explainGoogleError(errorCode)}</p>
+              </>
+            )}
+            {status === 'error' && (
+              <>
+                <p className="font-semibold text-white">Couldn&apos;t download Google Maps.</p>
+                <p>Something blocked maps.googleapis.com -- usually an ad or privacy blocker, a VPN, or a company firewall. Allow it for this site and reload.</p>
+              </>
+            )}
+            {status === 'timeout' && (
+              <>
+                <p className="font-semibold text-white">Google Maps didn&apos;t respond.</p>
+                <p>The map script never finished loading. A browser extension or network filter blocking maps.googleapis.com is the usual cause -- try a private window or another network, then reload.</p>
+              </>
+            )}
+            {googleKeyHint() && <p className="text-xs text-white/40">Key in this build ends in …{googleKeyHint()}</p>}
           </div>
         </div>
       )}

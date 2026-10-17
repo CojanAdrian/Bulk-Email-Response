@@ -62,6 +62,9 @@ function legacySearch(placesLib) {
         { input: query, types: ['(cities)'], componentRestrictions: { country: 'us' }, sessionToken: token },
         (predictions, status) => {
           if (status !== 'OK' || !predictions) {
+            // REQUEST_DENIED etc. means Google refused the key for Places --
+            // logged so it's visible in the browser console.
+            if (status !== 'ZERO_RESULTS') console.warn(`Google city search (legacy Places) returned ${status}.`);
             resolvePredictions([]);
             return;
           }
