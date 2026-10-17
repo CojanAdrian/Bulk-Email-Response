@@ -3,7 +3,9 @@
     "allow": [
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "PowerShell(winget --version)"
+      "PowerShell(winget --version)",
+      "Bash(git worktree *)",
+      "Bash(git branch *)"
     ]
   }
 }
