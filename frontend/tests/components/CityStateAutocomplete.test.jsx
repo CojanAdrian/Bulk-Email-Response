@@ -138,7 +138,7 @@ describe('CityStateAutocomplete', () => {
       expect.objectContaining({ placeId: 'place-gary-sd' }),
       expect.any(Function)
     );
-    expect(onPlaceSelected).toHaveBeenCalledWith({ city: 'Gary', state: 'SD' });
+    await vi.waitFor(() => expect(onPlaceSelected).toHaveBeenCalledWith({ city: 'Gary', state: 'SD' }));
   });
 
   test('a mousedown on a suggestion is prevented so the input\'s blur can\'t close the list before the click lands', async () => {
@@ -152,7 +152,7 @@ describe('CityStateAutocomplete', () => {
 
     const mousedownEvent = new MouseEvent('mousedown', { bubbles: true, cancelable: true });
     const preventDefaultSpy = vi.spyOn(mousedownEvent, 'preventDefault');
-    screen.getByText('Gary').closest('button').dispatchEvent(mousedownEvent);
+    screen.getByText('Gary').closest('[role="option"]').dispatchEvent(mousedownEvent);
     expect(preventDefaultSpy).toHaveBeenCalled();
   });
 
@@ -167,7 +167,86 @@ describe('CityStateAutocomplete', () => {
     fireEvent.change(screen.getByLabelText('Origin city'), { target: { value: 'Gary' } });
     await vi.advanceTimersByTimeAsync(250);
     fireEvent.click(screen.getByText('SD, USA'));
+    await vi.advanceTimersByTimeAsync(0);
 
     expect(onPlaceSelected).not.toHaveBeenCalled();
+  });
+
+  test('Up/Down move through the suggestions and Enter picks one, no mouse needed', async () => {
+    vi.useFakeTimers();
+    predictionsResponse = { status: 'OK', predictions: [PREDICTION_GARY_SD, PREDICTION_GARY_IN] };
+    detailsResponse = { status: 'OK', place: placeWith([CITY_COMPONENT('Gary'), STATE_COMPONENT('IN', 'Indiana')]) };
+    const onPlaceSelected = vi.fn();
+    render(<CityStateAutocomplete id="origin_city" ariaLabel="Origin city" value="" onChange={vi.fn()} onPlaceSelected={onPlaceSelected} />);
+    await vi.waitFor(() => expect(loadLibraryMock).toHaveBeenCalledWith('places'));
+
+    const input = screen.getByLabelText('Origin city');
+    fireEvent.change(input, { target: { value: 'Gary' } });
+    await vi.advanceTimersByTimeAsync(250);
+
+    expect(input).toHaveAttribute('aria-activedescendant', expect.stringMatching(/opt-0$/));
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    expect(input).toHaveAttribute('aria-activedescendant', expect.stringMatching(/opt-1$/));
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(getDetailsMock).toHaveBeenCalledWith(expect.objectContaining({ placeId: 'place-gary-in' }), expect.any(Function));
+    await vi.waitFor(() => expect(onPlaceSelected).toHaveBeenCalledWith({ city: 'Gary', state: 'IN' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+  });
+
+  test('Escape closes the suggestions without picking', async () => {
+    vi.useFakeTimers();
+    predictionsResponse = { status: 'OK', predictions: [PREDICTION_GARY_SD] };
+    const onPlaceSelected = vi.fn();
+    render(<CityStateAutocomplete id="origin_city" ariaLabel="Origin city" value="" onChange={vi.fn()} onPlaceSelected={onPlaceSelected} />);
+    await vi.waitFor(() => expect(loadLibraryMock).toHaveBeenCalledWith('places'));
+    const input = screen.getByLabelText('Origin city');
+    fireEvent.change(input, { target: { value: 'Gary' } });
+    await vi.advanceTimersByTimeAsync(250);
+    fireEvent.keyDown(input, { key: 'Escape' });
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    expect(onPlaceSelected).not.toHaveBeenCalled();
+  });
+});
+
+describe('CityStateAutocomplete on the current Places API', () => {
+  test('uses AutocompleteSuggestion + Place.fetchFields when available', async () => {
+    vi.resetModules();
+    vi.stubEnv('VITE_GOOGLE_MAPS_API_KEY', 'test-key');
+    const fetchFields = vi.fn(async function fetchFields() {
+      this.addressComponents = [
+        { longText: 'Memphis', shortText: 'Memphis', types: ['locality'] },
+        { longText: 'Tennessee', shortText: 'TN', types: ['administrative_area_level_1'] },
+      ];
+    });
+    const fetchAutocompleteSuggestions = vi.fn(async () => ({
+      suggestions: [
+        {
+          placePrediction: {
+            placeId: 'memphis',
+            mainText: { text: 'Memphis' },
+            secondaryText: { text: 'TN, USA' },
+            toPlace: () => ({ fetchFields }),
+          },
+        },
+      ],
+    }));
+    loadLibraryMock.mockImplementation(async () => ({
+      AutocompleteSuggestion: { fetchAutocompleteSuggestions },
+      AutocompleteSessionToken: function Token() {},
+    }));
+    const { default: Component } = await import('../../src/components/CityStateAutocomplete');
+    const onPlaceSelected = vi.fn();
+    render(<Component id="dest_city" ariaLabel="Destination city" value="" onChange={vi.fn()} onPlaceSelected={onPlaceSelected} />);
+    await vi.waitFor(() => expect(loadLibraryMock).toHaveBeenCalled());
+
+    fireEvent.change(screen.getByLabelText('Destination city'), { target: { value: 'Memph' } });
+    await screen.findByText('TN, USA', {}, { timeout: 2000 });
+    expect(fetchAutocompleteSuggestions).toHaveBeenCalledWith(
+      expect.objectContaining({ input: 'Memph', includedPrimaryTypes: ['(cities)'], includedRegionCodes: ['us'] })
+    );
+    fireEvent.keyDown(screen.getByLabelText('Destination city'), { key: 'Enter' });
+    await vi.waitFor(() => expect(onPlaceSelected).toHaveBeenCalledWith({ city: 'Memphis', state: 'TN' }));
+    vi.unstubAllEnvs();
   });
 });

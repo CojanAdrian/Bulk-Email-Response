@@ -30,9 +30,14 @@ const loadLibraryMock = vi.fn((name) => {
   return Promise.resolve({});
 });
 
+let authFailureListener = null;
 vi.mock('../../src/lib/googleMapsLoader', () => ({
   loadGoogleMapsLibrary: (...args) => loadLibraryMock(...args),
   hasGoogleMapsKey: () => Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY),
+  onGoogleAuthFailure: (listener) => {
+    authFailureListener = listener;
+    return () => {};
+  },
 }));
 
 const FOCUSED_LOAD = { originLat: 32.7767, originLng: -96.797, destLat: 41.8781, destLng: -87.6298 };
@@ -188,5 +193,31 @@ describe('CarrierLaneMap', () => {
     const clickHandler = markerInstances[0].addListener.mock.calls.find(([event]) => event === 'click')[1];
     clickHandler();
     expect(onSelectCarrier).toHaveBeenCalledWith(1);
+  });
+
+  test('explains a rejected API key instead of leaving the map blank', async () => {
+    render(<CarrierLaneMap focusedLoad={null} laneMatches={[]} regionalMatches={[]} />);
+    await waitFor(() => expect(MapMock).toHaveBeenCalled());
+    const { act } = await import('@testing-library/react');
+    act(() => authFailureListener());
+    expect(screen.getByRole('alert')).toHaveTextContent(/google rejected this app's maps api key/i);
+    expect(screen.getByRole('alert')).toHaveTextContent(/places api \(new\), routes api/i);
+  });
+
+  test('draws the lane with the current Routes API when it is available', async () => {
+    const polyline = { setOptions: vi.fn(), setMap: vi.fn() };
+    const computeRoutes = vi.fn(async () => ({
+      routes: [{ createPolylines: () => [polyline], localizedValues: { distance: '920 mi', duration: '14 hours' } }],
+    }));
+    loadLibraryMock.mockImplementation((name) => {
+      if (name === 'maps') return Promise.resolve({ Map: MapMock });
+      if (name === 'routes') return Promise.resolve({ Route: { computeRoutes }, DirectionsService: DirectionsServiceMock });
+      return Promise.resolve({});
+    });
+    render(<CarrierLaneMap focusedLoad={FOCUSED_LOAD} laneMatches={[]} regionalMatches={[]} />);
+    await waitFor(() => expect(computeRoutes).toHaveBeenCalledWith(expect.objectContaining({ travelMode: 'DRIVING' })));
+    await waitFor(() => expect(screen.getByText(/920 mi · 14 hours/)).toBeInTheDocument());
+    expect(polyline.setMap).toHaveBeenCalledWith(mapInstance);
+    expect(directionsServiceInstance.route).not.toHaveBeenCalled();
   });
 });

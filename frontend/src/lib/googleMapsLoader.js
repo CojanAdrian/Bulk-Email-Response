@@ -21,3 +21,24 @@ export function loadGoogleMapsLibrary(name) {
 export function hasGoogleMapsKey() {
   return Boolean(import.meta.env.VITE_GOOGLE_MAPS_API_KEY);
 }
+
+// Google calls window.gm_authFailure when it rejects the key (wrong key,
+// API not enabled, billing off, or this domain not in the key's allowed
+// referrers). Without this the map just stays blank with no explanation.
+const authFailureListeners = new Set();
+let authFailed = false;
+
+if (typeof window !== 'undefined') {
+  const previous = window.gm_authFailure;
+  window.gm_authFailure = () => {
+    authFailed = true;
+    authFailureListeners.forEach((listener) => listener());
+    if (typeof previous === 'function') previous();
+  };
+}
+
+export function onGoogleAuthFailure(listener) {
+  if (authFailed) listener();
+  authFailureListeners.add(listener);
+  return () => authFailureListeners.delete(listener);
+}

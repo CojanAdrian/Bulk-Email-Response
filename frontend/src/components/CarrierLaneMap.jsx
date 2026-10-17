@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { loadGoogleMapsLibrary, hasGoogleMapsKey } from '../lib/googleMapsLoader';
+import { loadGoogleMapsLibrary, hasGoogleMapsKey, onGoogleAuthFailure } from '../lib/googleMapsLoader';
+import { createRouteDrawer } from '../lib/mapRoutes';
 
 const CURRENT_LANE_COLOR = '#d7ff3d';
 const HISTORY_COLOR = '#22d3ee';
@@ -19,8 +20,7 @@ const TIER_COLOR = {
 function loadMapsLibraries() {
   return Promise.all([loadGoogleMapsLibrary('maps'), loadGoogleMapsLibrary('routes')]).then(([mapsLib, routesLib]) => ({
     Map: mapsLib.Map,
-    DirectionsService: routesLib.DirectionsService,
-    DirectionsRenderer: routesLib.DirectionsRenderer,
+    routesLib,
   }));
 }
 
@@ -32,22 +32,6 @@ function toLatLng(lat, lng) {
   return { lat: parsedLat, lng: parsedLng };
 }
 
-// Real driving directions between origin/dest, rendered with a
-// DirectionsRenderer in the given color. Returns the route's
-// distance/duration text (for the on-map summary) or null on failure.
-async function drawRoute({ directionsService, map, color, origin, destination }) {
-  const result = await directionsService.route({ origin, destination, travelMode: 'DRIVING' });
-  const renderer = new google.maps.DirectionsRenderer({
-    map,
-    directions: result,
-    suppressMarkers: false,
-    preserveViewport: true,
-    polylineOptions: { strokeColor: color, strokeWeight: 5, strokeOpacity: 0.9 },
-  });
-  const leg = result.routes?.[0]?.legs?.[0];
-  return { renderer, distanceText: leg?.distance?.text ?? null, durationText: leg?.duration?.text ?? null };
-}
-
 // Real Google Maps in satellite/hybrid view with actual driving routes
 // (DirectionsService/Renderer) drawn for the currently searched/focused
 // lane and, when a carrier is selected, their lane history -- in place of
@@ -56,11 +40,11 @@ async function drawRoute({ directionsService, map, color, origin, destination })
 function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCarrier, selectedCarrierId, selectedCarrierHistory }) {
   const containerRef = useRef(null);
   const mapObjRef = useRef(null);
-  const directionsServiceRef = useRef(null);
+  const drawRouteRef = useRef(null);
   const currentRenderersRef = useRef([]);
   const historyRenderersRef = useRef([]);
   const matchMarkersRef = useRef([]);
-  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error' | 'missing-key'
+  const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error' | 'missing-key' | 'auth-failed'
   const [routeInfo, setRouteInfo] = useState({ current: null, history: [] });
 
   useEffect(() => {
@@ -69,26 +53,29 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
       return;
     }
     let cancelled = false;
+    const stopListening = onGoogleAuthFailure(() => {
+      if (!cancelled) setStatus('auth-failed');
+    });
     loadMapsLibraries()
-      .then(({ Map, DirectionsService }) => {
+      .then(({ Map, routesLib }) => {
         if (cancelled || !containerRef.current) return;
         mapObjRef.current = new Map(containerRef.current, {
           center: CONTINENTAL_US_CENTER,
           zoom: 4,
           mapTypeId: 'hybrid',
-          tilt: 45,
           streetViewControl: false,
           mapTypeControl: false,
           fullscreenControl: false,
         });
-        directionsServiceRef.current = new DirectionsService();
-        setStatus('ready');
+        drawRouteRef.current = createRouteDrawer(routesLib);
+        setStatus((prev) => (prev === 'auth-failed' ? prev : 'ready'));
       })
       .catch(() => {
         if (!cancelled) setStatus('error');
       });
     return () => {
       cancelled = true;
+      stopListening();
     };
   }, []);
 
@@ -115,7 +102,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
     const destination = toLatLng(focusedLoad.destLat, focusedLoad.destLng);
     if (!origin || !destination) return;
     let cancelled = false;
-    drawRoute({ directionsService: directionsServiceRef.current, map: mapObjRef.current, color: CURRENT_LANE_COLOR, origin, destination })
+    drawRouteRef.current({ map: mapObjRef.current, color: CURRENT_LANE_COLOR, origin, destination })
       .then(({ renderer, distanceText, durationText }) => {
         if (cancelled) {
           renderer.setMap(null);
@@ -158,7 +145,7 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
         if (!origin || !destination) return null;
         bounds.extend(origin);
         bounds.extend(destination);
-        return drawRoute({ directionsService: directionsServiceRef.current, map: mapObjRef.current, color: HISTORY_COLOR, origin, destination });
+        return drawRouteRef.current({ map: mapObjRef.current, color: HISTORY_COLOR, origin, destination });
       })
     ).then((results) => {
       if (cancelled) {
@@ -223,7 +210,19 @@ function CarrierLaneMap({ focusedLoad, laneMatches, regionalMatches, onSelectCar
       )}
       {status === 'error' && (
         <div className="absolute inset-0 flex items-center justify-center bg-[#05060a] p-6 text-center">
-          <p className="max-w-sm text-sm text-error">Failed to load Google Maps.</p>
+          <p className="max-w-sm text-sm text-error">Couldn&apos;t load Google Maps. Check your connection and reload the page.</p>
+        </div>
+      )}
+      {status === 'auth-failed' && (
+        <div role="alert" className="absolute inset-0 flex items-center justify-center bg-[#05060a] p-6 text-center">
+          <div className="max-w-md space-y-2 text-sm text-white/70">
+            <p className="font-semibold text-white">Google rejected this app&apos;s Maps API key.</p>
+            <p>
+              In Google Cloud Console, make sure the key&apos;s project has billing on and these APIs enabled:{' '}
+              <span className="text-white">Maps JavaScript API, Places API (New), Routes API</span> &mdash; and that this site&apos;s
+              address is in the key&apos;s allowed websites.
+            </p>
+          </div>
         </div>
       )}
       {(routeInfo.current || routeInfo.history.length > 0) && (

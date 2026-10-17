@@ -92,7 +92,7 @@ describe('AddLoadModal', () => {
     const equipmentInput = screen.getByLabelText(/equipment/i);
     fireEvent.focus(equipmentInput);
     fireEvent.change(equipmentInput, { target: { value: 'reefer' } });
-    fireEvent.click(screen.getByRole('button', { name: 'R — Reefer' }));
+    fireEvent.click(screen.getByRole('option', { name: 'R — Reefer' }));
 
     fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
 

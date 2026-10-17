@@ -11,9 +11,9 @@ describe('EquipmentPicker', () => {
   test('opens a dropdown of every option when focused with an empty value', () => {
     render(<EquipmentPicker id="equipment" value="" onChange={vi.fn()} />);
     fireEvent.focus(screen.getByLabelText(/equipment/i));
-    expect(screen.getByRole('button', { name: 'V — Van' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'R — Reefer' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'F — Flatbed' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'V — Van' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'R — Reefer' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'F — Flatbed' })).toBeInTheDocument();
   });
 
   test('typing filters the dropdown by code or label', () => {
@@ -22,7 +22,7 @@ describe('EquipmentPicker', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'sprinter' } });
 
-    expect(screen.getByRole('button', { name: 'SP — Sprinter Van' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SP — Sprinter Van' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'V — Van' })).not.toBeInTheDocument();
   });
 
@@ -32,7 +32,7 @@ describe('EquipmentPicker', () => {
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'sd' } });
 
-    expect(screen.getByRole('button', { name: 'SD — Step Deck' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: 'SD — Step Deck' })).toBeInTheDocument();
   });
 
   test('clicking an option calls onChange with its code and closes the dropdown', () => {
@@ -41,7 +41,7 @@ describe('EquipmentPicker', () => {
     const input = screen.getByLabelText(/equipment/i);
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'sprinter' } });
-    fireEvent.click(screen.getByRole('button', { name: 'SP — Sprinter Van' }));
+    fireEvent.click(screen.getByRole('option', { name: 'SP — Sprinter Van' }));
 
     expect(onChange).toHaveBeenCalledWith('SP');
     expect(screen.queryByRole('button', { name: 'SP — Sprinter Van' })).not.toBeInTheDocument();

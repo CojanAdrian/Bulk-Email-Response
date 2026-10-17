@@ -32,7 +32,7 @@ describe('StateSelect', () => {
     const onChange = vi.fn();
     render(<StateSelect id="s" ariaLabel="State" value="" onChange={onChange} />);
     fireEvent.change(screen.getByLabelText('State'), { target: { value: 'Cali' } });
-    fireEvent.click(screen.getByRole('button', { name: /CA.*California/ }));
+    fireEvent.click(screen.getByRole('option', { name: /CA.*California/ }));
     expect(onChange).toHaveBeenCalledWith('CA');
   });
 
@@ -50,5 +50,19 @@ describe('StateSelect', () => {
     expect(screen.getByLabelText('State')).toHaveValue('TX');
     rerender(<StateSelect id="s" ariaLabel="State" value="IL" onChange={vi.fn()} />);
     expect(screen.getByLabelText('State')).toHaveValue('IL');
+  });
+});
+
+describe('StateSelect keyboard', () => {
+  test('arrow keys move through matching states and Enter commits the highlighted one', async () => {
+    const { default: StateSelect } = await import('../../src/components/StateSelect');
+    const onChange = vi.fn();
+    render(<StateSelect ariaLabel="Origin state" value="" onChange={onChange} />);
+    const input = screen.getByLabelText('Origin state');
+    fireEvent.change(input, { target: { value: 'new' } });
+    fireEvent.keyDown(input, { key: 'ArrowDown' });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(onChange).toHaveBeenLastCalledWith(expect.stringMatching(/^N[A-Z]$/));
+    expect(onChange.mock.calls.at(-1)[0]).not.toBe('');
   });
 });
