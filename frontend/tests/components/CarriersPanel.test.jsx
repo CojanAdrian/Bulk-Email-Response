@@ -79,7 +79,7 @@ describe('CarriersPanel', () => {
     fireEvent.click(screen.getByText('ABC Trucking'));
     const dialog = await screen.findByRole('dialog');
     expect(container.contains(dialog)).toBe(false);
-    expect(await screen.findByText('Load #0090505')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: /copy load number 0090505/i })).toBeInTheDocument();
   });
 
   test('the detail sheet\'s Edit button opens the edit sheet', async () => {

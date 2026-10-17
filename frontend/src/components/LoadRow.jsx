@@ -1,10 +1,10 @@
-import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useMotionPreset } from '../lib/motionConfig';
 import { formatMoney } from '../lib/formatMoney';
 import { formatDayAgo, formatDayFull } from '../lib/formatDay';
 import ProvenBadge from './ProvenBadge';
-import { ChevronDownIcon, CopyIcon, CheckIcon } from './icons';
+import { ChevronDownIcon } from './icons';
+import CopyableLoadNumber from './CopyableLoadNumber';
 
 // One load on the board. Purely presentational: LoadsTable owns every bit
 // of state and passes the interactive pieces in as slots, so the row only
@@ -18,6 +18,7 @@ function LoadRow({
   proven,
   expanded,
   onToggleExpand,
+  onOpenCarrier,
   leadingSlot,
   badges,
   puField,
@@ -26,7 +27,6 @@ function LoadRow({
   actions,
 }) {
   const preset = useMotionPreset();
-  const [numberCopied, setNumberCopied] = useState(false);
   const provenCount = proven ? proven.length : 0;
   const isProven = provenCount > 0;
   const origin = [load.origin_city, load.origin_state].filter(Boolean).join(', ') || 'Origin missing';
@@ -57,28 +57,7 @@ function LoadRow({
           </div>
 
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-            <button
-              type="button"
-              onClick={() => {
-                if (!navigator.clipboard || !navigator.clipboard.writeText) return;
-                navigator.clipboard.writeText(String(load.load_number)).then(() => {
-                  setNumberCopied(true);
-                  setTimeout(() => setNumberCopied(false), 1500);
-                });
-              }}
-              aria-label={`Copy load number ${load.load_number}`}
-              title="Copy load number"
-              className="group inline-flex items-center gap-1.5 rounded-lg border border-control-border bg-control px-2 py-0.5 font-mono text-[13px] font-bold tracking-wide text-text transition hover:bg-control-hover active:scale-[0.97]"
-            >
-              <span aria-hidden="true" className="text-text-muted">#</span>
-              <span>{load.load_number}</span>
-              {numberCopied ? (
-                <CheckIcon aria-hidden="true" className="h-3.5 w-3.5 text-success" />
-              ) : (
-                <CopyIcon aria-hidden="true" className="h-3.5 w-3.5 opacity-50 transition group-hover:opacity-100" />
-              )}
-              <span className="sr-only" role="status">{numberCopied ? 'Copied' : ''}</span>
-            </button>
+            <CopyableLoadNumber loadNumber={load.load_number} />
             {load.equipment && (
               <>
                 <span aria-hidden="true">·</span>
@@ -152,16 +131,28 @@ function LoadRow({
           >
             <ul aria-label={`Carriers who ran ${load.load_number}'s lane`} className="mt-3 grid gap-2 border-t border-gold/30 pt-3 sm:grid-cols-2">
               {proven.map((carrier) => (
-                <li key={carrier.carrierId} className="flex min-w-0 items-center justify-between gap-3 rounded-xl bg-surface/60 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold" title={carrier.carrierName}>
-                      {carrier.carrierName}
-                    </p>
-                    <p className="truncate text-xs text-text-muted">
-                      Ran it {carrier.runs}× · last <span title={formatDayFull(carrier.lastRanAt)}>{formatDayAgo(carrier.lastRanAt)}</span>
-                    </p>
-                  </div>
-                  <span className="shrink-0 text-sm font-semibold tabular-nums">{formatMoney(carrier.lastRate)}</span>
+                <li key={carrier.carrierId}>
+                  {/* Opens the carrier's full profile (contacts, equipment,
+                      every lane they've run). */}
+                  <button
+                    type="button"
+                    onClick={() => onOpenCarrier && onOpenCarrier(carrier.carrierId)}
+                    aria-label={`Open ${carrier.carrierName}'s profile`}
+                    className="group flex w-full min-w-0 items-center justify-between gap-3 rounded-xl border border-transparent bg-surface/60 px-3 py-2 text-left transition hover:border-gold/50 hover:bg-surface active:scale-[0.99]"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold group-hover:underline" title={carrier.carrierName}>
+                        {carrier.carrierName}
+                      </span>
+                      <span className="block truncate text-xs text-text-muted">
+                        Ran it {carrier.runs}× · last <span title={formatDayFull(carrier.lastRanAt)}>{formatDayAgo(carrier.lastRanAt)}</span>
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1.5">
+                      <span className="text-sm font-semibold tabular-nums">{formatMoney(carrier.lastRate)}</span>
+                      <ChevronDownIcon aria-hidden="true" className="h-4 w-4 -rotate-90 text-text-muted transition group-hover:translate-x-0.5" />
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

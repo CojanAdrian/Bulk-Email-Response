@@ -5,9 +5,11 @@ import LoadsTable from '../../src/components/LoadsTable';
 import * as loadsApi from '../../src/api/loads';
 import * as carrierMatchesApi from '../../src/api/carrierMatches';
 import * as liveSocket from '../../src/lib/liveSocket';
+import * as carriersApi from '../../src/api/carriers';
 
 vi.mock('../../src/api/loads');
 vi.mock('../../src/api/carrierMatches');
+vi.mock('../../src/api/carriers');
 vi.mock('../../src/lib/liveSocket');
 
 const SAMPLE_LOAD = {
@@ -943,5 +945,25 @@ describe('LoadsTable', () => {
     fireEvent.click(await screen.findByRole('button', { name: /copy load number l1001/i }));
     expect(writeText).toHaveBeenCalledWith('L1001');
     expect(await screen.findByText('Copied')).toBeInTheDocument();
+  });
+
+  test('clicking a carrier in the gold "who ran it" list opens their full profile', async () => {
+    loadsApi.listLoads.mockResolvedValue([SAMPLE_LOAD]);
+    carrierMatchesApi.getProvenCarriers.mockResolvedValue({
+      [SAMPLE_LOAD.id]: [{ carrierId: 7, carrierName: 'Swift Haul LLC', runs: 3, lastRanAt: '2026-08-02', lastRate: 1450 }],
+    });
+    carriersApi.getCarrier.mockResolvedValue({ id: 7, company_name: 'Swift Haul LLC', mc_number: '123456', dispatcher_name: 'Nancy' });
+    carriersApi.listCarrierHistory.mockResolvedValue([
+      { id: 1, origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', load_number: '0087376' },
+    ]);
+    render(<LoadsTable refreshKey={0} onSelectLoad={vi.fn()} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /show the 1 carrier who ran this lane/i }));
+    fireEvent.click(screen.getByRole('button', { name: /open swift haul llc's profile/i }));
+
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(carriersApi.getCarrier).toHaveBeenCalledWith(7);
+    expect(await screen.findByText('Nancy')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /copy load number 0087376/i })).toBeInTheDocument();
   });
 });

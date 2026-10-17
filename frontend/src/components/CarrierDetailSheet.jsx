@@ -6,6 +6,7 @@ import BottomSheet from './BottomSheet';
 import Badge from './Badge';
 import SecondaryButton from './SecondaryButton';
 import Skeleton from './Skeleton';
+import CopyableLoadNumber from './CopyableLoadNumber';
 import { formatMoney } from '../lib/formatMoney';
 import { PhoneIcon, MailIcon } from './icons';
 
@@ -107,9 +108,7 @@ function CarrierDetailBody({ status, carrier, history, onClose, onEdit }) {
                     {entry.rate && <span className="shrink-0 font-semibold tabular-nums text-text">{formatMoney(entry.rate)}</span>}
                   </div>
                   <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-                    {entry.load_number && (
-                      <span className="rounded-md bg-surface px-1.5 py-0.5 font-mono font-semibold text-text">Load #{entry.load_number}</span>
-                    )}
+                    <CopyableLoadNumber loadNumber={entry.load_number} label="Load #" />
                     {(entry.load_equipment || null) && <span className="rounded-md bg-surface px-1.5 py-0.5 font-semibold text-text">{entry.load_equipment}</span>}
                     {entry.ran_at && <span>{new Date(entry.ran_at).toLocaleDateString()}</span>}
                     {entry.gp !== null && entry.gp !== undefined && <span>GP {formatMoney(entry.gp)}</span>}

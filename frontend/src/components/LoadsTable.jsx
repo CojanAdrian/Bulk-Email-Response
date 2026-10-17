@@ -9,6 +9,8 @@ import { isoToDatetimeLocal, datetimeLocalToMysql } from '../lib/dateInput';
 import { useSelectionMode } from '../lib/useSelectionMode';
 import Badge from './Badge';
 import BookingCarrierModal from './BookingCarrierModal';
+import CarrierDetailSheet from './CarrierDetailSheet';
+import CarrierSheet from './CarrierSheet';
 import BottomActionBar from './BottomActionBar';
 import Card from './Card';
 import Skeleton from './Skeleton';
@@ -115,6 +117,8 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches, stat
   const [matchInfo, setMatchInfo] = useState({});
   const [provenInfo, setProvenInfo] = useState({});
   const [expandedId, setExpandedId] = useState(null);
+  const [profileCarrierId, setProfileCarrierId] = useState(null);
+  const [editingCarrier, setEditingCarrier] = useState(null);
   const [quickFilter, setQuickFilter] = usePersistentState('loadsTable.quickFilter', 'all');
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
   // The status filter can be driven from outside (the Active / Booked /
@@ -539,6 +543,7 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches, stat
                 proven={provenInfo[load.id]}
                 expanded={expandedId === load.id}
                 onToggleExpand={() => setExpandedId((prev) => (prev === load.id ? null : load.id))}
+                onOpenCarrier={setProfileCarrierId}
                 leadingSlot={
                   selection.active ? (
                     <SelectionCircle
@@ -691,6 +696,19 @@ function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches, stat
       )}
       <AnimatePresence>
         {bookingModalLoad && <BookingCarrierModal load={bookingModalLoad} onClose={() => setBookingModalLoad(null)} />}
+        {profileCarrierId && (
+          <CarrierDetailSheet
+            carrierId={profileCarrierId}
+            onClose={() => setProfileCarrierId(null)}
+            onEdit={(carrier) => {
+              setProfileCarrierId(null);
+              setEditingCarrier(carrier);
+            }}
+          />
+        )}
+        {editingCarrier && (
+          <CarrierSheet carrier={editingCarrier} onClose={() => setEditingCarrier(null)} onSaved={() => setEditingCarrier(null)} />
+        )}
       </AnimatePresence>
     </Card>
   );
