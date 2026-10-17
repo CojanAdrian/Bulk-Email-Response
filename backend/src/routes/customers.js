@@ -74,6 +74,58 @@ function createCustomersRouter(pool) {
     res.json(list);
   }));
 
+  // Every load for one customer -- what's still available and what's been
+  // done -- with the carrier who hauled each done load (the most recent
+  // lane-history entry tied to it). Same range / equipment / load-type
+  // filters as the carriers view.
+  router.get('/loads', asyncHandler(async (req, res) => {
+    const name = String(req.query.name ?? '').trim();
+    if (name === '') {
+      return res.status(400).json({ error: 'name is required' });
+    }
+    const conditions = ['l.user_id = ?', 'LOWER(TRIM(l.customer)) = LOWER(?)'];
+    const values = [req.session.userId, name];
+    if (req.query.loadType === 'contract' || req.query.loadType === 'spot') {
+      conditions.push('l.load_type = ?');
+      values.push(req.query.loadType);
+    }
+    const days = RANGE_DAYS[req.query.range];
+    if (days) {
+      // An available load always shows; a done one only if it was booked
+      // (or last touched) inside the range.
+      conditions.push("(l.status = 'active' OR COALESCE(l.booked_at, l.updated_at) >= (NOW() - INTERVAL ? DAY))");
+      values.push(days);
+    }
+    const [rows] = await pool.query(
+      `SELECT l.id, l.load_number, l.status, l.load_type, l.equipment, l.weight,
+              l.origin_city, l.origin_state, l.dest_city, l.dest_state, l.target_pay,
+              DATE_FORMAT(l.early_pu, '%Y-%m-%dT%H:%i:%s') AS early_pu,
+              DATE_FORMAT(l.late_pu, '%Y-%m-%dT%H:%i:%s') AS late_pu,
+              DATE_FORMAT(COALESCE(l.booked_at, h.created_at, l.updated_at), '%Y-%m-%dT%H:%i:%s') AS done_at,
+              h.carrier_id, c.company_name AS carrier_name, h.rate, h.gp
+       FROM loads l
+       LEFT JOIN (
+         SELECT *, ROW_NUMBER() OVER (PARTITION BY load_id ORDER BY created_at DESC) AS rn
+         FROM carrier_lane_history
+         WHERE load_id IS NOT NULL
+       ) h ON h.load_id = l.id AND h.rn = 1
+       LEFT JOIN carriers c ON c.id = h.carrier_id
+       WHERE ${conditions.join(' AND ')}`,
+      values
+    );
+
+    const equipment = req.query.equipment ? String(req.query.equipment).trim().toUpperCase() : null;
+    const filtered = equipment ? rows.filter((row) => isEquipmentCompatible(equipment, row.equipment ? [row.equipment] : [])) : rows;
+
+    const available = filtered
+      .filter((row) => row.status === 'active')
+      .sort((a, b) => String(a.early_pu ?? '9999').localeCompare(String(b.early_pu ?? '9999')));
+    const done = filtered
+      .filter((row) => row.status !== 'active')
+      .sort((a, b) => String(b.done_at ?? '').localeCompare(String(a.done_at ?? '')));
+    res.json({ available, done });
+  }));
+
   // Carriers who have hauled for one customer, on any lane.
   router.get('/carriers', asyncHandler(async (req, res) => {
     const name = String(req.query.name ?? '').trim();

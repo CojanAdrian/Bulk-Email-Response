@@ -19,12 +19,22 @@ const CARRIERS = [
   },
 ];
 
+const LOADS = {
+  available: [
+    { id: 1, load_number: '0091003', status: 'active', origin_city: 'Elgin', origin_state: 'IL', dest_city: 'Farmville', dest_state: 'NC', equipment: 'V', target_pay: '2800.00', early_pu: '2026-10-19T16:00:00', load_type: 'contract' },
+  ],
+  done: [
+    { id: 2, load_number: '0087376', status: 'booked', origin_city: 'Goodyear', origin_state: 'AZ', dest_city: 'Norco', dest_state: 'CA', equipment: 'V', target_pay: '800.00', rate: '750.00', gp: '50.00', done_at: '2026-09-14T10:00:00', carrier_id: 7, carrier_name: 'Khela Trucking Inc' },
+  ],
+};
+
 describe('CustomersPage', () => {
   beforeEach(() => {
     vi.resetAllMocks();
     localStorage.clear();
     customersApi.listCustomers.mockResolvedValue(CUSTOMERS);
     customersApi.getCustomerCarriers.mockResolvedValue(CARRIERS);
+    customersApi.getCustomerLoads.mockResolvedValue(LOADS);
   });
 
   test('lists customers and shows the most recent one with its carriers', async () => {
@@ -117,5 +127,24 @@ describe('CustomersPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /keep it/i }));
     expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument();
     expect(customersApi.deleteCustomer).not.toHaveBeenCalled();
+  });
+
+  test('the Loads view shows available and done loads, and done ones link to the carrier', async () => {
+    render(<CustomersPage />);
+    await screen.findByText('Swift Haul LLC');
+    const showSwitch = screen.getByRole('radiogroup', { name: /^show$/i });
+    expect(within(showSwitch).getByRole('radio', { name: /loads/i })).toHaveTextContent('2');
+    fireEvent.click(within(showSwitch).getByRole('radio', { name: /loads/i }));
+
+    const available = screen.getByRole('region', { name: /available/i });
+    expect(within(available).getByText(/Elgin, IL/)).toBeInTheDocument();
+    expect(within(available).getByRole('button', { name: /copy load number 0091003/i })).toBeInTheDocument();
+    expect(within(available).getByText('$2,800')).toBeInTheDocument();
+
+    const done = screen.getByRole('region', { name: /done/i });
+    expect(within(done).getByText('$750')).toBeInTheDocument();
+    expect(within(done).getByText('GP $50')).toBeInTheDocument();
+    expect(within(done).getByRole('button', { name: /open khela trucking inc's profile/i })).toBeInTheDocument();
+    expect(customersApi.getCustomerLoads).toHaveBeenCalledWith({ name: 'ALDI, Inc', range: 'all', equipment: '', loadType: 'all' });
   });
 });

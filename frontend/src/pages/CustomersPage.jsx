@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { listCustomers, getCustomerCarriers, deleteCustomer } from '../api/customers';
+import { listCustomers, getCustomerCarriers, getCustomerLoads, deleteCustomer } from '../api/customers';
+import CustomerLoadHistory from '../components/CustomerLoadHistory';
 import { EQUIPMENT_OPTIONS } from '../lib/equipmentOptions';
 import { formatMoney } from '../lib/formatMoney';
 import { formatDayAgo, formatDayFull } from '../lib/formatDay';
@@ -210,6 +211,9 @@ function CustomersPage() {
   const [typeFilter, setTypeFilter] = usePersistentState('customers.loadType', 'all');
   const [carriers, setCarriers] = useState([]);
   const [carrierStatus, setCarrierStatus] = useState('idle');
+  const [view, setView] = usePersistentState('customers.view', 'carriers'); // 'carriers' | 'loads'
+  const [customerLoads, setCustomerLoads] = useState({ available: [], done: [] });
+  const [loadsStatus, setLoadsStatus] = useState('idle');
   const [detailCarrierId, setDetailCarrierId] = useState(null);
   const [editingCarrier, setEditingCarrier] = useState(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -259,6 +263,26 @@ function CustomersPage() {
     };
   }, [effectiveSelected, range, equipment, typeFilter, reloadKey]);
 
+  // Fetched alongside the carriers (not only when the Loads view is open) so
+  // the Carriers / Loads switch can show both counts up front.
+  useEffect(() => {
+    if (!effectiveSelected) return undefined;
+    let cancelled = false;
+    setLoadsStatus('loading');
+    getCustomerLoads({ name: effectiveSelected, range, equipment, loadType: typeFilter })
+      .then((data) => {
+        if (cancelled) return;
+        setCustomerLoads({ available: data?.available || [], done: data?.done || [] });
+        setLoadsStatus('ready');
+      })
+      .catch(() => {
+        if (!cancelled) setLoadsStatus('error');
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [effectiveSelected, range, equipment, typeFilter, reloadKey]);
+
   const selectedCustomer = customers.find((c) => c.name === effectiveSelected);
 
   // Switching customers cancels a half-finished "remove?" prompt.
@@ -294,7 +318,7 @@ function CustomersPage() {
         onTypeFilterChange={setTypeFilter}
       />
 
-      <section aria-label="Carriers for this customer" className="min-w-0 space-y-4">
+      <section aria-label="Customer details" className="min-w-0 space-y-4">
         {selectedCustomer && (
           <Card className="space-y-4">
             <div className="flex min-w-0 items-start justify-between gap-3">
@@ -348,6 +372,20 @@ function CustomersPage() {
                 </div>
               </div>
             )}
+            <SegmentedControl
+              ariaLabel="Show"
+              value={view}
+              onChange={setView}
+              options={[
+                { value: 'carriers', label: 'Carriers', count: carrierStatus === 'ready' ? carriers.length : undefined },
+                {
+                  value: 'loads',
+                  label: 'Loads',
+                  count: loadsStatus === 'ready' ? customerLoads.available.length + customerLoads.done.length : undefined,
+                },
+              ]}
+              className="w-full sm:w-80"
+            />
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <SegmentedControl ariaLabel="Time range" options={RANGE_OPTIONS} value={range} onChange={setRange} className="sm:w-auto" />
               <div className="flex min-w-0 items-center gap-2 text-sm text-text-muted">
@@ -364,15 +402,25 @@ function CustomersPage() {
           </Card>
         )}
 
-        {carrierStatus === 'loading' && <Skeleton count={3} height="8.5rem" className="rounded-2xl" />}
-        {carrierStatus === 'error' && (
+        {view === 'loads' && loadsStatus === 'loading' && <Skeleton count={4} height="6.5rem" className="rounded-2xl" />}
+        {view === 'loads' && loadsStatus === 'error' && (
+          <Card>
+            <p role="alert" className="text-sm text-error">
+              Couldn&apos;t load this customer&apos;s loads.
+            </p>
+          </Card>
+        )}
+        {view === 'loads' && loadsStatus === 'ready' && <CustomerLoadHistory loads={customerLoads} onOpenCarrier={setDetailCarrierId} />}
+
+        {view === 'carriers' && carrierStatus === 'loading' && <Skeleton count={3} height="8.5rem" className="rounded-2xl" />}
+        {view === 'carriers' && carrierStatus === 'error' && (
           <Card>
             <p role="alert" className="text-sm text-error">
               Couldn&apos;t load carriers for this customer.
             </p>
           </Card>
         )}
-        {carrierStatus === 'ready' && carriers.length === 0 && (
+        {view === 'carriers' && carrierStatus === 'ready' && carriers.length === 0 && (
           <Card>
             <EmptyState icon={<TruckIcon className="h-6 w-6" />} title="No carrier runs in this view">
               {range !== 'all' || equipment
@@ -381,7 +429,7 @@ function CustomersPage() {
             </EmptyState>
           </Card>
         )}
-        {carrierStatus === 'ready' && carriers.length > 0 && (
+        {view === 'carriers' && carrierStatus === 'ready' && carriers.length > 0 && (
           <ul className="grid min-w-0 gap-3 xl:grid-cols-2">
             {carriers.map((carrier, index) => (
               <CarrierCard key={carrier.carrierId} carrier={carrier} index={index} onOpen={setDetailCarrierId} />

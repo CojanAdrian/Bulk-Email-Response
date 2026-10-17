@@ -36,7 +36,7 @@ const TAB_SUBTITLES = {
   loads: 'Your board. Gold rows are lanes a carrier has already run.',
   inquiries: 'Carrier emails about your loads, matched and ready to answer.',
   carriers: 'Every carrier you work with and the lanes they run.',
-  customers: 'Who has hauled for each customer, on any lane.',
+  customers: 'Every customer’s loads and the carriers who hauled them.',
   stats: 'Booked loads, rates and gross profit.',
 };
 

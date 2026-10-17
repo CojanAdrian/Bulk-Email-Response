@@ -214,4 +214,38 @@ describe('proven lanes and customers routes', () => {
     const [rows] = await pool.query("SELECT customer FROM loads WHERE load_number = 'MC1'");
     expect(rows[0].customer).toBe('ALDI, Inc');
   });
+
+  describe('GET /api/customers/loads', () => {
+    test('splits the customer loads into available and done, with who hauled the done ones', async () => {
+      await makeLoad({ load_number: 'A-LATER', customer: 'ALDI, Inc', early_pu: '2026-10-25 08:00:00' });
+      await makeLoad({ load_number: 'A-SOON', customer: 'aldi, inc', early_pu: '2026-10-20 08:00:00' });
+      const booked = await makeLoad({ load_number: 'B-1', customer: 'ALDI, Inc', status: 'booked', booked_at: '2026-10-10 09:00:00' });
+      await makeLoad({ load_number: 'OTHER', customer: 'Kroger' });
+      const carrier = await makeCarrier('Swift Haul');
+      await makeRun(carrier, { load_id: booked, rate: 1800, gp: 220 });
+
+      const res = await agent.get('/api/customers/loads').query({ name: 'ALDI, Inc' });
+      expect(res.status).toBe(200);
+      expect(res.body.available.map((l) => l.load_number)).toEqual(['A-SOON', 'A-LATER']);
+      expect(res.body.done).toHaveLength(1);
+      expect(res.body.done[0]).toMatchObject({
+        load_number: 'B-1', status: 'booked', carrier_id: carrier, carrier_name: 'Swift Haul', done_at: '2026-10-10T09:00:00',
+      });
+      expect(Number(res.body.done[0].rate)).toBe(1800);
+    });
+
+    test('equipment and load type filters apply', async () => {
+      await makeLoad({ load_number: 'VAN', customer: 'Target', equipment: 'V', load_type: 'spot' });
+      await makeLoad({ load_number: 'FLAT', customer: 'Target', equipment: 'F', load_type: 'contract' });
+      const vans = await agent.get('/api/customers/loads').query({ name: 'Target', equipment: 'V' });
+      expect(vans.body.available.map((l) => l.load_number)).toEqual(['VAN']);
+      const contract = await agent.get('/api/customers/loads').query({ name: 'Target', loadType: 'contract' });
+      expect(contract.body.available.map((l) => l.load_number)).toEqual(['FLAT']);
+    });
+
+    test('400 without a name', async () => {
+      const res = await agent.get('/api/customers/loads');
+      expect(res.status).toBe(400);
+    });
+  });
 });
