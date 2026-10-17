@@ -25,7 +25,7 @@ const MotionModalCard = motion(ModalCard);
 const TEXT_FIELDS = [
   'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip',
-  'equipment', 'weight', 'commodity', 'temperature', 'comment', 'customer',
+  'equipment', 'weight', 'commodity', 'temperature', 'comment', 'customer', 'load_type',
 ];
 
 function blankToNull(value) {
@@ -329,7 +329,23 @@ function RateModal({ load, onClose, onSaved }) {
             </div>
           </div>
 
-          <CustomerField className="mb-4" value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
+          <div className="mb-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_10rem]">
+          <CustomerField value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
+          <div>
+            <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted">Load type</span>
+            <Select
+              ariaLabel="Load type"
+              value={fields.load_type || ''}
+              onChange={(value) => handleFieldChange('load_type', value)}
+              options={[
+                { value: '', label: 'Not set' },
+                { value: 'contract', label: 'Contract' },
+                { value: 'spot', label: 'Spot' },
+              ]}
+              className="w-full"
+            />
+          </div>
+        </div>
 
           <div className="mb-4 grid grid-cols-3 gap-2">
             <div>

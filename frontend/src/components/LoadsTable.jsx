@@ -110,14 +110,18 @@ function getInitialSort() {
   return { key: null, direction: 'asc' };
 }
 
-function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches }) {
+function LoadsTable({ refreshKey, onSelectLoad, onOpenBlast, onViewMatches, statusFilter: controlledStatus, onStatusFilterChange }) {
   const [loads, setLoads] = useState([]);
   const [matchInfo, setMatchInfo] = useState({});
   const [provenInfo, setProvenInfo] = useState({});
   const [expandedId, setExpandedId] = useState(null);
   const [quickFilter, setQuickFilter] = usePersistentState('loadsTable.quickFilter', 'all');
   const [status, setStatus] = useState('loading'); // 'loading' | 'ready' | 'error'
-  const [statusFilter, setStatusFilter] = useState('active');
+  // The status filter can be driven from outside (the Active / Booked /
+  // Covered counters above the board), or kept internally when it isn't.
+  const [ownStatus, setOwnStatus] = useState('active');
+  const statusFilter = controlledStatus ?? ownStatus;
+  const setStatusFilter = onStatusFilterChange ?? setOwnStatus;
   const [searchText, setSearchText] = useState('');
   const [error, setError] = useState(null);
   const [liveTick, setLiveTick] = useState(0);

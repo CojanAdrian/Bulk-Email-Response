@@ -296,4 +296,13 @@ describe('MainToolPage', () => {
       expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
     });
   });
+
+  test('clicking the Booked counter filters the board to booked loads', async () => {
+    renderPage({ username: 'admin', onLogout: vi.fn() });
+    const booked = await screen.findByRole('button', { name: /^booked: \d+ loads$/i });
+    fireEvent.click(booked);
+    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('booked'));
+    expect(booked).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent('Booked');
+  });
 });

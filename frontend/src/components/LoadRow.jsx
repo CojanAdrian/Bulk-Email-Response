@@ -101,6 +101,15 @@ function LoadRow({
                 </span>
               </>
             )}
+            {(load.load_type === 'contract' || load.load_type === 'spot') && (
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
+                  load.load_type === 'contract' ? 'bg-info-bg text-info' : 'bg-warning-bg text-warning'
+                }`}
+              >
+                {load.load_type === 'contract' ? 'Contract' : 'Spot'}
+              </span>
+            )}
             {isProven && (
               <button
                 type="button"

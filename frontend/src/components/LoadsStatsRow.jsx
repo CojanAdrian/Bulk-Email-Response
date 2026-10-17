@@ -4,7 +4,7 @@ import { subscribe } from '../lib/liveSocket';
 import StatTile from './StatTile';
 
 
-function LoadsStatsRow({ refreshKey }) {
+function LoadsStatsRow({ refreshKey, activeStatus, onSelectStatus }) {
   const [counts, setCounts] = useState(null);
   const [liveTick, setLiveTick] = useState(0);
 
@@ -34,10 +34,31 @@ function LoadsStatsRow({ refreshKey }) {
   if (!counts) return null;
 
   return (
-    <div className="grid grid-cols-3 gap-2 sm:gap-4">
-      <StatTile label="Active" value={counts.active} accentClassName="text-success" />
-      <StatTile label="Booked" value={counts.booked} accentClassName="text-tag" />
-      <StatTile label="Covered" value={counts.covered} accentClassName="text-tag" />
+    <div role="group" aria-label="Show loads by status" className="grid grid-cols-3 gap-2 sm:gap-4">
+      {[
+        { key: 'active', label: 'Active', accent: 'text-success', ring: 'ring-success/60' },
+        { key: 'booked', label: 'Booked', accent: 'text-tag', ring: 'ring-tag/60' },
+        { key: 'covered', label: 'Covered', accent: 'text-info', ring: 'ring-info/60' },
+      ].map((tile) =>
+        onSelectStatus ? (
+          // Each counter is also the board's status filter: click "Booked" to
+          // see the booked loads.
+          <button
+            key={tile.key}
+            type="button"
+            aria-pressed={activeStatus === tile.key}
+            aria-label={`${tile.label}: ${counts[tile.key]} loads`}
+            onClick={() => onSelectStatus(tile.key)}
+            className={`min-w-0 rounded-3xl text-left transition duration-200 ease-smooth hover:-translate-y-0.5 active:scale-[0.98] ${
+              activeStatus === tile.key ? `ring-2 ${tile.ring}` : 'opacity-80 hover:opacity-100'
+            }`}
+          >
+            <StatTile label={tile.label} value={counts[tile.key]} accentClassName={tile.accent} />
+          </button>
+        ) : (
+          <StatTile key={tile.key} label={tile.label} value={counts[tile.key]} accentClassName={tile.accent} />
+        )
+      )}
     </div>
   );
 }

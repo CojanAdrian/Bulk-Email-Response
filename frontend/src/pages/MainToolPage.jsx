@@ -73,6 +73,7 @@ function CarriersViewToggle({ carriersView, onChange }) {
 function MainToolPage({ username, onLogout }) {
   const [tab, setTab] = useState('loads'); // 'loads' | 'inquiries'
   const [refreshKey, setRefreshKey] = useState(0);
+  const [loadsStatus, setLoadsStatus] = useState('active');
   const [selectedLoad, setSelectedLoad] = useState(null);
   const [addLoadOpen, setAddLoadOpen] = useState(false);
   const [blastTarget, setBlastTarget] = useState(null);
@@ -138,7 +139,7 @@ function MainToolPage({ username, onLogout }) {
         <AnimatePresence>
           {tab === 'loads' && (
             <motion.main key="loads" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
-              <LoadsStatsRow refreshKey={refreshKey} />
+              <LoadsStatsRow refreshKey={refreshKey} activeStatus={loadsStatus} onSelectStatus={setLoadsStatus} />
               <UploadPanel
                 onUploadComplete={handleUploadComplete}
                 headerActions={
@@ -157,6 +158,8 @@ function MainToolPage({ username, onLogout }) {
                 onSelectLoad={setSelectedLoad}
                 onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
                 onViewMatches={handleViewMatches}
+                statusFilter={loadsStatus}
+                onStatusFilterChange={setLoadsStatus}
               />
               <DatExportSection ref={datExportRef} refreshKey={refreshKey} />
             </motion.main>
