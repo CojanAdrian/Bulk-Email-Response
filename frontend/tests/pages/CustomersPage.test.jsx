@@ -8,8 +8,8 @@ vi.mock('../../src/api/customers');
 vi.mock('../../src/api/carriers');
 
 const CUSTOMERS = [
-  { name: 'ALDI, Inc', loadCount: 12, carrierCount: 3, lastActivity: '2026-10-10T08:00:00' },
-  { name: 'Kroger', loadCount: 4, carrierCount: 1, lastActivity: '2026-09-01T08:00:00' },
+  { name: 'ALDI, Inc', loadCount: 12, contractLoads: 12, spotLoads: 0, loadType: 'contract', carrierCount: 3, lastActivity: '2026-10-10T08:00:00' },
+  { name: 'Kroger', loadCount: 4, contractLoads: 0, spotLoads: 4, loadType: 'spot', carrierCount: 1, lastActivity: '2026-09-01T08:00:00' },
 ];
 
 const CARRIERS = [
@@ -34,7 +34,7 @@ describe('CustomersPage', () => {
     expect(within(list).getByText('Kroger')).toBeInTheDocument();
 
     expect(await screen.findByText('Swift Haul LLC')).toBeInTheDocument();
-    expect(customersApi.getCustomerCarriers).toHaveBeenCalledWith({ name: 'ALDI, Inc', range: 'all', equipment: '' });
+    expect(customersApi.getCustomerCarriers).toHaveBeenCalledWith({ name: 'ALDI, Inc', range: 'all', equipment: '', loadType: 'all' });
     expect(screen.getByText('3 runs')).toBeInTheDocument();
     expect(screen.getByText('$1,980')).toBeInTheDocument();
     expect(screen.getByText('$240.50')).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe('CustomersPage', () => {
     render(<CustomersPage />);
     fireEvent.click(await screen.findByRole('button', { name: /kroger/i }));
     await waitFor(() => {
-      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'Kroger', range: 'all', equipment: '' });
+      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'Kroger', range: 'all', equipment: '', loadType: 'all' });
     });
     expect(screen.getByRole('button', { name: /kroger/i })).toHaveAttribute('aria-pressed', 'true');
   });
@@ -55,11 +55,11 @@ describe('CustomersPage', () => {
     await screen.findByText('Swift Haul LLC');
     fireEvent.click(screen.getByRole('radio', { name: /30 days/i }));
     await waitFor(() => {
-      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: '' });
+      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: '', loadType: 'all' });
     });
     chooseOption(/equipment/i, 'Reefer R');
     await waitFor(() => {
-      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: 'R' });
+      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'ALDI, Inc', range: '30', equipment: 'R', loadType: 'all' });
     });
   });
 
@@ -83,5 +83,17 @@ describe('CustomersPage', () => {
     customersApi.getCustomerCarriers.mockResolvedValue([]);
     render(<CustomersPage />);
     expect(await screen.findByText(/no carrier runs in this view/i)).toBeInTheDocument();
+  });
+
+  test('the Spot filter keeps only customers who ship spot with us, and narrows the carriers too', async () => {
+    render(<CustomersPage />);
+    const list = await screen.findByRole('list', { name: /customers/i });
+    expect(within(list).getByText('Contract')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('radio', { name: /spot/i }));
+    expect(within(list).queryByText('ALDI, Inc')).not.toBeInTheDocument();
+    fireEvent.click(within(list).getByRole('button', { name: /kroger/i }));
+    await waitFor(() => {
+      expect(customersApi.getCustomerCarriers).toHaveBeenLastCalledWith({ name: 'Kroger', range: 'all', equipment: '', loadType: 'spot' });
+    });
   });
 });

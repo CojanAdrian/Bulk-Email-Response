@@ -20,6 +20,34 @@ const RANGE_OPTIONS = [
   { value: 'all', label: 'All time' },
 ];
 
+const TYPE_OPTIONS = [
+  { value: 'all', label: 'All' },
+  { value: 'contract', label: 'Contract' },
+  { value: 'spot', label: 'Spot' },
+];
+
+const TYPE_TAG = {
+  contract: { label: 'Contract', className: 'bg-info-bg text-info' },
+  spot: { label: 'Spot', className: 'bg-warning-bg text-warning' },
+  mixed: { label: 'Contract + spot', className: 'bg-tag-bg text-tag' },
+};
+
+function TypeTag({ type, active }) {
+  const tag = TYPE_TAG[type];
+  if (!tag) return null;
+  return (
+    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${active ? 'bg-accent-ink/15 text-accent-ink' : tag.className}`}>
+      {tag.label}
+    </span>
+  );
+}
+
+function countForType(customer, type) {
+  if (type === 'contract') return customer.contractLoads || 0;
+  if (type === 'spot') return customer.spotLoads || 0;
+  return customer.loadCount || 0;
+}
+
 function plural(n, word) {
   return `${n} ${word}${n === 1 ? '' : 's'}`;
 }
@@ -34,11 +62,21 @@ function EmptyState({ icon, title, children }) {
   );
 }
 
-function CustomerList({ customers, status, query, onQueryChange, selected, onSelect }) {
+function CustomerList({ customers, status, query, onQueryChange, selected, onSelect, typeFilter, onTypeFilterChange }) {
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return q ? customers.filter((c) => c.name.toLowerCase().includes(q)) : customers;
-  }, [customers, query]);
+    let list = q ? customers.filter((c) => c.name.toLowerCase().includes(q)) : customers;
+    // Contract / Spot: only customers who ship that way with us, busiest first.
+    if (typeFilter !== 'all') {
+      list = list.filter((c) => countForType(c, typeFilter) > 0).sort((a, b) => countForType(b, typeFilter) - countForType(a, typeFilter));
+    }
+    return list;
+  }, [customers, query, typeFilter]);
+
+  const typeOptions = TYPE_OPTIONS.map((o) => ({
+    ...o,
+    count: o.value === 'all' ? customers.length : customers.filter((c) => countForType(c, o.value) > 0).length,
+  }));
 
   return (
     <Card className="flex max-h-[45vh] min-h-0 flex-col p-3 sm:p-4 md:sticky md:top-20 md:max-h-[calc(100vh-7rem)]">
@@ -54,6 +92,8 @@ function CustomerList({ customers, status, query, onQueryChange, selected, onSel
           className="w-full rounded-xl border border-border bg-surface-alt py-2.5 pl-9 pr-3 text-sm text-text placeholder:text-text-muted focus:border-focus focus:outline-none"
         />
       </label>
+
+      <SegmentedControl ariaLabel="Customer load type" size="sm" options={typeOptions} value={typeFilter} onChange={onTypeFilterChange} className="mb-3" />
 
       {status === 'loading' && <Skeleton count={6} height="3.25rem" />}
       {status === 'error' && (
@@ -83,11 +123,15 @@ function CustomerList({ customers, status, query, onQueryChange, selected, onSel
                     active ? 'bg-accent text-accent-ink' : 'text-text hover:bg-surface-alt'
                   }`}
                 >
-                  <span className="block truncate text-sm font-semibold" title={customer.name}>
-                    {customer.name}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="min-w-0 flex-1 truncate text-sm font-semibold" title={customer.name}>
+                      {customer.name}
+                    </span>
+                    <TypeTag type={customer.loadType} active={active} />
                   </span>
                   <span className={`block truncate text-xs ${active ? 'text-accent-ink/80' : 'text-text-muted'}`}>
-                    {plural(customer.loadCount, 'load')} · {plural(customer.carrierCount, 'carrier')}
+                    {typeFilter === 'all' ? plural(customer.loadCount, 'load') : plural(countForType(customer, typeFilter), typeFilter + ' load')} ·{' '}
+                    {plural(customer.carrierCount, 'carrier')}
                     {customer.lastActivity ? ` · ${formatDayAgo(customer.lastActivity)}` : ''}
                   </span>
                 </button>
@@ -163,6 +207,7 @@ function CustomersPage() {
   const [selected, setSelected] = usePersistentState('customers.selected', null);
   const [range, setRange] = usePersistentState('customers.range', 'all');
   const [equipment, setEquipment] = usePersistentState('customers.equipment', '');
+  const [typeFilter, setTypeFilter] = usePersistentState('customers.loadType', 'all');
   const [carriers, setCarriers] = useState([]);
   const [carrierStatus, setCarrierStatus] = useState('idle');
   const [detailCarrierId, setDetailCarrierId] = useState(null);
@@ -197,7 +242,7 @@ function CustomersPage() {
     if (!effectiveSelected) return undefined;
     let cancelled = false;
     setCarrierStatus('loading');
-    getCustomerCarriers({ name: effectiveSelected, range, equipment })
+    getCustomerCarriers({ name: effectiveSelected, range, equipment, loadType: typeFilter })
       .then((rows) => {
         if (cancelled) return;
         setCarriers(rows);
@@ -209,7 +254,7 @@ function CustomersPage() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveSelected, range, equipment, reloadKey]);
+  }, [effectiveSelected, range, equipment, typeFilter, reloadKey]);
 
   const selectedCustomer = customers.find((c) => c.name === effectiveSelected);
 
@@ -222,6 +267,8 @@ function CustomersPage() {
         onQueryChange={setQuery}
         selected={effectiveSelected}
         onSelect={setSelected}
+        typeFilter={typeFilter}
+        onTypeFilterChange={setTypeFilter}
       />
 
       <section aria-label="Carriers for this customer" className="min-w-0 space-y-4">
@@ -229,8 +276,12 @@ function CustomersPage() {
           <Card className="space-y-4">
             <div className="min-w-0">
               <h2 className="break-words font-display text-xl font-bold tracking-tight text-text sm:text-2xl">{selectedCustomer.name}</h2>
-              <p className="text-sm text-text-muted">
-                {plural(selectedCustomer.loadCount, 'load')} · {plural(selectedCustomer.carrierCount, 'carrier')} have hauled for them
+              <p className="flex flex-wrap items-center gap-2 text-sm text-text-muted">
+                <span>
+                  {plural(selectedCustomer.loadCount, 'load')} ({selectedCustomer.contractLoads || 0} contract · {selectedCustomer.spotLoads || 0} spot) ·{' '}
+                  {plural(selectedCustomer.carrierCount, 'carrier')} have hauled for them
+                </span>
+                <TypeTag type={selectedCustomer.loadType} />
               </p>
             </div>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

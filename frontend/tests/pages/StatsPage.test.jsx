@@ -22,7 +22,7 @@ const STATS_RESPONSE = {
       gp: 100,
       driver_name: 'Bob',
       carrier_name: 'Acme Trucking',
-      booked_date: '2026-09-10',
+      booked_date: '2026-09-10', booked_at: '2026-09-10T14:05:00',
     },
     {
       id: 2,
@@ -111,7 +111,7 @@ describe('StatsPage', () => {
     loadsApi.getLoadsStats.mockResolvedValue(STATS_RESPONSE);
     render(<StatsPage />);
     await waitFor(() => expect(loadsApi.getLoadsStats).toHaveBeenCalledTimes(1));
-    expect(loadsApi.getLoadsStats.mock.calls[0][0]).toMatchObject({ sort: 'ran_at', direction: 'desc' });
+    expect(loadsApi.getLoadsStats.mock.calls[0][0]).toMatchObject({ sort: 'booked_at', direction: 'desc' });
 
     await userEvent.click(screen.getByRole('button', { name: 'GP' }));
     await waitFor(() => expect(loadsApi.getLoadsStats).toHaveBeenCalledTimes(2));
@@ -137,5 +137,13 @@ describe('StatsPage', () => {
     });
 
     await waitFor(() => expect(loadsApi.getLoadsStats).toHaveBeenCalledTimes(2));
+  });
+
+  test('shows when each load was booked and can sort by it', async () => {
+    loadsApi.getLoadsStats.mockResolvedValue(STATS_RESPONSE);
+    render(<StatsPage />);
+    await waitFor(() => expect(screen.getByText(/booked sep 10, 2026/i)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole('button', { name: /^booked/i }));
+    await waitFor(() => expect(loadsApi.getLoadsStats).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'booked_at', direction: 'asc' })));
   });
 });

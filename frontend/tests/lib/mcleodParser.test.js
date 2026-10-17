@@ -212,3 +212,15 @@ describe('parseMcleodRows customer column', () => {
     expect(loads[0]).not.toHaveProperty('customer');
   });
 });
+
+describe('parseMcleodRows rev code column', () => {
+  test('reads Rev Code so the backend can tell contract from spot loads', () => {
+    const { loads } = parseMcleodRows([...FIELDS, 'Rev Code', 'Customer'], [row({ 'Rev Code': 'CONT', Customer: 'ALDI, Inc' })]);
+    expect(loads[0]).toMatchObject({ rev_code: 'CONT', customer: 'ALDI, Inc' });
+  });
+
+  test('omits rev_code when the CSV has no Rev Code column', () => {
+    const { loads } = parseMcleodRows(FIELDS, [row()]);
+    expect(loads[0]).not.toHaveProperty('rev_code');
+  });
+});

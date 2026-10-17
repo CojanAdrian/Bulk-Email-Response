@@ -33,6 +33,16 @@ setInterval(() => {
   pollAllAccounts(pool, wsHub).catch((err) => console.error('Email poll cycle failed:', err));
 }, POLL_INTERVAL_MS);
 
-server.listen(port, () => {
-  console.log(`Backend listening on port ${port}`);
-});
+// Apply any pending schema migrations before taking traffic. A failure is
+// logged but doesn't stop the server -- the app still runs on whatever
+// schema is there, the same as before this existed.
+const { ensureSchema } = require('../scripts/setup-db');
+
+ensureSchema(process.env.DB_NAME)
+  .then(() => console.log('Database schema is up to date.'))
+  .catch((err) => console.error('Automatic schema migration failed:', err))
+  .finally(() => {
+    server.listen(port, () => {
+      console.log(`Backend listening on port ${port}`);
+    });
+  });

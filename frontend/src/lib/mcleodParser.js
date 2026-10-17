@@ -17,6 +17,7 @@ export const OPTIONAL_COLS = {
   stops: ['stops', 'stop count', 'num stops', 'number of stops'],
   origZip: ['origin zip', 'origin postal code', 'orig zip', 'orig zip code', 'pickup zip', 'pu zip', 'origin postal', 'origin zip code'],
   customer: ['customer', 'customer name', 'bill to', 'bill to name'],
+  revCode: ['rev code', 'revenue code', 'rev', 'load type', 'order type'],
   destZip: ['dest zip', 'destination zip', 'dest postal code', 'dest zip code', 'delivery zip', 'del zip', 'drop zip', 'destination postal', 'destination postal code', 'destination zip code'],
 };
 
@@ -169,6 +170,9 @@ function mapRowToLoad(row, colMap) {
     // Only sent when the CSV has a Customer column, so re-uploading an
     // export without one never wipes customers already saved on loads.
     ...(colMap.customer ? { customer: cleanText(row[colMap.customer]) || null } : {}),
+    // McLeod "Rev Code" (CONT / SPOT): the backend turns it into the load's
+    // contract-vs-spot type. Same "only when the column exists" rule.
+    ...(colMap.revCode ? { rev_code: cleanText(row[colMap.revCode]) || null } : {}),
   };
 }
 

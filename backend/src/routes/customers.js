@@ -27,7 +27,7 @@ function createCustomersRouter(pool) {
   router.get('/', asyncHandler(async (req, res) => {
     const userId = req.session.userId;
     const [loadRows] = await pool.query(
-      `SELECT TRIM(customer) AS name, DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s') AS activity
+      `SELECT TRIM(customer) AS name, load_type, DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s') AS activity
        FROM loads WHERE user_id = ? AND customer IS NOT NULL AND TRIM(customer) <> ''`,
       [userId]
     );
@@ -42,12 +42,14 @@ function createCustomersRouter(pool) {
     const byKey = new Map();
     function entryFor(name) {
       const key = name.toLowerCase();
-      if (!byKey.has(key)) byKey.set(key, { name, loadCount: 0, carriers: new Set(), lastActivity: null });
+      if (!byKey.has(key)) byKey.set(key, { name, loadCount: 0, contractLoads: 0, spotLoads: 0, carriers: new Set(), lastActivity: null });
       return byKey.get(key);
     }
     for (const row of loadRows) {
       const entry = entryFor(row.name);
       entry.loadCount += 1;
+      if (row.load_type === 'contract') entry.contractLoads += 1;
+      if (row.load_type === 'spot') entry.spotLoads += 1;
       entry.lastActivity = later(entry.lastActivity, row.activity);
     }
     for (const row of historyRows) {
@@ -58,7 +60,16 @@ function createCustomersRouter(pool) {
     }
 
     const list = [...byKey.values()]
-      .map((e) => ({ name: e.name, loadCount: e.loadCount, carrierCount: e.carriers.size, lastActivity: e.lastActivity }))
+      .map((e) => ({
+        name: e.name,
+        loadCount: e.loadCount,
+        contractLoads: e.contractLoads,
+        spotLoads: e.spotLoads,
+        // How this customer mostly ships with us.
+        loadType: e.contractLoads && e.spotLoads ? 'mixed' : e.contractLoads ? 'contract' : e.spotLoads ? 'spot' : null,
+        carrierCount: e.carriers.size,
+        lastActivity: e.lastActivity,
+      }))
       .sort((a, b) => String(b.lastActivity ?? '').localeCompare(String(a.lastActivity ?? '')) || a.name.localeCompare(b.name));
     res.json(list);
   }));
@@ -71,6 +82,10 @@ function createCustomersRouter(pool) {
     }
     const conditions = ['h.user_id = ?', `LOWER(${EFFECTIVE_CUSTOMER}) = LOWER(?)`];
     const values = [req.session.userId, name];
+    if (req.query.loadType === 'contract' || req.query.loadType === 'spot') {
+      conditions.push('l.load_type = ?');
+      values.push(req.query.loadType);
+    }
     const days = RANGE_DAYS[req.query.range];
     if (days) {
       conditions.push('COALESCE(h.ran_at, DATE(h.created_at)) >= (CURDATE() - INTERVAL ? DAY)');

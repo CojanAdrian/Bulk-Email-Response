@@ -7,12 +7,21 @@ import StatTile from '../components/StatTile';
 import Skeleton from '../components/Skeleton';
 
 const SORT_COLUMNS = [
+  { key: 'booked_at', label: 'Booked' },
   { key: 'load_number', label: 'Load #' },
   { key: 'ran_at', label: 'Date' },
   { key: 'target_pay', label: 'Target Pay' },
   { key: 'rate', label: 'Rate' },
   { key: 'gp', label: 'GP' },
 ];
+
+// "Oct 17, 3:24 PM" -- the moment the load was marked booked.
+function formatBookedAt(value) {
+  if (!value) return '—';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
 
 function money(value) {
   return value === null || value === undefined ? '—' : `$${Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
@@ -68,7 +77,7 @@ function StatsPage() {
   const [customFrom, setCustomFrom] = useState('');
   const [customTo, setCustomTo] = useState('');
   const [usingCustomRange, setUsingCustomRange] = useState(false);
-  const [sort, setSort] = useState({ key: 'ran_at', direction: 'desc' });
+  const [sort, setSort] = useState({ key: 'booked_at', direction: 'desc' });
   const [data, setData] = useState(null);
   const [status, setStatus] = useState('loading');
   const [error, setError] = useState(null);
@@ -178,9 +187,17 @@ function StatsPage() {
                       {load.dest_city}, {load.dest_state}
                     </p>
                     <p className="shrink-0 text-xs text-text-muted">
-                      <span>{load.load_number}</span> · <span>{load.booked_date}</span>
+                      <span className="font-semibold text-text">{load.load_number}</span> ·{' '}
+                      <time dateTime={load.booked_at || undefined} title="When it was marked booked">
+                        Booked {formatBookedAt(load.booked_at)}
+                      </time>
                     </p>
                   </div>
+                  {(load.customer || load.load_type) && (
+                    <p className="mt-1 truncate text-xs text-text-muted">
+                      {[load.customer, load.load_type === 'contract' ? 'Contract' : load.load_type === 'spot' ? 'Spot' : null].filter(Boolean).join(' · ')}
+                    </p>
+                  )}
                   <dl className="mt-2 grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
                     <div className="min-w-0">
                       <dt className="text-text-muted">Carrier</dt>

@@ -156,4 +156,30 @@ describe('proven lanes and customers routes', () => {
       expect(vanOnly.body.map((c) => c.carrierName)).toEqual(['Swift Haul']);
     });
   });
+
+  describe('contract vs spot', () => {
+    test('customers report contract and spot load counts and their main type', async () => {
+      await makeLoad({ load_number: 'C1', customer: 'ALDI, Inc', load_type: 'contract' });
+      await makeLoad({ load_number: 'C2', customer: 'ALDI, Inc', load_type: 'contract' });
+      await makeLoad({ load_number: 'S1', customer: 'Kroger', load_type: 'spot' });
+      await makeLoad({ load_number: 'M1', customer: 'Target', load_type: 'spot' });
+      await makeLoad({ load_number: 'M2', customer: 'Target', load_type: 'contract' });
+      const res = await agent.get('/api/customers');
+      const byName = Object.fromEntries(res.body.map((c) => [c.name, c]));
+      expect(byName['ALDI, Inc']).toMatchObject({ contractLoads: 2, spotLoads: 0, loadType: 'contract' });
+      expect(byName.Kroger).toMatchObject({ spotLoads: 1, loadType: 'spot' });
+      expect(byName.Target.loadType).toBe('mixed');
+    });
+
+    test('carriers can be narrowed to runs on contract or spot loads', async () => {
+      const contract = await makeLoad({ load_number: 'C1', customer: 'ALDI, Inc', load_type: 'contract' });
+      const spot = await makeLoad({ load_number: 'S1', customer: 'ALDI, Inc', load_type: 'spot' });
+      const a = await makeCarrier('Contract Hauler');
+      await makeRun(a, { load_id: contract });
+      const b = await makeCarrier('Spot Hauler');
+      await makeRun(b, { load_id: spot });
+      const res = await agent.get('/api/customers/carriers').query({ name: 'ALDI, Inc', loadType: 'spot' });
+      expect(res.body.map((c) => c.carrierName)).toEqual(['Spot Hauler']);
+    });
+  });
 });

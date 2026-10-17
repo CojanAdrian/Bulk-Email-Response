@@ -7,7 +7,7 @@ const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'raw_equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'late_del', 'stops',
-  'commodity', 'temperature', 'comment', 'customer',
+  'commodity', 'temperature', 'comment', 'customer', 'rev_code', 'load_type',
 ];
 
 // Deliberately excludes load_number (the upload/matching key -- editing it here
@@ -19,15 +19,26 @@ const EDITABLE_FIELDS = [
   'dest_city', 'dest_state', 'dest_zip', 'equipment', 'weight',
   'target_pay', 'early_pu', 'late_pu', 'early_del', 'late_del', 'stops',
   'commodity', 'temperature', 'comment', 'status', 'custom_reply_body',
-  'include_rate', 'extra_stops', 'customer',
+  'include_rate', 'extra_stops', 'customer', 'load_type',
 ];
 
 const STATUS_VALUES = ['active', 'booked', 'covered'];
+const LOAD_TYPES = ['contract', 'spot'];
+
+// McLeod's "Rev Code" -> how the load was sold: CONT(ract) loads are part
+// of a customer's contracted freight, SPOT loads are one-off market loads.
+function loadTypeFromRevCode(revCode) {
+  const code = String(revCode || '').trim().toUpperCase();
+  if (code.startsWith('CONT')) return 'contract';
+  if (code.startsWith('SPOT')) return 'spot';
+  return null;
+}
 
 // Whitelisted so the sort column can never come from unvalidated user input
 // straight into an ORDER BY clause.
 const STATS_SORT_COLUMNS = {
   gp: 'gp', rate: 'rate', target_pay: 'l.target_pay', ran_at: 'booked_date', load_number: 'l.load_number',
+  booked_at: 'booked_at_raw',
 };
 
 // Manually-typed city/state values get title-cased/uppercased so a reply or
@@ -43,6 +54,15 @@ function normalizeLoadBody(body) {
   if ('customer' in normalized) {
     const trimmed = normalized.customer === null || normalized.customer === undefined ? '' : String(normalized.customer).trim();
     normalized.customer = trimmed === '' ? null : trimmed;
+  }
+  if ('rev_code' in normalized) {
+    const code = normalized.rev_code === null || normalized.rev_code === undefined ? '' : String(normalized.rev_code).trim().toUpperCase();
+    normalized.rev_code = code === '' ? null : code;
+    if (!('load_type' in normalized)) normalized.load_type = loadTypeFromRevCode(code);
+  }
+  if ('load_type' in normalized) {
+    const type = normalized.load_type === null || normalized.load_type === undefined ? '' : String(normalized.load_type).trim().toLowerCase();
+    normalized.load_type = LOAD_TYPES.includes(type) ? type : null;
   }
   if ('extra_stops' in normalized && Array.isArray(normalized.extra_stops)) {
     normalized.extra_stops = normalized.extra_stops.map((stop) =>
@@ -106,7 +126,12 @@ function createLoadsRouter(pool, wsHub) {
         -- serializes through res.json() shifted by the server's local
         -- timezone (a booked_date of "2026-09-10" silently becoming
         -- "2026-09-09T21:00:00.000Z"). A formatted string sidesteps that.
-        DATE_FORMAT(COALESCE(h.ran_at, DATE(l.updated_at)), '%Y-%m-%d') AS booked_date
+        DATE_FORMAT(COALESCE(h.ran_at, DATE(l.updated_at)), '%Y-%m-%d') AS booked_date,
+        -- When it was marked booked (exact time); older loads booked before
+        -- booked_at existed fall back to their carrier entry / last update.
+        DATE_FORMAT(COALESCE(l.booked_at, h.created_at, l.updated_at), '%Y-%m-%dT%H:%i:%s') AS booked_at,
+        COALESCE(l.booked_at, h.created_at, l.updated_at) AS booked_at_raw,
+        l.customer, l.load_type
       FROM loads l
       LEFT JOIN (
         SELECT *, ROW_NUMBER() OVER (PARTITION BY load_id ORDER BY created_at DESC) AS rn
@@ -117,7 +142,8 @@ function createLoadsRouter(pool, wsHub) {
       WHERE ${conditions.join(' AND ')}
       ORDER BY ${sortColumn} ${sortDirection}
     `;
-    const [rows] = await pool.query(sql, params);
+    const [rawRows] = await pool.query(sql, params);
+    const rows = rawRows.map(({ booked_at_raw: _sortOnly, ...row }) => row);
 
     const totals = rows.reduce(
       (acc, row) => ({
@@ -213,7 +239,7 @@ function createLoadsRouter(pool, wsHub) {
   }));
 
   router.patch('/:id', asyncHandler(async (req, res) => {
-    const [existingRows] = await pool.query('SELECT id, user_id FROM loads WHERE id = ?', [req.params.id]);
+    const [existingRows] = await pool.query('SELECT id, user_id, status FROM loads WHERE id = ?', [req.params.id]);
     const existing = existingRows[0];
     const isAdmin = req.session.role === 'admin';
     if (!existing || (!isAdmin && existing.user_id !== req.session.userId)) {
@@ -231,6 +257,11 @@ function createLoadsRouter(pool, wsHub) {
     }
     if (updates.length === 0) {
       return res.status(400).json({ error: 'No valid fields to update' });
+    }
+    // Stamp the moment a load becomes booked (Stats shows and sorts by it);
+    // moving it off booked clears it.
+    if (body.status !== undefined && body.status !== existing.status) {
+      updates.push(body.status === 'booked' ? 'booked_at = NOW()' : 'booked_at = NULL');
     }
     values.push(req.params.id);
     await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
@@ -290,10 +321,13 @@ function createLoadsRouter(pool, wsHub) {
     }
     const isAdmin = req.session.role === 'admin';
     const placeholders = ids.map(() => '?').join(', ');
+    // booked_at is assigned before status: MySQL evaluates SET left to right
+    // with already-updated values, so this still sees the old status.
+    const setClause = "booked_at = IF(? = 'booked', IF(status = 'booked', COALESCE(booked_at, NOW()), NOW()), NULL), status = ?";
     const sql = isAdmin
-      ? `UPDATE loads SET status = ? WHERE id IN (${placeholders})`
-      : `UPDATE loads SET status = ? WHERE id IN (${placeholders}) AND user_id = ?`;
-    const params = isAdmin ? [status, ...ids] : [status, ...ids, req.session.userId];
+      ? `UPDATE loads SET ${setClause} WHERE id IN (${placeholders})`
+      : `UPDATE loads SET ${setClause} WHERE id IN (${placeholders}) AND user_id = ?`;
+    const params = isAdmin ? [status, status, ...ids] : [status, status, ...ids, req.session.userId];
     const [result] = await pool.query(sql, params);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', {});
     res.json({ updated: result.affectedRows });

@@ -319,14 +319,19 @@ async function migrateSchema(databaseName) {
   // Customer the load was for (McLeod CSV's "Customer" column, or typed on
   // Add/Edit Load) -- and on lane history, for a run logged by hand that
   // isn't linked to a load. Powers the Customers tab.
+  // rev_code is McLeod's raw "Rev Code" (e.g. CONT); load_type is what it
+  // means for us -- 'contract' or 'spot' -- so customers can be split by it.
   const customerColumns = [
-    ['loads', `ALTER TABLE loads ADD COLUMN customer VARCHAR(255) NULL`],
-    ['carrier_lane_history', `ALTER TABLE carrier_lane_history ADD COLUMN customer VARCHAR(255) NULL`],
+    ['loads', 'customer', `ALTER TABLE loads ADD COLUMN customer VARCHAR(255) NULL`],
+    ['carrier_lane_history', 'customer', `ALTER TABLE carrier_lane_history ADD COLUMN customer VARCHAR(255) NULL`],
+    ['loads', 'rev_code', `ALTER TABLE loads ADD COLUMN rev_code VARCHAR(20) NULL`],
+    ['loads', 'load_type', `ALTER TABLE loads ADD COLUMN load_type VARCHAR(20) NULL`],
+    ['loads', 'booked_at', `ALTER TABLE loads ADD COLUMN booked_at DATETIME NULL`],
   ];
-  for (const [tableName, alterSql] of customerColumns) {
+  for (const [tableName, columnName, alterSql] of customerColumns) {
     const [col] = await conn.query(
-      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = 'customer'`,
-      [databaseName, tableName]
+      `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [databaseName, tableName, columnName]
     );
     if (col[0].count === 0) {
       await conn.query(alterSql);
@@ -354,7 +359,32 @@ async function main() {
   console.log('Database setup complete.');
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Brings an existing database up to date: re-runs schema.sql (every table
+// is CREATE TABLE IF NOT EXISTS) and every idempotent column migration.
+// Called by server.js on every boot, so a deploy never runs new code
+// against a database that's missing its new columns.
+async function ensureSchema(databaseName) {
+  const conn = await mysql.createConnection({
+    host: process.env.DB_HOST,
+    port: Number(process.env.DB_PORT) || 3306,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    database: databaseName,
+    multipleStatements: true,
+  });
+  try {
+    await conn.query(schema);
+  } finally {
+    await conn.end();
+  }
+  await migrateSchema(databaseName);
+}
+
+module.exports = { ensureSchema, migrateSchema };
+
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

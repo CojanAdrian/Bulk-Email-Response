@@ -1039,4 +1039,40 @@ describe('loads routes', () => {
     const patched = await agent.patch(`/api/loads/${created.body.id}`).send({ customer: '   ' });
     expect(patched.body.customer).toBeNull();
   });
+
+  test('upload reads the load type from McLeod Rev Code (CONT = contract, SPOT = spot)', async () => {
+    await agent.post('/api/loads/upload').send({ loads: [
+      { load_number: 'R1', rev_code: 'cont' },
+      { load_number: 'R2', rev_code: 'SPOT' },
+      { load_number: 'R3', rev_code: 'XYZ' },
+    ] });
+    const [rows] = await pool.query('SELECT load_number, rev_code, load_type FROM loads ORDER BY load_number');
+    expect(rows).toEqual([
+      { load_number: 'R1', rev_code: 'CONT', load_type: 'contract' },
+      { load_number: 'R2', rev_code: 'SPOT', load_type: 'spot' },
+      { load_number: 'R3', rev_code: 'XYZ', load_type: null },
+    ]);
+  });
+
+  test('marking a load booked stamps booked_at; moving it off booked clears it; stats expose it', async () => {
+    const created = await agent.post('/api/loads').send({ load_number: 'B1' });
+    await agent.patch(`/api/loads/${created.body.id}`).send({ status: 'booked' });
+    let [rows] = await pool.query('SELECT booked_at FROM loads WHERE id = ?', [created.body.id]);
+    expect(rows[0].booked_at).not.toBeNull();
+
+    const stats = await agent.get('/api/loads/stats').query({ sort: 'booked_at', direction: 'desc' });
+    expect(stats.body.loads[0].booked_at).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+    expect(stats.body.loads[0]).not.toHaveProperty('booked_at_raw');
+
+    await agent.patch(`/api/loads/${created.body.id}`).send({ status: 'active' });
+    [rows] = await pool.query('SELECT booked_at FROM loads WHERE id = ?', [created.body.id]);
+    expect(rows[0].booked_at).toBeNull();
+  });
+
+  test('bulk-booking stamps booked_at too', async () => {
+    const a = await agent.post('/api/loads').send({ load_number: 'BB1' });
+    await agent.post('/api/loads/bulk-status').send({ ids: [a.body.id], status: 'booked' });
+    const [rows] = await pool.query('SELECT booked_at FROM loads WHERE id = ?', [a.body.id]);
+    expect(rows[0].booked_at).not.toBeNull();
+  });
 });
