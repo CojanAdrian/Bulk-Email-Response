@@ -1,4 +1,5 @@
 import { motion } from 'framer-motion';
+import Portal from './Portal';
 import { useMotionPreset } from '../lib/motionConfig';
 import BookingCarrierFields from './BookingCarrierFields';
 import ModalCard from './ModalCard';
@@ -14,31 +15,33 @@ const MotionModalCard = motion(ModalCard);
 function BookingCarrierModal({ load, onClose }) {
   const preset = useMotionPreset();
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="booking-carrier-modal-title"
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
-      {...preset.modal.backdrop}
-    >
-      <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
-        <h2 id="booking-carrier-modal-title" className="mb-1 text-lg font-semibold text-text">
-          Who's running load {load.load_number}?
-        </h2>
-        <p className="mb-4 text-sm text-text-muted">Marked as booked -- log the carrier now, or skip and add it later from the load.</p>
-        <BookingCarrierFields
-          loadId={load.id}
-          originCity={load.origin_city}
-          originState={load.origin_state}
-          destCity={load.dest_city}
-          destState={load.dest_state}
-          targetPay={load.target_pay}
-        />
-        <div className="flex justify-end">
-          <SecondaryButton onClick={onClose}>Close</SecondaryButton>
-        </div>
-      </MotionModalCard>
-    </motion.div>
+    <Portal>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="booking-carrier-modal-title"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        {...preset.modal.backdrop}
+      >
+        <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
+          <h2 id="booking-carrier-modal-title" className="mb-1 text-lg font-semibold text-text">
+            Who's running load {load.load_number}?
+          </h2>
+          <p className="mb-4 text-sm text-text-muted">Marked as booked -- log the carrier now, or skip and add it later from the load.</p>
+          <BookingCarrierFields
+            loadId={load.id}
+            originCity={load.origin_city}
+            originState={load.origin_state}
+            destCity={load.dest_city}
+            destState={load.dest_state}
+            targetPay={load.target_pay}
+          />
+          <div className="flex justify-end">
+            <SecondaryButton onClick={onClose}>Close</SecondaryButton>
+          </div>
+        </MotionModalCard>
+      </motion.div>
+    </Portal>
   );
 }
 

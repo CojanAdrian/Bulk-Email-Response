@@ -24,9 +24,9 @@ describe('AddLoadModal', () => {
 
   test('sends the customer, and suggests customers already in the system', async () => {
     loadsApi.createLoad.mockResolvedValue({ id: 1, load_number: 'L1001' });
-    const { container } = render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
+    render(<AddLoadModal onClose={vi.fn()} onCreated={vi.fn()} />);
     await waitFor(() => {
-      expect(container.querySelectorAll('datalist option')).toHaveLength(2);
+      expect(document.querySelectorAll('datalist option')).toHaveLength(2);
     });
 
     fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'L1001' } });

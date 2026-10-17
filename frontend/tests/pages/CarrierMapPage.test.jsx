@@ -164,12 +164,13 @@ describe('CarrierMapPage', () => {
 
   test('flags a match whose equipment doesn\'t cover what was searched for', async () => {
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({
-      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10, equipmentMismatch: true }],
+      laneMatches: [{ carrierId: 1, carrierName: 'ABC Trucking', tier: 'perfect', originDistanceMiles: 10, equipmentMismatch: true, knownEquipment: ['SB'] }],
       regionalMatches: [],
     });
-    render(<CarrierMapPage focusedLoad={FOCUSED_LOAD} />);
+    render(<CarrierMapPage focusedLoad={{ ...FOCUSED_LOAD, equipment: 'V' }} />);
     await waitFor(() => screen.getByText('ABC Trucking'));
-    expect(screen.getByText(/equipment\?/i)).toBeInTheDocument();
+    expect(screen.getByText('No Van')).toBeInTheDocument();
+    expect(screen.getByText('Straight/Box Truck')).toBeInTheDocument();
   });
 
   test('a deep-linked load\'s current lane is drawn on the map using the response\'s geocoded coordinates -- not the load\'s own (always-null) lat/lng columns', async () => {

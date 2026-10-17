@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Portal from './Portal';
 import { motion } from 'framer-motion';
 import { useMotionPreset } from '../lib/motionConfig';
 import ModalCard from './ModalCard';
@@ -21,54 +22,56 @@ function ContactMethodModal({ onCancel, onConfirm }) {
   }
 
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="contact-modal-title"
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
-      {...preset.modal.backdrop}
-    >
-      <MotionModalCard className="w-full max-w-md" {...preset.modal.card}>
-        <h2 id="contact-modal-title" className="mb-4 text-lg font-semibold text-text">
-          DAT Contact Method
-        </h2>
+    <Portal>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="contact-modal-title"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        {...preset.modal.backdrop}
+      >
+        <MotionModalCard className="w-full max-w-md" {...preset.modal.card}>
+          <h2 id="contact-modal-title" className="mb-4 text-lg font-semibold text-text">
+            DAT Contact Method
+          </h2>
 
-        <fieldset className="mb-4">
-          <legend className="mb-2 text-sm text-text-muted">Contact method</legend>
-          <label className="mb-1 flex items-center gap-2 text-sm text-text">
-            <input type="radio" name="contactMethod" value="phone" checked={contactMethod === 'phone'} onChange={() => setContactMethod('phone')} />
-            Phone
-          </label>
-          <label className="flex items-center gap-2 text-sm text-text">
-            <input type="radio" name="contactMethod" value="email" checked={contactMethod === 'email'} onChange={() => setContactMethod('email')} />
-            Email
-          </label>
-        </fieldset>
+          <fieldset className="mb-4">
+            <legend className="mb-2 text-sm text-text-muted">Contact method</legend>
+            <label className="mb-1 flex items-center gap-2 text-sm text-text">
+              <input type="radio" name="contactMethod" value="phone" checked={contactMethod === 'phone'} onChange={() => setContactMethod('phone')} />
+              Phone
+            </label>
+            <label className="flex items-center gap-2 text-sm text-text">
+              <input type="radio" name="contactMethod" value="email" checked={contactMethod === 'email'} onChange={() => setContactMethod('email')} />
+              Email
+            </label>
+          </fieldset>
 
-        <fieldset className="mb-4">
-          <legend className="mb-2 text-sm text-text-muted">Append a contact line to the comment?</legend>
-          <label className="mb-1 flex items-center gap-2 text-sm text-text">
-            <input type="checkbox" checked={includeContactLine} onChange={(e) => setIncludeContactLine(e.target.checked)} />
-            Include a contact line
-          </label>
-          {includeContactLine && (
-            <input
-              type="text"
-              value={commentContact}
-              onChange={(e) => setCommentContact(e.target.value)}
-              placeholder="e.g. Call John 555-1234"
-              aria-label="Contact line text"
-              className="mt-2 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          )}
-        </fieldset>
+          <fieldset className="mb-4">
+            <legend className="mb-2 text-sm text-text-muted">Append a contact line to the comment?</legend>
+            <label className="mb-1 flex items-center gap-2 text-sm text-text">
+              <input type="checkbox" checked={includeContactLine} onChange={(e) => setIncludeContactLine(e.target.checked)} />
+              Include a contact line
+            </label>
+            {includeContactLine && (
+              <input
+                type="text"
+                value={commentContact}
+                onChange={(e) => setCommentContact(e.target.value)}
+                placeholder="e.g. Call John 555-1234"
+                aria-label="Contact line text"
+                className="mt-2 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
+            )}
+          </fieldset>
 
-        <div className="flex justify-end gap-2">
-          <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
-          <PrimaryButton onClick={handleConfirm}>Continue</PrimaryButton>
-        </div>
-      </MotionModalCard>
-    </motion.div>
+          <div className="flex justify-end gap-2">
+            <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
+            <PrimaryButton onClick={handleConfirm}>Continue</PrimaryButton>
+          </div>
+        </MotionModalCard>
+      </motion.div>
+    </Portal>
   );
 }
 

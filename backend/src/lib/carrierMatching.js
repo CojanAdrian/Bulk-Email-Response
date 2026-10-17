@@ -1,3 +1,5 @@
+const { isEquipmentCompatible } = require('./equipmentCompat');
+
 const EARTH_RADIUS_MILES = 3958.8;
 const STRONG_RADIUS_MILES = 150;
 const WEAK_RADIUS_MILES = 300;
@@ -43,14 +45,36 @@ function classifyLaneMatch(queryOrigin, queryDest, historyRow) {
 // tagged operating_states match on the query's origin (and optionally
 // destination) state are returned separately as regionalMatches, never
 // double-counted against a carrier that also has real lane history.
+// Everything we know a carrier runs: the equipment on their profile plus
+// the equipment of every load they've actually hauled for us.
+function knownEquipmentByCarrier(historyRows) {
+  const known = new Map();
+  for (const row of historyRows) {
+    if (!known.has(row.carrier_id)) known.set(row.carrier_id, new Set());
+    const set = known.get(row.carrier_id);
+    for (const code of Array.isArray(row.carrier_equipment_types) ? row.carrier_equipment_types : []) set.add(code);
+    if (row.load_equipment) set.add(row.load_equipment);
+  }
+  return known;
+}
+
+// A carrier is only flagged when we actually know their equipment and none
+// of it overlaps the searched type (VR/RV count as both V and R). Unknown
+// equipment is never treated as a mismatch.
+function equipmentMismatchFor(equipment, knownCodes) {
+  if (!equipment || knownCodes.length === 0) return false;
+  return !isEquipmentCompatible(equipment, knownCodes);
+}
+
 function findMatchesForLane({ queryOrigin, queryDest, equipment, historyRows, regionalCarriers }) {
   const bestByCarrier = new Map();
+  const known = knownEquipmentByCarrier(historyRows);
   for (const row of historyRows) {
     const classified = classifyLaneMatch(queryOrigin, queryDest, row);
     if (!classified) continue;
 
-    const carrierEquipment = Array.isArray(row.carrier_equipment_types) ? row.carrier_equipment_types : [];
-    const equipmentMismatch = Boolean(equipment && carrierEquipment.length > 0 && !carrierEquipment.includes(equipment));
+    const knownEquipment = [...(known.get(row.carrier_id) || [])];
+    const equipmentMismatch = equipmentMismatchFor(equipment, knownEquipment);
 
     const existing = bestByCarrier.get(row.carrier_id);
     const isBetter =
@@ -71,6 +95,7 @@ function findMatchesForLane({ queryOrigin, queryDest, equipment, historyRows, re
         destLat: row.dest_lat !== null && row.dest_lat !== undefined ? Number(row.dest_lat) : null,
         destLng: row.dest_lng !== null && row.dest_lng !== undefined ? Number(row.dest_lng) : null,
         equipmentMismatch,
+        knownEquipment,
         laneCount: (existing ? existing.laneCount : 0) + 1,
       });
     } else {
@@ -78,7 +103,10 @@ function findMatchesForLane({ queryOrigin, queryDest, equipment, historyRows, re
     }
   }
 
+  // Carriers with the right equipment first; a mismatch stays in the list
+  // (flagged) but never outranks a carrier who can actually take the load.
   const laneMatches = [...bestByCarrier.values()].sort((a, b) => {
+    if (a.equipmentMismatch !== b.equipmentMismatch) return a.equipmentMismatch ? 1 : -1;
     if (TIER_RANK[b.tier] !== TIER_RANK[a.tier]) return TIER_RANK[b.tier] - TIER_RANK[a.tier];
     return a.originDistanceMiles - b.originDistanceMiles;
   });
@@ -91,15 +119,21 @@ function findMatchesForLane({ queryOrigin, queryDest, equipment, historyRows, re
       const originTagged = states.includes(queryOrigin.state);
       if (!originTagged) return null;
       const destTagged = Boolean(queryDest && states.includes(queryDest.state));
+      const knownEquipment = Array.isArray(carrier.equipment_types) ? carrier.equipment_types : [];
       return {
         carrierId: carrier.id,
         carrierName: carrier.company_name,
         tier: destTagged ? 'regional_perfect' : 'regional',
         taggedStates: states,
+        knownEquipment,
+        equipmentMismatch: equipmentMismatchFor(equipment, knownEquipment),
       };
     })
     .filter(Boolean)
-    .sort((a, b) => (a.tier === b.tier ? 0 : a.tier === 'regional_perfect' ? -1 : 1));
+    .sort((a, b) => {
+      if (a.equipmentMismatch !== b.equipmentMismatch) return a.equipmentMismatch ? 1 : -1;
+      return a.tier === b.tier ? 0 : a.tier === 'regional_perfect' ? -1 : 1;
+    });
 
   return { laneMatches, regionalMatches };
 }

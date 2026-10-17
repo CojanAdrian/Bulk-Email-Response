@@ -253,6 +253,30 @@ describe('carriers routes', () => {
       expect(patched.body.customer).toBe('Kroger');
     });
 
+    test('GET /:id/history includes the linked load number, equipment and customer', async () => {
+      const [load] = await pool.query("INSERT INTO loads (user_id, load_number, equipment, customer) VALUES (?, '0090505', 'V', 'ALDI, Inc')", [userId]);
+      await pool.query(
+        "INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state) VALUES (?, ?, ?, 'Temecula', 'CA', 'Memphis', 'TN')",
+        [carrierId, userId, load.insertId]
+      );
+      const res = await agent.get(`/api/carriers/${carrierId}/history`);
+      expect(res.status).toBe(200);
+      expect(res.body[0]).toMatchObject({ load_number: '0090505', load_equipment: 'V', effective_customer: 'ALDI, Inc' });
+    });
+
+    test('logging a run against a load adds the load equipment to the carrier', async () => {
+      await pool.query("UPDATE carriers SET equipment_types = ? WHERE id = ?", [JSON.stringify(['R']), carrierId]);
+      const [load] = await pool.query("INSERT INTO loads (user_id, load_number, equipment) VALUES (?, 'EQ1', 'v')", [userId]);
+      await agent.post(`/api/carriers/${carrierId}/history`).send({
+        origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', load_id: load.insertId,
+      });
+      await agent.post(`/api/carriers/${carrierId}/history`).send({
+        origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', load_id: load.insertId,
+      });
+      const [rows] = await pool.query('SELECT equipment_types FROM carriers WHERE id = ?', [carrierId]);
+      expect(rows[0].equipment_types).toEqual(['R', 'V']);
+    });
+
     test('PATCH /history/:historyId can update gp', async () => {
       const createRes = await agent.post(`/api/carriers/${carrierId}/history`).send({
         origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', rate: 1500, gp: 300,

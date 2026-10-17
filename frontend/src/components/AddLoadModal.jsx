@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Portal from './Portal';
 import { motion } from 'framer-motion';
 import { createLoad } from '../api/loads';
 import { datetimeLocalToMysql } from '../lib/dateInput';
@@ -98,202 +99,204 @@ function AddLoadModal({ onClose, onCreated }) {
   }
 
   return (
-    <motion.div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="add-load-title"
-      className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
-      {...preset.modal.backdrop}
-    >
-      <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
-        <h2 id="add-load-title" className="mb-4 text-lg font-semibold text-text">
-          Add a load
-        </h2>
+    <Portal>
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-load-title"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        {...preset.modal.backdrop}
+      >
+        <MotionModalCard className="w-full max-w-lg" {...preset.modal.card}>
+          <h2 id="add-load-title" className="mb-4 text-lg font-semibold text-text">
+            Add a load
+          </h2>
 
-        <div className="mb-4 grid gap-2 sm:grid-cols-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="load_number">
-              Load #
-            </label>
-            <input
-              id="load_number"
-              value={fields.load_number}
-              onChange={(e) => handleFieldChange('load_number', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <CustomerField value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
-        </div>
-
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          <div className="col-span-1">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_city">
-              Origin city
-            </label>
-            <CityStateAutocomplete
-              id="origin_city"
-              ariaLabel="Origin city"
-              value={fields.origin_city}
-              onChange={(e) => handleFieldChange('origin_city', e.target.value)}
-              onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
-              State
-            </label>
-            <StateSelect
-              id="origin_state"
-              ariaLabel="Origin state"
-              value={fields.origin_state}
-              onChange={(state) => handleFieldChange('origin_state', state)}
-              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_zip">
-              Zip
-            </label>
-            <input id="origin_zip" value={fields.origin_zip} onChange={(e) => handleFieldChange('origin_zip', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
-        </div>
-
-        <div className="mb-4 grid grid-cols-3 gap-2">
-          <div className="col-span-1">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_city">
-              Dest city
-            </label>
-            <CityStateAutocomplete
-              id="dest_city"
-              ariaLabel="Dest city"
-              value={fields.dest_city}
-              onChange={(e) => handleFieldChange('dest_city', e.target.value)}
-              onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
-              State
-            </label>
-            <StateSelect
-              id="dest_state"
-              ariaLabel="Destination state"
-              value={fields.dest_state}
-              onChange={(state) => handleFieldChange('dest_state', state)}
-              className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_zip">
-              Zip
-            </label>
-            <input id="dest_zip" value={fields.dest_zip} onChange={(e) => handleFieldChange('dest_zip', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
-        </div>
-
-        <div className="mb-4 space-y-2">
-          <DateRangeField
-            legend="Pickup"
-            earlyId="earlyPu"
-            lateId="latePu"
-            earlyValue={earlyPu}
-            lateValue={latePu}
-            onEarlyChange={setEarlyPu}
-            onLateChange={setLatePu}
-            formatRange={buildPUSched}
-          />
-          <DateRangeField
-            legend="Delivery"
-            earlyId="earlyDel"
-            lateId="lateDel"
-            earlyValue={earlyDel}
-            lateValue={lateDel}
-            onEarlyChange={setEarlyDel}
-            onLateChange={setLateDel}
-            formatRange={buildDELSched}
-          />
-        </div>
-
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
-              Equipment
-            </label>
-            <EquipmentPicker id="equipment" value={fields.equipment} onChange={(code) => handleFieldChange('equipment', code)} />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
-              Weight
-            </label>
-            <input id="weight" value={fields.weight} onChange={(e) => handleFieldChange('weight', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
-        </div>
-
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="commodity">
-              Commodity
-            </label>
-            <input id="commodity" value={fields.commodity} onChange={(e) => handleFieldChange('commodity', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
-          <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="temperature">
-              Temperature
-            </label>
-            <input id="temperature" value={fields.temperature} onChange={(e) => handleFieldChange('temperature', e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-          </div>
-        </div>
-
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="comment">
-          Comment
-        </label>
-        <textarea id="comment" value={fields.comment} onChange={(e) => handleFieldChange('comment', e.target.value)} rows={2}
-          className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
-
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          <div>
-            <label className="mb-1 block text-sm text-text-muted" htmlFor="targetPay">
-              Target pay
-            </label>
-            <input id="targetPay" type="number" step="0.01" value={targetPay} onChange={(e) => setTargetPay(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text" />
-          </div>
-          <div className="flex items-end">
-            <label className="flex items-center gap-2 text-sm text-text" htmlFor="includeRate">
-              <input id="includeRate" type="checkbox" checked={includeRate} onChange={(e) => setIncludeRate(e.target.checked)} />
-              Include rate in replies
-            </label>
-          </div>
-        </div>
-
-        {error && (
-          <p role="alert" className="mb-4 text-sm text-error">
-            {error}
-          </p>
-        )}
-        {/* Sticky so Save/Cancel stay reachable on a long form (the
-            sheet scrolls under it), instead of hiding below the fold. */}
-        <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-2 border-t border-border bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6">
-          {closeConfirmation.confirming ? (
-            <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
-          ) : (
-            <div className="flex justify-end gap-2">
-              <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
-              <PrimaryButton onClick={handleSave} disabled={saving}>
-                {saving ? 'Adding...' : 'Add load'}
-              </PrimaryButton>
+          <div className="mb-4 grid gap-2 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="load_number">
+                Load #
+              </label>
+              <input
+                id="load_number"
+                value={fields.load_number}
+                onChange={(e) => handleFieldChange('load_number', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
             </div>
+            <CustomerField value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
+          </div>
+
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="col-span-1">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_city">
+                Origin city
+              </label>
+              <CityStateAutocomplete
+                id="origin_city"
+                ariaLabel="Origin city"
+                value={fields.origin_city}
+                onChange={(e) => handleFieldChange('origin_city', e.target.value)}
+                onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
+                State
+              </label>
+              <StateSelect
+                id="origin_state"
+                ariaLabel="Origin state"
+                value={fields.origin_state}
+                onChange={(state) => handleFieldChange('origin_state', state)}
+                className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_zip">
+                Zip
+              </label>
+              <input id="origin_zip" value={fields.origin_zip} onChange={(e) => handleFieldChange('origin_zip', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-3 gap-2">
+            <div className="col-span-1">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_city">
+                Dest city
+              </label>
+              <CityStateAutocomplete
+                id="dest_city"
+                ariaLabel="Dest city"
+                value={fields.dest_city}
+                onChange={(e) => handleFieldChange('dest_city', e.target.value)}
+                onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
+                State
+              </label>
+              <StateSelect
+                id="dest_state"
+                ariaLabel="Destination state"
+                value={fields.dest_state}
+                onChange={(state) => handleFieldChange('dest_state', state)}
+                className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_zip">
+                Zip
+              </label>
+              <input id="dest_zip" value={fields.dest_zip} onChange={(e) => handleFieldChange('dest_zip', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            </div>
+          </div>
+
+          <div className="mb-4 space-y-2">
+            <DateRangeField
+              legend="Pickup"
+              earlyId="earlyPu"
+              lateId="latePu"
+              earlyValue={earlyPu}
+              lateValue={latePu}
+              onEarlyChange={setEarlyPu}
+              onLateChange={setLatePu}
+              formatRange={buildPUSched}
+            />
+            <DateRangeField
+              legend="Delivery"
+              earlyId="earlyDel"
+              lateId="lateDel"
+              earlyValue={earlyDel}
+              lateValue={lateDel}
+              onEarlyChange={setEarlyDel}
+              onLateChange={setLateDel}
+              formatRange={buildDELSched}
+            />
+          </div>
+
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
+                Equipment
+              </label>
+              <EquipmentPicker id="equipment" value={fields.equipment} onChange={(code) => handleFieldChange('equipment', code)} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
+                Weight
+              </label>
+              <input id="weight" value={fields.weight} onChange={(e) => handleFieldChange('weight', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            </div>
+          </div>
+
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="commodity">
+                Commodity
+              </label>
+              <input id="commodity" value={fields.commodity} onChange={(e) => handleFieldChange('commodity', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="temperature">
+                Temperature
+              </label>
+              <input id="temperature" value={fields.temperature} onChange={(e) => handleFieldChange('temperature', e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            </div>
+          </div>
+
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="comment">
+            Comment
+          </label>
+          <textarea id="comment" value={fields.comment} onChange={(e) => handleFieldChange('comment', e.target.value)} rows={2}
+            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+
+          <div className="mb-4 grid grid-cols-2 gap-2">
+            <div>
+              <label className="mb-1 block text-sm text-text-muted" htmlFor="targetPay">
+                Target pay
+              </label>
+              <input id="targetPay" type="number" step="0.01" value={targetPay} onChange={(e) => setTargetPay(e.target.value)}
+                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text" />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 text-sm text-text" htmlFor="includeRate">
+                <input id="includeRate" type="checkbox" checked={includeRate} onChange={(e) => setIncludeRate(e.target.checked)} />
+                Include rate in replies
+              </label>
+            </div>
+          </div>
+
+          {error && (
+            <p role="alert" className="mb-4 text-sm text-error">
+              {error}
+            </p>
           )}
-        </div>
-      </MotionModalCard>
-    </motion.div>
+          {/* Sticky so Save/Cancel stay reachable on a long form (the
+              sheet scrolls under it), instead of hiding below the fold. */}
+          <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-2 border-t border-border bg-surface/95 px-5 py-3 backdrop-blur sm:-mx-6 sm:-mb-6 sm:px-6">
+            {closeConfirmation.confirming ? (
+              <UnsavedChangesBar onDiscard={closeConfirmation.confirmDiscard} onKeepEditing={closeConfirmation.cancelDiscard} />
+            ) : (
+              <div className="flex justify-end gap-2">
+                <SecondaryButton onClick={handleRequestClose}>Cancel</SecondaryButton>
+                <PrimaryButton onClick={handleSave} disabled={saving}>
+                  {saving ? 'Adding...' : 'Add load'}
+                </PrimaryButton>
+              </div>
+            )}
+          </div>
+        </MotionModalCard>
+      </motion.div>
+    </Portal>
   );
 }
 

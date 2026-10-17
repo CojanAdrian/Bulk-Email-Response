@@ -6,6 +6,7 @@ import BottomSheet from './BottomSheet';
 import Badge from './Badge';
 import SecondaryButton from './SecondaryButton';
 import Skeleton from './Skeleton';
+import { formatMoney } from '../lib/formatMoney';
 import { PhoneIcon, MailIcon } from './icons';
 
 const EQUIPMENT_LABEL = Object.fromEntries(EQUIPMENT_OPTIONS.map((o) => [o.code, o.label]));
@@ -98,18 +99,22 @@ function CarrierDetailBody({ status, carrier, history, onClose, onEdit }) {
             {history.length === 0 && <p className="text-sm text-text-muted">No lanes logged yet.</p>}
             <ul className="space-y-2">
               {history.map((entry) => (
-                <li key={entry.id} className="rounded-xl border border-border bg-surface-alt px-3 py-2 text-sm">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-text">
+                <li key={entry.id} className="rounded-xl border border-border bg-surface-alt px-3 py-2.5 text-sm">
+                  <div className="flex min-w-0 items-start justify-between gap-2">
+                    <span className="min-w-0 font-semibold text-text [overflow-wrap:anywhere]">
                       {entry.origin_city}, {entry.origin_state} → {entry.dest_city}, {entry.dest_state}
                     </span>
-                    {entry.rate && <span className="text-text-muted">${Number(entry.rate).toLocaleString()}</span>}
+                    {entry.rate && <span className="shrink-0 font-semibold tabular-nums text-text">{formatMoney(entry.rate)}</span>}
                   </div>
-                  <div className="mt-0.5 text-xs text-text-muted">
-                    {entry.ran_at && new Date(entry.ran_at).toLocaleDateString()}
-                    {entry.gp !== null && entry.gp !== undefined && ` — GP $${Number(entry.gp).toLocaleString()}`}
-                    {entry.driver_name && ` — ${entry.driver_name}`}
-                    {entry.driver_phone && ` (${entry.driver_phone})`}
+                  <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
+                    {entry.load_number && (
+                      <span className="rounded-md bg-surface px-1.5 py-0.5 font-mono font-semibold text-text">Load #{entry.load_number}</span>
+                    )}
+                    {(entry.load_equipment || null) && <span className="rounded-md bg-surface px-1.5 py-0.5 font-semibold text-text">{entry.load_equipment}</span>}
+                    {entry.ran_at && <span>{new Date(entry.ran_at).toLocaleDateString()}</span>}
+                    {entry.gp !== null && entry.gp !== undefined && <span>GP {formatMoney(entry.gp)}</span>}
+                    {(entry.effective_customer || entry.customer) && <span className="truncate">{entry.effective_customer || entry.customer}</span>}
+                    {entry.driver_name && <span>{entry.driver_name}{entry.driver_phone ? ` (${entry.driver_phone})` : ''}</span>}
                   </div>
                   {entry.comment && <p className="mt-1 text-xs text-text-muted">{entry.comment}</p>}
                 </li>

@@ -12,14 +12,15 @@ const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 async function loadCandidates(pool, userId) {
   const [historyRows] = await pool.query(
     `SELECT h.id, h.carrier_id, c.company_name AS carrier_company_name, c.equipment_types AS carrier_equipment_types,
-            h.origin_lat, h.origin_lng, h.dest_lat, h.dest_lng
+            l.equipment AS load_equipment, h.origin_lat, h.origin_lng, h.dest_lat, h.dest_lng
      FROM carrier_lane_history h
      JOIN carriers c ON c.id = h.carrier_id
+     LEFT JOIN loads l ON l.id = h.load_id
      WHERE h.user_id = ?`,
     [userId]
   );
   const [regionalCarriers] = await pool.query(
-    `SELECT c.id, c.company_name, c.operating_states
+    `SELECT c.id, c.company_name, c.operating_states, c.equipment_types
      FROM carriers c
      WHERE c.user_id = ? AND JSON_LENGTH(c.operating_states) > 0
        AND NOT EXISTS (SELECT 1 FROM carrier_lane_history h WHERE h.carrier_id = c.id)`,

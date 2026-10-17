@@ -143,7 +143,16 @@ function createCarriersRouter(pool) {
     if (carrierRows.length === 0) {
       return res.status(404).json({ error: 'Carrier not found' });
     }
-    const [rows] = await pool.query('SELECT * FROM carrier_lane_history WHERE carrier_id = ? ORDER BY ran_at DESC, created_at DESC', [req.params.id]);
+    // The linked load's number (when the run came from a booked load) so the
+    // carrier's history shows *which* load they hauled, not just the lane.
+    const [rows] = await pool.query(
+      `SELECT h.*, l.load_number, l.equipment AS load_equipment, COALESCE(NULLIF(TRIM(l.customer), ''), h.customer) AS effective_customer
+       FROM carrier_lane_history h
+       LEFT JOIN loads l ON l.id = h.load_id
+       WHERE h.carrier_id = ?
+       ORDER BY h.ran_at DESC, h.created_at DESC`,
+      [req.params.id]
+    );
     res.json(rows);
   }));
 
@@ -178,6 +187,20 @@ function createCarriersRouter(pool) {
         req.body.customer ? String(req.body.customer).trim() || null : null,
       ]
     );
+    // A run tied to a real load teaches us what this carrier pulls: the
+    // load's equipment joins the carrier's equipment_types (if it isn't
+    // there already), so future matches know they run it.
+    if (req.body.load_id) {
+      const [loadRows] = await pool.query('SELECT equipment FROM loads WHERE id = ? AND user_id = ?', [req.body.load_id, req.session.userId]);
+      const loadEquipment = loadRows[0] && loadRows[0].equipment ? String(loadRows[0].equipment).trim().toUpperCase() : null;
+      if (loadEquipment) {
+        const [carrierEquipmentRows] = await pool.query('SELECT equipment_types FROM carriers WHERE id = ?', [req.params.id]);
+        const current = Array.isArray(carrierEquipmentRows[0]?.equipment_types) ? carrierEquipmentRows[0].equipment_types : [];
+        if (!current.includes(loadEquipment)) {
+          await pool.query('UPDATE carriers SET equipment_types = ? WHERE id = ?', [JSON.stringify([...current, loadEquipment]), req.params.id]);
+        }
+      }
+    }
     const [rows] = await pool.query('SELECT * FROM carrier_lane_history WHERE id = ?', [result.insertId]);
     res.status(201).json(rows[0]);
   }));

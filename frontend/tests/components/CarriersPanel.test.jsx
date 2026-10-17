@@ -66,6 +66,22 @@ describe('CarriersPanel', () => {
     expect(screen.queryByLabelText(/company name/i)).not.toBeInTheDocument();
   });
 
+  // Regression: the sheet used to render inside the carrier list's glass
+  // card, whose backdrop-filter traps position:fixed children -- the sheet
+  // opened inside (and clipped by) the card, often off-screen, so clicking a
+  // carrier looked like it did nothing.
+  test('the detail sheet renders at the top of the page, not inside the list card', async () => {
+    carriersApi.listCarriers.mockResolvedValue([{ id: 1, company_name: 'ABC Trucking' }]);
+    carriersApi.listCarrierHistory.mockResolvedValue([{ id: 9, origin_city: 'Temecula', origin_state: 'CA', dest_city: 'Memphis', dest_state: 'TN', load_number: '0090505' }]);
+    carriersApi.getCarrier.mockResolvedValue({ id: 1, company_name: 'ABC Trucking' });
+    const { container } = render(<CarriersPanel />);
+    await waitFor(() => screen.getByText('ABC Trucking'));
+    fireEvent.click(screen.getByText('ABC Trucking'));
+    const dialog = await screen.findByRole('dialog');
+    expect(container.contains(dialog)).toBe(false);
+    expect(await screen.findByText('Load #0090505')).toBeInTheDocument();
+  });
+
   test('the detail sheet\'s Edit button opens the edit sheet', async () => {
     carriersApi.listCarriers.mockResolvedValue([{ id: 1, company_name: 'ABC Trucking' }]);
     carriersApi.listCarrierHistory.mockResolvedValue([]);

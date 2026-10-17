@@ -45,7 +45,9 @@ function noteForQueryLane(data) {
 // bare name behind a click. Clicking it swaps this list out for the
 // read-only detail panel (see CarrierMapPage) and draws that carrier's
 // lane history as real driving routes on the map.
-function MatchCard({ match, onSelect }) {
+function MatchCard({ match, onSelect, searchedEquipment }) {
+  const knownEquipment = Array.isArray(match.knownEquipment) && match.knownEquipment.length > 0 ? match.knownEquipment : match.equipment_types;
+  const searchedLabel = searchedEquipment ? EQUIPMENT_LABEL[searchedEquipment] || searchedEquipment : null;
   const distanceLabel = match.taggedStates
     ? (match.taggedStates || []).join(', ')
     : `${Math.round(match.originDistanceMiles)}mi from origin`;
@@ -53,15 +55,20 @@ function MatchCard({ match, onSelect }) {
     <button
       type="button"
       onClick={() => onSelect(match.carrierId)}
-      className="w-full rounded-2xl border border-white/10 bg-white/5 p-3 text-left transition hover:bg-white/10"
+      className={`w-full rounded-2xl border p-3 text-left transition hover:bg-white/10 ${
+        match.equipmentMismatch ? 'border-red-400/40 bg-red-500/[0.06]' : 'border-white/10 bg-white/5'
+      }`}
     >
       <div className="mb-1.5 flex items-start justify-between gap-2">
         <span className="font-semibold text-white">{match.carrierName}</span>
         <div className="flex shrink-0 items-center gap-1">
           {match.equipmentMismatch && (
-            <Badge variant="warning" title="Doesn't have the equipment type you searched for">
-              Equipment?
-            </Badge>
+            <span
+              title={`No ${searchedLabel || 'matching equipment'} on file for this carrier -- they've only run ${(knownEquipment || []).join(', ')}`}
+              className="inline-flex shrink-0 items-center rounded-full border border-red-400/50 bg-red-500/20 px-2.5 py-0.5 text-xs font-bold text-red-200"
+            >
+              No {searchedLabel || 'match for equipment'}
+            </span>
           )}
           <Badge variant={TIER_BADGE_VARIANT[match.tier] || 'default'}>{TIER_LABEL[match.tier] || match.tier}</Badge>
         </div>
@@ -76,10 +83,10 @@ function MatchCard({ match, onSelect }) {
           </>
         )}
       </div>
-      {Array.isArray(match.equipment_types) && match.equipment_types.length > 0 && (
+      {Array.isArray(knownEquipment) && knownEquipment.length > 0 && (
         <div className="mt-1.5 flex flex-wrap gap-1">
-          {match.equipment_types.map((code) => (
-            <span key={code} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/70">
+          {knownEquipment.map((code) => (
+            <span key={code} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-semibold text-white/80">
               {EQUIPMENT_LABEL[code] || code}
             </span>
           ))}
@@ -349,7 +356,7 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
             <ul className="mb-4 space-y-2">
               {laneMatches.map((match) => (
                 <li key={match.carrierId}>
-                  <MatchCard match={match} onSelect={handleSelectCarrier} />
+                  <MatchCard match={match} onSelect={handleSelectCarrier} searchedEquipment={lane.equipment} />
                 </li>
               ))}
             </ul>
@@ -360,7 +367,7 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
               <ul className="space-y-2">
                 {regionalMatches.map((match) => (
                   <li key={match.carrierId}>
-                    <MatchCard match={match} onSelect={handleSelectCarrier} />
+                    <MatchCard match={match} onSelect={handleSelectCarrier} searchedEquipment={lane.equipment} />
                   </li>
                 ))}
               </ul>

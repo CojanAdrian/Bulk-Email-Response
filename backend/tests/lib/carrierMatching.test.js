@@ -172,4 +172,40 @@ describe('findMatchesForLane', () => {
     });
     expect(laneMatches).toHaveLength(0);
   });
+
+  test('VR on file covers a van search, and equipment from a hauled load counts as known', () => {
+    const vr = findMatchesForLane({
+      queryOrigin: FORT_WORTH, queryDest: MIAMI, equipment: 'V',
+      historyRows: [historyRow({ carrier_equipment_types: ['VR'] })], regionalCarriers: [],
+    });
+    expect(vr.laneMatches[0].equipmentMismatch).toBe(false);
+
+    const hauledFlatbed = findMatchesForLane({
+      queryOrigin: FORT_WORTH, queryDest: MIAMI, equipment: 'V',
+      historyRows: [historyRow({ carrier_equipment_types: null, load_equipment: 'F' })], regionalCarriers: [],
+    });
+    expect(hauledFlatbed.laneMatches[0].equipmentMismatch).toBe(true);
+    expect(hauledFlatbed.laneMatches[0].knownEquipment).toEqual(['F']);
+  });
+
+  test('carriers with the wrong equipment sort below ones that can take the load', () => {
+    const { laneMatches } = findMatchesForLane({
+      queryOrigin: FORT_WORTH, queryDest: MIAMI, equipment: 'V',
+      historyRows: [
+        historyRow({ id: 1, carrier_id: 1, carrier_company_name: 'Flatbed Only', carrier_equipment_types: ['F'] }),
+        historyRow({ id: 2, carrier_id: 2, carrier_company_name: 'Van Co', carrier_equipment_types: ['V'] }),
+      ],
+      regionalCarriers: [],
+    });
+    expect(laneMatches.map((m) => m.carrierName)).toEqual(['Van Co', 'Flatbed Only']);
+  });
+
+  test('regional matches are flagged for equipment too', () => {
+    const { regionalMatches } = findMatchesForLane({
+      queryOrigin: FORT_WORTH, queryDest: MIAMI, equipment: 'V',
+      historyRows: [],
+      regionalCarriers: [{ id: 5, company_name: 'Box Trucks Inc', operating_states: ['TX'], equipment_types: ['SB'] }],
+    });
+    expect(regionalMatches[0]).toMatchObject({ equipmentMismatch: true, knownEquipment: ['SB'] });
+  });
 });
