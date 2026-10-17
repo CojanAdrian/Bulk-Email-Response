@@ -209,7 +209,7 @@ describe('emailPoller', () => {
       id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
-    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO' }, tier: 'load_number' });
     gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
 
     const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
@@ -244,7 +244,7 @@ describe('emailPoller', () => {
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({
-      matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number',
+      matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO' }, tier: 'load_number',
     });
     gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
 
@@ -872,7 +872,7 @@ describe('emailPoller', () => {
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({
-        matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number',
+        matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO' }, tier: 'load_number',
       });
       gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
 

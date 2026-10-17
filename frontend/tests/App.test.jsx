@@ -15,6 +15,7 @@ describe('App', () => {
     loadsApi.listLoads.mockResolvedValue([]);
     liveSocket.getStatus.mockReturnValue('closed');
     liveSocket.subscribeStatus.mockReturnValue(() => {});
+    liveSocket.subscribe.mockReturnValue(() => {});
   });
 
   test('shows the login page when there is no active session', async () => {

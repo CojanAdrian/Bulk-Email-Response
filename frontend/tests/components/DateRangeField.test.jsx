@@ -50,13 +50,13 @@ describe('DateRangeField', () => {
 
     const early = within(screen.getByRole('group', { name: 'Early' }));
     fireEvent.click(early.getByRole('button', { name: '2026-08-24' }));
-    fireEvent.click(early.getByRole('button', { name: /set time to 2:00 am/i }));
+    fireEvent.click(early.getByRole('button', { name: /set time to 6:00 am/i }));
 
     const late = within(screen.getByRole('group', { name: 'Late' }));
     fireEvent.click(late.getByRole('button', { name: '2026-08-24' }));
     fireEvent.click(late.getByRole('button', { name: /set time to 10:00 am/i }));
 
-    expect(screen.getByRole('button', { name: /08\/24\/2026 2am - 10am FCFS/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /08\/24\/2026 6am - 10am FCFS/i })).toBeInTheDocument();
   });
 
   test('"Same as early (appt)" is disabled until an early value is set', () => {
