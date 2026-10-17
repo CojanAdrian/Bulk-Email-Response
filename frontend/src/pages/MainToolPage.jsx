@@ -21,13 +21,27 @@ import AuroraBackground from '../components/AuroraBackground';
 import { useInquiryAlerts } from '../components/InquiryAlertBanner';
 import { subscribe } from '../lib/liveSocket';
 import { useMotionPreset } from '../lib/motionConfig';
+import { useHotkeys, focusPageSearch } from '../lib/useHotkeys';
+import CustomersPage from './CustomersPage';
 
 const TAB_TITLES = {
   loads: 'Loads',
   inquiries: 'Inquiries',
   carriers: 'Carriers',
+  customers: 'Customers',
   stats: 'Stats',
 };
+
+const TAB_SUBTITLES = {
+  loads: 'Your board. Gold rows are lanes a carrier has already run.',
+  inquiries: 'Carrier emails about your loads, matched and ready to answer.',
+  carriers: 'Every carrier you work with and the lanes they run.',
+  customers: 'Who has hauled for each customer, on any lane.',
+  stats: 'Booked loads, rates and gross profit.',
+};
+
+// Leaves room under the content for the phone's fixed bottom tab bar.
+const PAGE_CLASS = 'mx-auto w-full min-w-0 max-w-[1400px] px-4 pb-28 pt-4 sm:px-6 md:pb-10';
 
 function CarriersViewToggle({ carriersView, onChange }) {
   return (
@@ -35,8 +49,9 @@ function CarriersViewToggle({ carriersView, onChange }) {
       <button
         type="button"
         onClick={() => onChange('find')}
-        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-          carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+        aria-pressed={carriersView === 'find'}
+        className={`min-h-[36px] rounded-full px-3.5 py-1.5 text-xs font-semibold backdrop-blur-xl transition ${
+          carriersView === 'find' ? 'bg-accent text-accent-ink' : 'border border-white/15 bg-black/40 text-white/80 hover:text-white'
         }`}
       >
         Find matches
@@ -44,8 +59,9 @@ function CarriersViewToggle({ carriersView, onChange }) {
       <button
         type="button"
         onClick={() => onChange('manage')}
-        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition ${
-          carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border text-shell-text-muted hover:text-shell-text'
+        aria-pressed={carriersView === 'manage'}
+        className={`min-h-[36px] rounded-full px-3.5 py-1.5 text-xs font-semibold transition ${
+          carriersView === 'manage' ? 'bg-accent text-accent-ink' : 'border border-shell-border bg-surface-alt text-text-muted hover:text-text'
         }`}
       >
         All carriers
@@ -93,20 +109,28 @@ function MainToolPage({ username, onLogout }) {
     });
   }, [pushAlert]);
 
+  useHotkeys({
+    '/': focusPageSearch,
+    n: () => {
+      if (tab === 'loads') setAddLoadOpen(true);
+    },
+  });
+
   return (
-    <div className="relative min-h-screen overflow-hidden bg-shell-bg text-shell-text">
+    <div className="relative min-h-screen overflow-x-clip bg-shell-bg text-shell-text">
       <AuroraBackground />
       {inquiryAlertViewport}
       <TopNav tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
       <div className="relative z-10 min-w-0">
         {!(tab === 'carriers' && carriersView === 'find') && (
-          <header className="px-4 pt-6 sm:px-6">
-            <h1 className="text-2xl font-extrabold tracking-tight text-shell-text">{TAB_TITLES[tab]}</h1>
+          <header className="mx-auto w-full max-w-[1400px] px-4 pt-6 sm:px-6 sm:pt-8">
+            <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-shell-text sm:text-[32px]">{TAB_TITLES[tab]}</h1>
+            <p className="mt-0.5 text-sm text-shell-text-muted">{TAB_SUBTITLES[tab]}</p>
           </header>
         )}
         <AnimatePresence>
           {tab === 'loads' && (
-            <motion.main key="loads" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
+            <motion.main key="loads" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
               <LoadsStatsRow refreshKey={refreshKey} />
               <UploadPanel
                 onUploadComplete={handleUploadComplete}
@@ -131,7 +155,7 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'inquiries' && (
-            <motion.main key="inquiries" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
+            <motion.main key="inquiries" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
               <div className="flex justify-end">
                 <SecondaryButton onClick={() => setInquiriesRefreshKey((k) => k + 1)} className="px-4 py-2 text-xs">
                   Refresh
@@ -144,13 +168,13 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'carriers' && carriersView === 'manage' && (
-            <motion.main key="carriers-manage" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-4 p-4 sm:p-6">
+            <motion.main key="carriers-manage" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4`}>
               <CarriersViewToggle carriersView={carriersView} onChange={setCarriersView} />
               <CarriersPanel />
             </motion.main>
           )}
           {tab === 'carriers' && carriersView === 'find' && (
-            <motion.main key="carriers-find" {...preset.crossfade} className="relative h-[calc(100vh-3.75rem)] w-full overflow-hidden">
+            <motion.main key="carriers-find" {...preset.crossfade} className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden pb-[4.5rem] md:pb-0">
               <CarrierMapPage focusedLoad={focusedMatchLoad} onClearFocusedLoad={() => setFocusedMatchLoad(null)} />
               {/* Floats over the globe instead of sitting in a separate header
                   strip above it, so the whole tab reads as one continuous
@@ -166,8 +190,13 @@ function MainToolPage({ username, onLogout }) {
               </div>
             </motion.main>
           )}
+          {tab === 'customers' && (
+            <motion.main key="customers" {...preset.crossfade} className={PAGE_CLASS}>
+              <CustomersPage />
+            </motion.main>
+          )}
           {tab === 'stats' && (
-            <motion.main key="stats" {...preset.crossfade} className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-6">
+            <motion.main key="stats" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
               <StatsPage />
             </motion.main>
           )}

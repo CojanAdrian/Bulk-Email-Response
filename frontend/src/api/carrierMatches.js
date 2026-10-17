@@ -11,3 +11,8 @@ export function searchCarrierMatches(lane) {
 export function bulkCarrierMatches(loadIds) {
   return post('/api/carrier-matches/bulk', { loadIds });
 }
+
+// Carriers who already ran each load's exact lane (gold "proven" rows).
+export function getProvenCarriers(loadIds) {
+  return post('/api/carrier-matches/proven', { loadIds });
+}

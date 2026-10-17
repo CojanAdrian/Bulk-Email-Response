@@ -1,4 +1,4 @@
-import { describe, test, expect, vi, beforeEach } from 'vitest';
+import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import TopNav from '../../src/components/TopNav';
 import * as gmailApi from '../../src/api/gmail';
@@ -131,6 +131,45 @@ describe('TopNav', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('pending-review-badge')).toHaveTextContent('1');
+    });
+  });
+
+  test('renders a Customers tab that switches to the customers view', () => {
+    const onTabChange = vi.fn();
+    render(<TopNav tab="loads" onTabChange={onTabChange} username="adrian" onLogout={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /^customers$/i }));
+    expect(onTabChange).toHaveBeenCalledWith('customers');
+  });
+
+  describe('on a phone-width screen', () => {
+    const originalMatchMedia = window.matchMedia;
+    beforeEach(() => {
+      window.matchMedia = vi.fn().mockImplementation((query) => ({
+        matches: query === '(max-width: 767px)',
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }));
+    });
+    afterEach(() => {
+      window.matchMedia = originalMatchMedia;
+    });
+
+    test('moves the tabs into a single bottom navigation bar', () => {
+      render(<TopNav tab="inquiries" onTabChange={() => {}} username="adrian" onLogout={() => {}} />);
+      const navs = screen.getAllByRole('navigation', { name: /primary/i });
+      expect(navs).toHaveLength(1);
+      expect(navs[0].className).toContain('bottom-0');
+      expect(screen.getByRole('button', { name: /^inquiries$/i })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getAllByRole('button', { name: /^loads$/i })).toHaveLength(1);
+    });
+  });
+
+  test('puts the pending-review count in the browser tab title', async () => {
+    inquiriesApi.listInquiries.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    render(<TopNav tab="loads" onTabChange={() => {}} username="adrian" onLogout={() => {}} />);
+    await waitFor(() => {
+      expect(document.title).toBe('(2) BulkPosting');
     });
   });
 });
