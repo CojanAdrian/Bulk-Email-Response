@@ -159,10 +159,11 @@ function GmailConnectionPanel() {
       )}
       {status === 'ready' && gmailStatus.connected && (
         <div>
-          <div className="flex items-center justify-between">
-            <p className="flex items-center gap-2 text-sm text-text">
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <p className="flex min-w-0 items-center gap-2 text-sm text-text">
               <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-success" />
-              Connected: <span className="font-medium text-text">{gmailStatus.gmailAddress}</span>
+              <span className="shrink-0">Connected:</span>
+              <span className="min-w-0 truncate font-medium text-text" title={gmailStatus.gmailAddress}>{gmailStatus.gmailAddress}</span>
             </p>
             {!confirmingDisconnect && (
               <SecondaryButton onClick={() => setConfirmingDisconnect(true)} className="px-3 py-1 text-xs">
@@ -171,7 +172,7 @@ function GmailConnectionPanel() {
             )}
           </div>
           {confirmingDisconnect && (
-            <div className="mt-3 flex items-center justify-between rounded-lg border border-error/40 bg-error-bg px-3 py-2">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-error/40 bg-error-bg px-3 py-2">
               <p className="text-sm text-error">Disconnect this Gmail account? Auto-replies will stop until reconnected.</p>
               <div className="flex gap-2">
                 <SecondaryButton onClick={() => setConfirmingDisconnect(false)} className="px-3 py-1 text-xs">
@@ -188,7 +189,7 @@ function GmailConnectionPanel() {
             </div>
           )}
           <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-border bg-surface-alt px-4 py-3">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-text">Auto-send confident matches</p>
               <p className="text-xs text-text-muted">
                 When on, an inquiry that mentions an exact load number is replied to automatically. Every other match

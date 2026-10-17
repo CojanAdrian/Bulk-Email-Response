@@ -174,7 +174,7 @@ function CarrierDetailSheet({ carrierId, onClose, onEdit, variant = 'sheet' }) {
         animate={{ x: 0, opacity: 1 }}
         exit={{ x: '100%', opacity: 0 }}
         transition={{ type: 'spring', damping: 30, stiffness: 260 }}
-        className="absolute inset-y-0 right-0 z-30 w-full max-w-sm overflow-y-auto border-l border-border bg-surface p-5 shadow-[-12px_0_40px_rgba(0,0,0,0.35)]"
+        className="fixed inset-x-0 bottom-0 top-14 z-40 w-full overflow-y-auto border-t border-border bg-surface p-5 pb-24 text-text shadow-[-12px_0_40px_rgba(0,0,0,0.35)] md:absolute md:inset-y-0 md:left-auto md:right-0 md:top-0 md:max-w-sm md:border-l md:border-t-0 md:pb-5"
       >
         <CarrierDetailBody status={status} carrier={carrier} history={history} onClose={onClose} onEdit={onEdit} />
       </motion.div>

@@ -7,7 +7,13 @@ function StatTile({ label, value, accentClassName = 'text-text' }) {
       <p className="truncate text-[11px] font-semibold uppercase tracking-wide text-text-muted sm:text-xs" title={label}>
         {label}
       </p>
-      <p className={`mt-0.5 break-words font-display text-lg font-bold leading-tight tabular-nums sm:mt-1 sm:text-2xl ${accentClassName}`}>{value}</p>
+      <p
+        className={`mt-0.5 font-display font-bold leading-tight tabular-nums sm:mt-1 sm:text-2xl ${
+          typeof value === 'string' && value.length > 7 ? 'text-sm' : 'text-lg'
+        } ${accentClassName}`}
+      >
+        {value}
+      </p>
     </Card>
   );
 }

@@ -176,7 +176,7 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'carriers' && carriersView === 'find' && (
-            <motion.main key="carriers-find" {...preset.crossfade} className="relative h-[calc(100dvh-3.5rem)] w-full overflow-hidden pb-[4.5rem] md:pb-0">
+            <motion.main key="carriers-find" {...preset.crossfade} className="relative w-full pb-[4.5rem] md:h-[calc(100dvh-3.5rem)] md:overflow-hidden md:pb-0">
               <CarrierMapPage focusedLoad={focusedMatchLoad} onClearFocusedLoad={() => setFocusedMatchLoad(null)} />
               {/* Floats over the globe instead of sitting in a separate header
                   strip above it, so the whole tab reads as one continuous

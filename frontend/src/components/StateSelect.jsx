@@ -19,7 +19,7 @@ function stateMatches(code, query) {
 // every keystroke, not just on blur -- both because that's the natural
 // way to type a code you already know, and because several existing
 // call sites simulate a single change event with no following blur.
-function StateSelect({ id, ariaLabel, value, onChange, className = '', dark = false }) {
+function StateSelect({ id, ariaLabel, value, onChange, className = '', dark = false, placeholder = 'State' }) {
   const [query, setQuery] = useState(value || '');
   const [open, setOpen] = useState(false);
   const [invalid, setInvalid] = useState(false);
@@ -93,6 +93,7 @@ function StateSelect({ id, ariaLabel, value, onChange, className = '', dark = fa
         aria-expanded={open}
         aria-autocomplete="list"
         autoComplete="off"
+        placeholder={placeholder}
         value={query}
         onChange={handleChange}
         onFocus={() => setOpen(true)}

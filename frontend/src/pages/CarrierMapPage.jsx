@@ -244,8 +244,11 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
   }
 
   return (
-    <div className="relative h-full min-h-[520px] w-full overflow-hidden bg-[#05060a]">
-      <div className="absolute inset-0">
+    <div className="relative w-full bg-[#05060a] md:h-full md:min-h-[520px] md:overflow-hidden">
+      {/* Phones: map, then the lane search, then the matches, stacked and
+          page-scrolled. Tablets and up: search and matches float over a
+          full-bleed map. */}
+      <div className="relative h-[42vh] min-h-[260px] md:absolute md:inset-0 md:h-auto">
         <CarrierLaneMap
           focusedLoad={queryLane}
           laneMatches={laneMatches}
@@ -256,7 +259,7 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
         />
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex justify-start p-4 sm:p-6">
+      <div className="relative z-20 flex justify-start p-3 md:pointer-events-none md:absolute md:inset-x-0 md:bottom-0 md:p-6 md:pr-[25rem]">
         <div className="pointer-events-auto w-full max-w-xl rounded-2xl border border-white/10 bg-black/50 p-3 backdrop-blur-xl">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/50">Search a lane</p>
           <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -340,9 +343,9 @@ function CarrierMapPage({ focusedLoad, onClearFocusedLoad }) {
         </div>
       </div>
 
-      <div className="absolute inset-y-0 right-0 z-10 flex w-full max-w-sm flex-col overflow-hidden border-l border-white/10 bg-black/40 backdrop-blur-xl">
+      <div className="relative z-10 flex w-full flex-col border-t border-white/10 bg-black/40 md:absolute md:inset-y-0 md:right-0 md:max-w-sm md:overflow-hidden md:border-l md:border-t-0 md:backdrop-blur-xl">
         <h2 className="shrink-0 border-b border-white/10 px-4 py-3 text-sm font-semibold text-white">Matched carriers</h2>
-        <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="p-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
           {laneMatches.length === 0 && regionalMatches.length === 0 && (
             <p className="text-sm text-white/50">{status === 'loading' ? 'Searching...' : 'No matches yet.'}</p>
           )}
