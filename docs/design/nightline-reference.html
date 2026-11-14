@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nightline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300..800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<style>
+  :root {
+    --spring: linear(0, 0.009, 0.035 2.1%, 0.141 4.4%, 0.723 12.9%, 0.938 16.7%, 1.017, 1.077, 1.121, 1.149 24.3%, 1.159, 1.163, 1.161, 1.154 29.9%, 1.129 32.8%, 1.051 39.6%, 1.017 43.1%, 0.991, 0.977 51%, 0.974 53.8%, 0.975 57.1%, 0.997 69.8%, 1.003 76.9%, 1);
+    --soft: cubic-bezier(.32,.72,0,1);
+    --t1: #f5f5f2; --t2: rgba(245,245,242,.56); --t3: rgba(245,245,242,.28); --sep: rgba(255,255,255,.07);
+    --gold: #f0c462; --hot: #ff7a3d;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; }
+  html, body { height: 100%; overflow: hidden; background: #000; color: var(--t1); font-family: Inter, system-ui, sans-serif; font-size: 13px; letter-spacing: -.008em; user-select: none; }
+  #map { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .grain { position: fixed; inset: 0; pointer-events: none; z-index: 60; opacity: .06; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  .mat { background: rgba(16,16,17,.62); -webkit-backdrop-filter: blur(40px) saturate(160%); backdrop-filter: blur(40px) saturate(160%); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.11), inset 0 1px 0 rgba(255,255,255,.1), 0 40px 100px rgba(0,0,0,.7); }
+  .cap { font-size: 10.5px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--t3); }
+
+  /* brand + clock */
+  .brand { position: fixed; left: 36px; top: 26px; z-index: 20; display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 15px; letter-spacing: -.03em; }
+  .brand i { width: 18px; height: 18px; border: 2px solid var(--t1); border-radius: 50%; position: relative; } .brand i::after { content: ''; position: absolute; inset: 3px; border-radius: 50%; background: var(--t1); }
+  .clock { position: fixed; right: 36px; top: 26px; z-index: 20; text-align: right; } .clock b { display: block; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 3px; }
+
+  /* island */
+  #island { position: fixed; top: 16px; left: 50%; translate: -50% 0; z-index: 40; background: #000; border-radius: 22px; width: 204px; height: 38px; overflow: hidden; cursor: pointer; transition: width .8s var(--spring), height .8s var(--spring), border-radius .5s var(--soft); box-shadow: inset 0 0 0 .5px rgba(255,255,255,.16), 0 14px 50px rgba(0,0,0,.7); }
+  #island .idle { position: absolute; inset: 0; display: flex; align-items: center; justify-content: space-between; padding: 0 15px; font-size: 12px; font-weight: 500; transition: opacity .2s; }
+  #island .idle span { display: flex; align-items: center; gap: 8px; color: var(--t2); } #island .idle i { width: 6px; height: 6px; border-radius: 50%; background: #3ddc84; animation: live 2s infinite; }
+  @keyframes live { 50% { opacity: .35; } } #island .idle b { font-weight: 600; color: var(--hot); }
+  #island .open { position: absolute; inset: 0; padding: 18px 20px; opacity: 0; transition: opacity .15s; display: flex; flex-direction: column; }
+  #island.x { width: 440px; height: 172px; border-radius: 36px; cursor: default; } #island.x .idle { opacity: 0; } #island.x .open { opacity: 1; transition: opacity .35s .25s; }
+  .open .who { display: flex; align-items: baseline; gap: 10px; } .open .who b { font-size: 14px; font-weight: 600; } .open .who span { font-size: 12px; color: var(--t2); } .open .who time { margin-left: auto; font-size: 11px; color: var(--hot); font-weight: 600; letter-spacing: .08em; }
+  .open p { margin-top: 9px; font-size: 14px; line-height: 1.4; color: var(--t2); } .open p b { color: var(--t1); font-weight: 600; }
+  .open .acts { margin-top: auto; display: flex; gap: 8px; } .open .acts button { all: unset; cursor: pointer; flex: 1; text-align: center; padding: 9px 0; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: rgba(255,255,255,.12); transition: scale .25s var(--spring); } .open .acts button:first-child { background: var(--t1); color: #000; } .open .acts button:active { scale: .94; }
+
+  /* board */
+  #board { position: fixed; left: 36px; top: 84px; bottom: 104px; width: 540px; border-radius: 30px; z-index: 10; display: flex; flex-direction: column; overflow: hidden; transform-origin: 50% 55%; transition: scale .7s var(--soft), filter .7s var(--soft); animation: up 1.1s var(--spring) .1s both; }
+  @keyframes up { from { opacity: 0; translate: 0 40px; scale: .94; } }
+  #board.back { scale: .95; filter: brightness(.45) blur(2px); }
+  .bh { padding: 26px 28px 0; display: flex; align-items: flex-end; gap: 14px; }
+  .bh .n { font-size: 84px; font-weight: 700; line-height: .8; letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
+  .bh .l { padding-bottom: 4px; } .bh .l b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.02em; margin-top: 2px; }
+  .bh .add { margin-left: auto; width: 40px; height: 40px; border-radius: 50%; background: var(--t1); color: #000; display: grid; place-items: center; font-size: 22px; font-weight: 300; cursor: pointer; transition: scale .35s var(--spring), rotate .5s var(--spring); margin-bottom: 4px; } .bh .add:hover { scale: 1.12; rotate: 90deg; }
+  .tabs { position: relative; display: flex; gap: 22px; padding: 20px 28px 0; border-bottom: .5px solid var(--sep); }
+  .tabs span { padding-bottom: 12px; font-size: 13px; font-weight: 500; color: var(--t3); cursor: pointer; transition: color .25s; } .tabs span.on { color: var(--t1); } .tabs span em { font-style: normal; margin-left: 5px; font-variant-numeric: tabular-nums; opacity: .6; }
+  .tabs u { position: absolute; bottom: -.5px; height: 1.5px; background: var(--t1); transition: left .6s var(--spring), width .6s var(--spring); }
+  #rows { flex: 1; overflow: auto; padding: 8px 10px 14px; } #rows::-webkit-scrollbar { width: 0; }
+  .row { position: relative; display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 13px 18px; border-radius: 18px; cursor: pointer; animation: rin .9s var(--spring) both; transition: background .2s, scale .35s var(--spring); }
+  @keyframes rin { from { opacity: 0; translate: -18px 0; } }
+  .row:hover, .row.cur { background: rgba(255,255,255,.065); } .row:active { scale: .985; }
+  .row .ln { font-size: 15.5px; font-weight: 600; letter-spacing: -.022em; display: flex; align-items: center; gap: 9px; white-space: nowrap; }
+  .row .ln svg { width: 18px; height: 8px; color: var(--t3); flex: none; transition: width .45s var(--spring), color .2s; } .row:hover .ln svg, .row.cur .ln svg { width: 30px; color: var(--t1); }
+  .row .me { margin-top: 4px; align-items: center; font-size: 12px; color: var(--t2); font-variant-numeric: tabular-nums; display: flex; gap: 8px; } .row .me i { font-style: normal; color: var(--t3); }
+  .row .rt { text-align: right; font-size: 17px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+  .row .iq { margin-top: 3px; font-size: 11.5px; font-weight: 600; color: var(--hot); text-align: right; height: 15px; }
+  .row.gold .ln { color: var(--gold); } .row.gold::before { content: ''; position: absolute; left: 6px; top: 16px; bottom: 16px; width: 2px; border-radius: 2px; background: var(--gold); box-shadow: 0 0 12px var(--gold); }
+
+  /* right column */
+  #feed { position: fixed; right: 36px; top: 96px; width: 300px; z-index: 9; }
+  #feed .cap { display: flex; justify-content: space-between; margin-bottom: 10px; } #feed .cap b { color: var(--hot); }
+  .fi { border-radius: 20px; padding: 13px 16px; margin-bottom: 8px; cursor: pointer; animation: fin 1s var(--spring) both; transition: scale .35s var(--spring), translate .35s var(--spring); } .fi:hover { scale: 1.03; translate: -6px 0; }
+  @keyframes fin { from { opacity: 0; translate: 60px 0; } }
+  .fi div { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 600; } .fi time { color: var(--t3); font-weight: 500; font-size: 11.5px; } .fi p { margin-top: 3px; font-size: 12.5px; color: var(--t2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #today { position: fixed; right: 36px; bottom: 104px; width: 300px; z-index: 9; border-radius: 28px; padding: 18px; display: grid; grid-template-columns: 96px 1fr; gap: 14px 16px; align-items: center; animation: fin 1.1s var(--spring) 1s both; cursor: pointer; transition: scale .4s var(--spring); } #today:hover { scale: 1.03; }
+  #today small { font-size: 11.5px; color: var(--t2); }
+  .ringw { position: relative; width: 96px; height: 96px; } .ringw svg { width: 100%; height: 100%; rotate: -90deg; } .ringw circle { fill: none; stroke-width: 9; stroke-linecap: round; }
+  .ringw .trk { stroke: rgba(255,255,255,.08); } .ringw .arc { stroke: var(--t1); stroke-dasharray: 314; stroke-dashoffset: 314; animation: ring 1.8s var(--spring) 1.5s forwards; } @keyframes ring { to { stroke-dashoffset: 118; } }
+  .ringw div { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; } .ringw b { font-size: 34px; font-weight: 700; letter-spacing: -.05em; line-height: 1; }
+  #today .tx p { margin-top: 6px; font-size: 12.5px; line-height: 1.45; color: var(--t2); } #today .tx p b { color: var(--t1); font-weight: 600; }
+  #today .sp { grid-column: 1 / -1; display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; padding-top: 14px; border-top: .5px solid var(--sep); }
+  #today .sp b { display: block; font-size: 26px; font-weight: 700; letter-spacing: -.045em; line-height: 1.1; margin-top: 5px; font-variant-numeric: tabular-nums; }
+  #today .sp svg { width: 120px; height: 44px; overflow: visible; } #today .li { fill: none; stroke: var(--t1); stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.6s var(--soft) 1.8s forwards; } @keyframes draw { to { stroke-dashoffset: 0; } }
+  #today .ar { fill: rgba(255,255,255,.07); opacity: 0; animation: fade .8s 2.6s forwards; } @keyframes fade { to { opacity: 1; } }
+  .bars { display: flex; align-items: flex-end; gap: 5px; height: 44px; width: 120px; } .bars i { flex: 1; border-radius: 3px; background: rgba(255,255,255,.22); height: 0; animation: grow .9s var(--spring) forwards; } .bars i:nth-last-child(-n+2) { background: #3ddc84; }
+  .bars i:nth-child(1) { animation-delay: 2s; } .bars i:nth-child(2) { animation-delay: 2.06s; } .bars i:nth-child(3) { animation-delay: 2.12s; } .bars i:nth-child(4) { animation-delay: 2.18s; } .bars i:nth-child(5) { animation-delay: 2.24s; } .bars i:nth-child(6) { animation-delay: 2.3s; } .bars i:nth-child(7) { animation-delay: 2.36s; } .bars i:nth-child(8) { animation-delay: 2.42s; } @keyframes grow { to { height: var(--h); } }
+
+  /* command bar */
+  #bar { position: fixed; bottom: 22px; left: 50%; translate: -50% 0; z-index: 30; display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 99px; animation: bin 1s var(--spring) .45s both; }
+  @keyframes bin { from { translate: -50% 120px; } }
+  #bar .pill { position: absolute; top: 6px; bottom: 6px; border-radius: 99px; background: var(--t1); transition: left .6s var(--spring), width .6s var(--spring); }
+  #bar a { position: relative; padding: 11px 20px; font-size: 13.5px; font-weight: 500; color: var(--t2); cursor: pointer; transition: color .25s; display: flex; align-items: center; gap: 7px; } #bar a.on { color: #000; font-weight: 600; }
+  #bar a em { font-style: normal; font-size: 11px; font-weight: 700; background: var(--hot); color: #000; border-radius: 99px; padding: 1px 6px; }
+  #bar .sep { width: .5px; height: 22px; background: rgba(255,255,255,.16); margin: 0 6px; }
+  #bar .k { padding: 10px 16px; border-radius: 99px; color: var(--t2); font-size: 12.5px; cursor: pointer; display: flex; gap: 10px; transition: background .2s; } #bar .k:hover { background: rgba(255,255,255,.08); } #bar .k kbd { font: inherit; color: var(--t3); }
+
+  /* spotlight */
+  #scrim { position: fixed; inset: 0; z-index: 44; background: rgba(0,0,0,.22); opacity: 0; pointer-events: none; transition: opacity .35s; } #scrim.on { opacity: 1; pointer-events: auto; }
+  #spot { position: fixed; top: 20vh; left: 50%; width: 660px; translate: -50% 0; z-index: 51; border-radius: 28px; overflow: hidden; opacity: 0; scale: .92; pointer-events: none; transition: opacity .2s, scale .55s var(--spring); } #spot.on { opacity: 1; scale: 1; pointer-events: auto; }
+  #spot input { all: unset; display: block; width: 100%; padding: 22px 26px; font-size: 26px; font-weight: 500; letter-spacing: -.03em; user-select: text; box-sizing: border-box; } #spot input::placeholder { color: var(--t3); }
+  #res { border-top: .5px solid var(--sep); padding: 8px; } #res div { display: flex; align-items: center; gap: 14px; padding: 11px 16px; border-radius: 16px; font-size: 15px; font-weight: 500; cursor: pointer; letter-spacing: -.015em; } #res div.sel { background: var(--t1); color: #000; }
+  #res span { font-size: 12px; opacity: .5; width: 64px; font-variant-numeric: tabular-nums; } #res em { margin-left: auto; font-style: normal; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+  /* detail morph */
+  #det { position: fixed; z-index: 45; border-radius: 18px; overflow: hidden; display: none; transition: left .75s var(--spring), top .75s var(--spring), width .75s var(--spring), height .75s var(--spring), border-radius .5s var(--soft); }
+  #det .c { position: absolute; inset: 0; padding: 30px 32px 26px; opacity: 0; transition: opacity .15s; display: flex; flex-direction: column; } #det.open .c { opacity: 1; transition: opacity .45s .28s; }
+  #det .x { position: absolute; right: 20px; top: 20px; width: 30px; height: 30px; border-radius: 50%; background: rgba(255,255,255,.1); display: grid; place-items: center; cursor: pointer; transition: rotate .5s var(--spring), background .2s; } #det .x:hover { rotate: 90deg; background: rgba(255,255,255,.2); } #det .x::before, #det .x::after { content: ''; position: absolute; width: 11px; height: 1.5px; background: var(--t1); rotate: 45deg; } #det .x::after { rotate: -45deg; }
+  #det h2 { font-size: 40px; font-weight: 700; letter-spacing: -.05em; line-height: 1; margin-top: 12px; } #det h2 span { display: block; color: var(--t3); }
+  .strip { margin-top: 22px; display: flex; align-items: center; gap: 12px; font-size: 12px; color: var(--t2); font-variant-numeric: tabular-nums; } .strip i { flex: 1; height: 1.5px; background: rgba(255,255,255,.14); position: relative; overflow: hidden; border-radius: 2px; } .strip i::after { content: ''; position: absolute; inset: 0; width: 34%; background: linear-gradient(90deg, transparent, var(--t1)); animation: run 2.2s var(--soft) infinite; } @keyframes run { from { translate: -100% 0; } to { translate: 300% 0; } }
+  .kv { display: grid; grid-template-columns: repeat(4, auto); justify-content: space-between; margin-top: 24px; padding: 18px 0; border-top: .5px solid var(--sep); border-bottom: .5px solid var(--sep); } .kv b { display: block; font-size: 22px; font-weight: 600; letter-spacing: -.035em; margin-top: 5px; }
+  .pv { margin-top: 16px; display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--gold); } .pv span { border: .5px solid rgba(240,196,98,.4); border-radius: 99px; padding: 4px 11px; color: var(--t1); }
+  .ft { margin-top: auto; display: flex; gap: 8px; } .ft button { all: unset; cursor: pointer; padding: 12px 20px; border-radius: 99px; font-size: 13px; font-weight: 600; background: rgba(255,255,255,.1); transition: scale .3s var(--spring), background .2s; } .ft button:hover { background: rgba(255,255,255,.18); } .ft button:active { scale: .93; } .ft button:first-child { background: var(--t1); color: #000; } .ft button:last-child { margin-left: auto; }
+
+  .cp { font-variant-numeric: tabular-nums; color: var(--t2); padding: 1px 7px; margin: -1px 0 -1px -7px; border-radius: 6px; transition: background .2s, color .2s; position: relative; }
+  .cp:hover { background: rgba(255,255,255,.12); color: var(--t1); } .cp.ok { background: #3ddc84; color: #000; }
+  #det .c { overflow: auto; } #det .c::-webkit-scrollbar { width: 0; }
+  .times { margin-top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .times div { background: rgba(255,255,255,.055); border-radius: 18px; padding: 14px 16px; } .times b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.025em; margin: 6px 0 2px; } .times small { color: var(--t2); font-size: 12.5px; } .times em { font-style: normal; font-size: 10.5px; font-weight: 700; letter-spacing: .08em; margin-left: 6px; padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.12); color: var(--t1); vertical-align: 2px; }
+  .note { margin-top: 14px; font-size: 13px; line-height: 1.5; color: var(--t2); } .note p { margin-top: 6px; color: var(--t1); user-select: text; }
+  #det .ft { padding-top: 18px; }
+  #drop { position: fixed; inset: 0; z-index: 70; display: grid; place-content: center; text-align: center; background: rgba(0,0,0,.55); -webkit-backdrop-filter: blur(18px); backdrop-filter: blur(18px); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  #drop.on { opacity: 1; } #drop div { width: 190px; height: 190px; margin: 0 auto 26px; border-radius: 50%; border: 1.5px dashed rgba(255,255,255,.5); display: grid; place-items: center; scale: .7; transition: scale .7s var(--spring); animation: spin 14s linear infinite; } #drop.on div { scale: 1; } @keyframes spin { to { rotate: 360deg; } }
+  #drop b { font-size: 34px; font-weight: 700; letter-spacing: -.045em; } #drop p { margin-top: 8px; color: var(--t2); font-size: 14px; }
+  #island.msg { width: 330px; } #island.msg .idle i { background: #3ddc84; animation: none; } #island.msg .idle span { color: var(--t1); }
+  .regs { display: flex; gap: 6px; margin-top: 9px; flex-wrap: wrap; }
+  .rg { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--t2); padding: 5px 11px 5px 6px; border-radius: 99px; background: rgba(240,196,98,.09); box-shadow: inset 0 0 0 .5px rgba(240,196,98,.35); transition: scale .35s var(--spring), background .2s; cursor: pointer; }
+  .rg:hover { scale: 1.05; background: rgba(240,196,98,.18); } .rg b { color: var(--t1); font-weight: 600; } .rg u { text-decoration: none; width: 20px; height: 20px; border-radius: 50%; background: var(--gold); color: #000; font-size: 10px; font-weight: 800; display: grid; place-items: center; }
+  #pop { position: fixed; z-index: 55; width: 300px; border-radius: 26px; padding: 18px; opacity: 0; scale: .85; pointer-events: none; transform-origin: 0 0; transition: opacity .18s, scale .5s var(--spring); }
+  #pop.on { opacity: 1; scale: 1; pointer-events: auto; }
+  #pop h4 { font-size: 19px; font-weight: 700; letter-spacing: -.035em; } #pop h4 + small { color: var(--t2); font-size: 12px; }
+  #pop .g { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin: 14px 0; padding: 12px 0; border-top: .5px solid var(--sep); border-bottom: .5px solid var(--sep); } #pop .g b { display: block; font-size: 17px; font-weight: 600; letter-spacing: -.03em; margin-top: 4px; }
+  #pop .ph { display: flex; justify-content: space-between; align-items: center; font-size: 13px; } #pop .ph span { color: var(--t2); }
+  #pop .bt { display: flex; gap: 8px; margin-top: 14px; } #pop .bt button { all: unset; flex: 1; text-align: center; cursor: pointer; padding: 10px 0; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: rgba(255,255,255,.1); transition: scale .3s var(--spring); } #pop .bt button:first-child { background: var(--gold); color: #000; } #pop .bt button:active { scale: .93; }
+  #me { position: fixed; right: 36px; top: 20px; z-index: 20; display: flex; align-items: center; gap: 10px; padding: 5px 14px 5px 5px; border-radius: 99px; cursor: pointer; font-size: 12.5px; font-weight: 500; color: var(--t2); transition: scale .35s var(--spring), color .2s; } #me:hover { scale: 1.05; color: var(--t1); }
+  #me u { text-decoration: none; width: 28px; height: 28px; border-radius: 50%; background: var(--t1); color: #000; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
+  #set { position: fixed; z-index: 52; left: 50%; top: 50%; width: min(920px, 92vw); height: min(620px, 86vh); margin: calc(min(620px, 86vh) / -2) 0 0 calc(min(920px, 92vw) / -2); border-radius: 34px; display: grid; grid-template-columns: 230px 1fr; overflow: hidden; opacity: 0; scale: .5; translate: 34vw -38vh; pointer-events: none; transition: opacity .2s, scale .7s var(--spring), translate .7s var(--spring); }
+  #set.on { opacity: 1; scale: 1; translate: 0 0; pointer-events: auto; }
+  #set nav { padding: 28px 14px; border-right: .5px solid var(--sep); background: rgba(0,0,0,.25); position: relative; }
+  #set nav h3 { font-size: 24px; font-weight: 700; letter-spacing: -.045em; padding: 0 12px 18px; }
+  #set nav a { position: relative; z-index: 1; display: block; padding: 10px 12px; font-size: 13.5px; font-weight: 500; color: var(--t2); cursor: pointer; transition: color .2s; } #set nav a.on { color: #000; font-weight: 600; }
+  #set nav i { position: absolute; left: 14px; right: 14px; height: 38px; border-radius: 12px; background: var(--t1); transition: top .55s var(--spring); }
+  #set nav .out { position: absolute; bottom: 22px; left: 26px; font-size: 12.5px; color: var(--t3); cursor: pointer; }
+  #sc { padding: 30px 34px; overflow: auto; } #sc::-webkit-scrollbar { width: 0; }
+  #sc h4 { font-size: 30px; font-weight: 700; letter-spacing: -.05em; } #sc h4 + p { color: var(--t2); margin: 6px 0 16px; font-size: 13.5px; }
+  .opt { display: flex; align-items: center; gap: 20px; padding: 16px 0; border-top: .5px solid var(--sep); animation: oin .7s var(--spring) both; } @keyframes oin { from { opacity: 0; translate: 0 14px; } }
+  .opt div:first-child { flex: 1; } .opt b { font-size: 14.5px; font-weight: 600; letter-spacing: -.015em; } .opt small { display: block; margin-top: 3px; color: var(--t2); font-size: 12.5px; line-height: 1.4; }
+  .tg { width: 46px; height: 28px; border-radius: 99px; background: rgba(255,255,255,.14); position: relative; cursor: pointer; transition: background .3s; flex: none; } .tg::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; transition: translate .5s var(--spring); } .tg.on { background: #3ddc84; } .tg.on::after { translate: 18px 0; }
+  .stp { display: flex; align-items: center; background: rgba(255,255,255,.08); border-radius: 99px; padding: 4px; flex: none; } .stp button { all: unset; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; font-size: 17px; color: var(--t2); transition: background .2s, scale .3s var(--spring); } .stp button:hover { background: rgba(255,255,255,.12); color: var(--t1); } .stp button:active { scale: .85; } .stp b { min-width: 74px; text-align: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .sg { display: flex; background: rgba(255,255,255,.08); border-radius: 99px; padding: 4px; flex: none; } .sg span { padding: 7px 14px; border-radius: 99px; font-size: 12.5px; font-weight: 500; color: var(--t2); cursor: pointer; transition: .25s; } .sg span.on { background: var(--t1); color: #000; font-weight: 600; }
+  .fld { background: rgba(255,255,255,.08); border-radius: 12px; padding: 9px 14px; font-size: 13.5px; min-width: 220px; color: var(--t1); flex: none; } .fld.ta { white-space: pre-line; line-height: 1.45; min-width: 260px; color: var(--t2); }
+  .lk { font-size: 12.5px; font-weight: 600; padding: 9px 16px; border-radius: 99px; background: rgba(255,255,255,.1); cursor: pointer; flex: none; }
+  .ringw .arc { transition: stroke-dashoffset 1s var(--spring); }
+  .hint { position: fixed; left: 36px; bottom: 34px; z-index: 5; font-size: 11.5px; color: var(--t3); } .hint b { color: var(--t2); font-weight: 500; }
+</style>
+</head>
+<body>
+<canvas id="map"></canvas><div class="grain"></div>
+
+<div class="brand"><i></i>bulkposting</div>
+
+
+<div id="island"><div class="idle"><span><i></i>Inbox live</span><b>6 waiting</b></div>
+  <div class="open">
+    <div class="who"><b>Redline Haul</b><span>about 0084341</span><time>NEW</time></div>
+    <p>"Is Chicago to Dallas still open? Can do <b>$2,300</b>, truck empties in Joliet tomorrow 7am."</p>
+    <div class="acts"><button id="irep" data-choice="island-reply">Reply with load details</button><button id="ix">Later</button></div>
+  </div>
+</div>
+
+<div id="board" class="mat">
+  <div class="bh"><div class="n" id="cnt">0</div><div class="l"><span class="cap">Live board</span><b>loads to cover</b></div><div class="add" title="New load">+</div></div>
+  <div class="tabs" id="tabs"><span class="on">Active<em>42</em></span><span>Booked<em>5</em></span><span>Covered<em>11</em></span><span>Proven<em>9</em></span><u></u></div>
+  <div id="rows"></div>
+</div>
+
+<div id="feed"><div class="cap"><span>Needs a reply</span><b>6</b></div>
+  <div class="fi mat" style="animation-delay:.6s"><div>Redline Haul<time>2m</time></div><p>Is Chicago to Dallas still open?</p></div>
+  <div class="fi mat" style="animation-delay:.72s"><div>Northstar Carriers<time>9m</time></div><p>Fresno to Denver reefer, can do $3,500</p></div>
+  <div class="fi mat" style="animation-delay:.84s"><div>TQL Freight<time>14m</time></div><p>0084377 Atlanta, what's the weight?</p></div>
+</div>
+<div id="today" class="mat">
+  <div class="ringw"><svg viewBox="0 0 120 120"><circle cx="60" cy="60" r="50" class="trk"/><circle cx="60" cy="60" r="50" class="arc"/></svg><div><b>5</b><small>of 8</small></div></div>
+  <div class="tx"><span class="cap">Booked today</span><p><b>3 more</b> to hit today's goal</p></div>
+  <div class="sp"><div><span class="cap">Avg margin</span><b>$1,840</b><small>+12% this week</small></div>
+    <svg viewBox="0 0 120 44" preserveAspectRatio="none"><path class="ar" d="M0 36 L17 31 L34 33 L51 22 L68 25 L85 13 L102 16 L120 5 L120 44 L0 44Z"/><path class="li" pathLength="1" d="M0 36 L17 31 L34 33 L51 22 L68 25 L85 13 L102 16 L120 5"/></svg></div>
+  <div class="sp"><div><span class="cap">Reply time</span><b>4 min</b><small>median today</small></div>
+    <div class="bars"><i style="--h:40%"></i><i style="--h:70%"></i><i style="--h:55%"></i><i style="--h:90%"></i><i style="--h:35%"></i><i style="--h:60%"></i><i style="--h:25%"></i><i style="--h:18%"></i></div></div>
+</div>
+
+<div id="bar" class="mat"><div class="pill"></div><a class="on">Loads</a><a>Inquiries<em>6</em></a><a>Carriers</a><a>Customers</a><a>Stats</a><div class="sep"></div><div class="k" id="kb">Search<kbd>Ctrl K</kbd></div></div>
+
+<div id="scrim"></div>
+<div id="spot" class="mat"><input id="q" placeholder="Find a load, carrier or customer" spellcheck="false"><div id="res"></div></div>
+<div id="det" class="mat"><div class="c"></div></div>
+<div id="drop"><div></div><b>Drop to build your board</b><p>McLeod CSV export. New loads are added, existing ones updated.</p></div>
+<div id="pop" class="mat"></div>
+<div id="me" class="mat" data-choice="open-settings"><u>AC</u>Adrian</div>
+<div id="set" class="mat"><nav><h3>Settings</h3><i></i><span class="out">Sign out</span></nav><div id="sc"></div></div>
+<div class="hint"><b>Try</b> &nbsp;your name (top right) for Settings, change the daily goal · click a carrier under a gold load · click a load number to copy it (or press C) · open a load · drag a file in · press Ctrl V</div>
+
+<script>
+  const L = [
+    { id: '0084341', o: 'Chicago', os: 'IL', d: 'Dallas', ds: 'TX', pu: 'Nov 16, 8am–2pm', eq: 'Van', w: '42,000 lb', r: '$2,450', n: 3, a: [-87.6, 41.9], b: [-96.8, 32.8] },
+    { id: '0084377', o: 'Atlanta', os: 'GA', d: 'Columbus', ds: 'OH', pu: 'Nov 16, 10am appt', eq: 'Reefer', w: '38,500 lb', r: '$1,980', n: 1, g: 1, a: [-84.4, 33.7], b: [-83, 40] },
+    { id: '0084402', o: 'Laredo', os: 'TX', d: 'Memphis', ds: 'TN', pu: 'Nov 17, 6am–12pm', eq: 'Van', w: '44,000 lb', r: '$2,900', n: 0, a: [-99.5, 27.5], b: [-90, 35.1] },
+    { id: '0084418', o: 'Fresno', os: 'CA', d: 'Denver', ds: 'CO', pu: 'Nov 17, 7am appt', eq: 'Reefer', w: '40,200 lb', r: '$3,650', n: 5, a: [-119.8, 36.7], b: [-105, 39.7] },
+    { id: '0084433', o: 'Savannah', os: 'GA', d: 'Charlotte', ds: 'NC', pu: 'Nov 18, 9am–5pm', eq: 'Flatbed', w: '46,000 lb', r: '$1,150', n: 0, a: [-81.1, 32.1], b: [-80.8, 35.2] },
+    { id: '0084450', o: 'Kansas City', os: 'MO', d: 'Nashville', ds: 'TN', pu: 'Nov 18, 1pm appt', eq: 'Van', w: '31,800 lb', r: '$1,720', n: 2, a: [-94.6, 39.1], b: [-86.8, 36.2] },
+    { id: '0084466', o: 'Seattle', os: 'WA', d: 'Salt Lake City', ds: 'UT', pu: 'Nov 19, 8am–4pm', eq: 'Van', w: '39,000 lb', r: '$2,280', n: 0, g: 1, a: [-122.3, 47.6], b: [-111.9, 40.8] },
+    { id: '0084471', o: 'Miami', os: 'FL', d: 'Newark', ds: 'NJ', pu: 'Nov 19, 6am appt', eq: 'Reefer', w: '41,500 lb', r: '$3,900', n: 1, a: [-80.2, 25.8], b: [-74.2, 40.7] },
+  ];
+  const X = {
+    '0084341': ['Nov 17, 6am–2pm', 'ALDI, Inc', 'Grocery / food', 'FCFS both ends. Driver must have 2 load locks. No pallet exchange. Call receiver 1 hr out.'],
+    '0084377': ['Nov 17, 9am appt', 'Saxco International', 'Empty bottles/cans', 'Temp 34–36°F continuous. Appt required at delivery, do not arrive early. Lumper reimbursed with receipt.'],
+    '0084402': ['Nov 18, 7am–3pm', 'Molson Coors', 'Beer', 'Cross-dock at Laredo. Seal intact at delivery or load refused. 2 stops.'],
+    '0084418': ['Nov 18, 10am appt', 'ALDI, Inc', 'Frozen food', 'Keep frozen, -10°F. Pulp temp at pickup. Multi-drop: 2nd DEL Aurora, CO.'],
+    '0084433': ['Nov 18, 4pm–8pm', 'Saxco International', 'Steel / metal', 'Tarps required. 48 ft flatbed minimum. Straps and edge protectors.'],
+    '0084450': ['Nov 19, 8am appt', 'Molson Coors', 'Beverages', 'Drop and hook at shipper. Live unload, about 2 hrs.'],
+    '0084466': ['Nov 20, 8am–4pm', 'ALDI, Inc', 'Paper / packaging', 'No touch. Driver assist not required.'],
+    '0084471': ['Nov 21, 5am appt', 'Saxco International', 'Grocery / food', 'Team preferred. Temp 38°F. Reefer download required at delivery.'],
+  };
+  L.forEach((l) => { [l.del, l.cu, l.co, l.cm] = X[l.id]; });
+  const REG = {
+    '0084377': [{ n: 'Redline Haul', mc: 'MC 884213', runs: 4, last: 'Oct 28', rate: '$1,850', avg: '$1,820', who: 'Marcus', ph: '(312) 555-0142' }, { n: 'Northstar Carriers', mc: 'MC 671905', runs: 2, last: 'Sep 30', rate: '$1,900', avg: '$1,925', who: 'Dana', ph: '(614) 555-0177' }],
+    '0084466': [{ n: 'Cascade Freightways', mc: 'MC 550318', runs: 3, last: 'Nov 4', rate: '$2,150', avg: '$2,190', who: 'Luis', ph: '(206) 555-0119' }],
+  };
+  const regChips = (l, i) => (REG[l.id] || []).map((c, j) => `<span class="rg" data-l="${i}" data-c="${j}"><u>${c.runs}</u><b>${c.n}</b>last ${c.rate}</span>`).join('');
+  const sched = (t) => { const [d, h] = t.split(', '); return `<b>${d}</b><small>${h.replace(' appt', '')}</small><em>${h.includes('appt') ? 'APPT' : 'FCFS'}</em>`; };
+  const $ = (s) => document.querySelector(s), arrow = '<svg viewBox="0 0 30 8" preserveAspectRatio="xMaxYMid slice" fill="none"><path d="M0 4h29M25.5 1l3.5 3-3.5 3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  $('#rows').innerHTML = L.map((l, i) => `<div class="row ${l.g ? 'gold' : ''}" data-i="${i}" data-choice="open-load" style="animation-delay:${.35 + i * .055}s"><div><div class="ln">${l.o}, ${l.os}${arrow}${l.d}, ${l.ds}</div><div class="me"><span class="cp" data-id="${l.id}" title="Copy load number">${l.id}</span><i>·</i>${l.pu}<i>·</i>${l.eq}</div>${l.g ? `<div class="regs">${regChips(l, i)}</div>` : ''}</div><div><div class="rt">${l.r}</div><div class="iq">${l.n ? l.n + ' asking' : ''}</div></div></div>`).join('');
+
+  /* ---------- the map ---------- */
+  const cv = $('#map'), cx = cv.getContext('2d'), proj = d3.geoAlbersUsa().scale(1300).translate([487.5, 305]);
+  let W, H, dpr, nation = null, borders = null, dots = [], focus = -1, ripples = [], mouse = [0, 0];
+  const cam = { x: 487, y: 300, k: 1 }, to = { x: 487, y: 300, k: 1 };
+  L.forEach((l) => {
+    l.A = proj(l.a); l.B = proj(l.b);
+    const dx = l.B[0] - l.A[0], dy = l.B[1] - l.A[1], len = Math.hypot(dx, dy), s = dx > 0 ? 1 : -1;
+    l.C = [(l.A[0] + l.B[0]) / 2 + (dy / len) * len * .2 * s, (l.A[1] + l.B[1]) / 2 - (dx / len) * len * .2 * s]; l.len = len;
+    l.mi = Math.round(d3.geoDistance(l.a, l.b) * 3958.8 * 1.17 / 10) * 10;
+  });
+  const pt = (l, t) => [(1 - t) ** 2 * l.A[0] + 2 * (1 - t) * t * l.C[0] + t * t * l.B[0], (1 - t) ** 2 * l.A[1] + 2 * (1 - t) * t * l.C[1] + t * t * l.B[1]];
+  function size() { dpr = devicePixelRatio || 1; W = innerWidth; H = innerHeight; cv.width = W * dpr; cv.height = H * dpr; }
+  size(); addEventListener('resize', size); addEventListener('pointermove', (e) => { mouse = [e.clientX / W - .5, e.clientY / H - .5]; });
+  fetch('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-albers-10m.json').then((r) => r.json()).then((us) => {
+    const path = d3.geoPath();
+    nation = new Path2D(path(topojson.feature(us, us.objects.nation)));
+    borders = new Path2D(path(topojson.mesh(us, us.objects.states, (a, b) => a !== b)));
+    const t = document.createElement('canvas').getContext('2d');
+    for (let y = 8; y < 610; y += 7.5) for (let x = (Math.round(y / 7.5) % 2) * 3.75; x < 975; x += 7.5) if (t.isPointInPath(nation, x, y)) dots.push([x, y]);
+  });
+  function setFocus(i) {
+    focus = i;
+    if (i < 0) { to.x = 487; to.y = 300; to.k = 1; return; }
+    const l = L[i]; to.x = l.C[0] * .4 + (l.A[0] + l.B[0]) * .3; to.y = l.C[1] * .4 + (l.A[1] + l.B[1]) * .3; to.k = Math.max(1.25, Math.min(2.4, 430 / l.len));
+  }
+  function frame(now) {
+    const e = .07; cam.x += (to.x - cam.x) * e; cam.y += (to.y - cam.y) * e; cam.k += (to.k - cam.k) * e;
+    const fl = 606, fr = Math.max(fl + 520, W - 366), k0 = Math.min((fr - fl) / 975, (H - 210) / 610), k = k0 * cam.k, ax = (fl + fr) / 2 - mouse[0] * 14, ay = H * .48 - mouse[1] * 10;
+    cx.setTransform(dpr, 0, 0, dpr, 0, 0); cx.clearRect(0, 0, W, H);
+    const glow = cx.createRadialGradient(ax, ay, 0, ax, ay, W * .5); glow.addColorStop(0, 'rgba(255,255,255,.035)'); glow.addColorStop(1, 'rgba(255,255,255,0)'); cx.fillStyle = glow; cx.fillRect(0, 0, W, H);
+    cx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (ax - cam.x * k), dpr * (ay - cam.y * k));
+    if (nation) {
+      const s = 1.5 / Math.sqrt(k);
+      cx.fillStyle = 'rgba(255,255,255,.11)'; cx.beginPath(); for (const d of dots) cx.rect(d[0], d[1], s, s); cx.fill();
+      ripples = ripples.filter((r) => now - r.t < 2600);
+      for (const r of ripples) {
+        const rad = ((now - r.t) / 2600) * 420, fade = 1 - (now - r.t) / 2600;
+        cx.fillStyle = `rgba(255,150,90,${.9 * fade})`; cx.beginPath();
+        for (const d of dots) { const dd = Math.abs(Math.hypot(d[0] - r.x, d[1] - r.y) - rad); if (dd < 16) cx.rect(d[0] - s * .4, d[1] - s * .4, s * 1.8, s * 1.8); } cx.fill();
+      }
+      cx.lineWidth = .7 / k; cx.strokeStyle = 'rgba(255,255,255,.09)'; cx.stroke(borders);
+      cx.lineWidth = 1 / k; cx.strokeStyle = 'rgba(255,255,255,.2)'; cx.stroke(nation);
+    }
+    L.forEach((l, i) => {
+      const on = focus === i, off = focus >= 0 && !on, col = l.g ? '240,196,98' : '255,255,255';
+      cx.lineCap = 'round'; cx.lineWidth = (on ? 1.6 : 1) / k; cx.strokeStyle = `rgba(${col},${off ? .06 : on ? .4 : .3})`;
+      cx.beginPath(); cx.moveTo(l.A[0], l.A[1]); cx.quadraticCurveTo(l.C[0], l.C[1], l.B[0], l.B[1]); cx.stroke();
+      if (on) {
+        const head = ((now / (on ? 1500 : 3200)) + i * .31) % 1.4;
+        cx.shadowColor = `rgba(${col},.9)`; cx.shadowBlur = on ? 16 : 8; cx.lineWidth = (on ? 2.6 : 1.5) / k; cx.strokeStyle = `rgb(${col})`; cx.beginPath(); let st = false;
+        for (let j = 0; j <= 14; j++) { const t = head - .28 + (j / 14) * .28; if (t < 0 || t > 1) continue; const p = pt(l, t); st ? cx.lineTo(p[0], p[1]) : cx.moveTo(p[0], p[1]); st = true; }
+        cx.stroke(); cx.shadowBlur = 0;
+      }
+      for (const [p, name] of [[l.A, l.o], [l.B, l.d]]) {
+        cx.fillStyle = `rgba(${col},${off ? .15 : 1})`; cx.beginPath(); cx.arc(p[0], p[1], (on ? 3.4 : 2.2) / k, 0, 7); cx.fill();
+        if (on) {
+          const ph = (now / 1400) % 1; cx.strokeStyle = `rgba(${col},${.6 * (1 - ph)})`; cx.lineWidth = 1 / k; cx.beginPath(); cx.arc(p[0], p[1], (4 + ph * 18) / k, 0, 7); cx.stroke();
+          cx.font = `600 ${12 / k}px Inter`; cx.fillStyle = '#f5f5f2'; cx.textAlign = p === l.A ? (l.A[0] < l.B[0] ? 'right' : 'left') : (l.A[0] < l.B[0] ? 'left' : 'right');
+          cx.fillText(name.toUpperCase(), p[0] + (cx.textAlign === 'left' ? 9 : -9) / k, p[1] + 4 / k);
+        }
+      }
+      if (on) { const m = pt(l, .5); cx.font = `500 ${11 / k}px Inter`; cx.textAlign = 'center'; cx.fillStyle = 'rgba(245,245,242,.6)'; cx.fillText(l.mi.toLocaleString() + ' mi', m[0], m[1] - 10 / k); }
+    });
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  /* ---------- small things ---------- */
+  
+  const t0 = performance.now() + 300; (function up(n) { const p = Math.min(1, Math.max(0, (n - t0) / 1500)); $('#cnt').textContent = Math.round(42 * (1 - (1 - p) ** 4)); if (p < 1) requestAnimationFrame(up); })(t0);
+  function slider(box, sel, bar) { const put = (a) => { bar.style.left = a.offsetLeft + 'px'; bar.style.width = a.offsetWidth + 'px'; }; box.querySelectorAll(sel).forEach((a) => a.addEventListener('click', () => { box.querySelector('.on').classList.remove('on'); a.classList.add('on'); put(a); })); document.fonts.ready.then(() => put(box.querySelector('.on'))); }
+  slider($('#tabs'), 'span', $('#tabs u')); slider($('#bar'), 'a', $('#bar .pill'));
+
+  /* ---------- rows: hover, keyboard, open ---------- */
+  let cur = -1; const rows = [...document.querySelectorAll('.row')], det = $('#det'); let from = null;
+  function mark(i) { rows.forEach((r, j) => r.classList.toggle('cur', j === i)); cur = i; if (!det.classList.contains('open')) setFocus(i); if (i >= 0) rows[i].scrollIntoView({ block: 'nearest' }); }
+  rows.forEach((r, i) => { r.addEventListener('pointerenter', () => mark(i)); r.addEventListener('click', () => openDet(i)); });
+  $('#rows').addEventListener('pointerleave', () => mark(-1));
+  function openDet(i) {
+    const r = rows[i].getBoundingClientRect(), l = L[i], b = $('#board').getBoundingClientRect(); from = r;
+    det.querySelector('.c').innerHTML = `<div class="x" onclick="closeDet()"></div><span class="cap">${l.cu} · load <span class="cp" data-id="${l.id}" style="margin:0;letter-spacing:0;font-size:12px">${l.id}</span></span><h2>${l.o}, ${l.os}<span>to ${l.d}, ${l.ds}</span></h2>
+      <div class="strip">${l.o}<i></i>${l.mi.toLocaleString()} mi<i></i>${l.d}</div>
+      <div class="times"><div><span class="cap">Pickup · ${l.o}</span>${sched(l.pu)}</div><div><span class="cap">Delivery · ${l.d}</span>${sched(l.del)}</div></div>
+      <div class="kv"><div><span class="cap">Rate</span><b>${l.r}</b></div><div><span class="cap">Equipment</span><b>${l.eq}</b></div><div><span class="cap">Weight</span><b>${l.w.replace(' lb', '')}</b></div><div><span class="cap">Commodity</span><b>${l.co}</b></div></div>
+      <div class="note"><span class="cap">Planning comment · from McLeod</span><p>${l.cm}</p></div>
+      ${l.g ? `<div class="note"><span class="cap" style="color:var(--gold)">Regulars on this lane</span><div class="regs">${regChips(l, i)}</div></div>` : `<div class="pv" style="color:var(--t2)">${l.n ? `<b style="color:var(--hot);font-weight:600">${l.n} carriers asking</b> about this load right now` : 'No inquiries yet. Blast it to carriers who run this region.'}</div>`}
+      <div class="ft"><button>Blast to carriers</button><button>Find carriers</button><button>Copy</button><button>Mark booked</button></div>`;
+    Object.assign(det.style, { display: 'block', transition: 'none', left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px', borderRadius: '18px' }); det.offsetWidth; det.style.transition = '';
+    const w = 620, h = Math.min(680, b.height); Object.assign(det.style, { left: b.left + 16 + 'px', top: b.top + (b.height - h) / 2 + 'px', width: w + 'px', height: h + 'px', borderRadius: '34px' });
+    det.classList.add('open'); $('#board').classList.add('back'); $('#scrim').classList.add('on'); setFocus(i);
+  }
+  window.closeDet = function () {
+    if (!det.classList.contains('open')) return; det.classList.remove('open'); $('#board').classList.remove('back'); $('#scrim').classList.remove('on');
+    Object.assign(det.style, { left: from.left + 'px', top: from.top + 'px', width: from.width + 'px', height: from.height + 'px', borderRadius: '18px' });
+    setTimeout(() => { if (!det.classList.contains('open')) det.style.display = 'none'; }, 700); setFocus(cur);
+  };
+
+  /* ---------- settings ---------- */
+  const T = (on) => `<div class="tg ${on ? 'on' : ''}"></div>`, F = (v, ta) => `<div class="fld ${ta ? 'ta' : ''}">${v}</div>`, G = (opts, on) => `<div class="sg">${opts.map((o, i) => `<span class="${i === on ? 'on' : ''}">${o}</span>`).join('')}</div>`;
+  const S = (key, v, step, fmt) => `<div class="stp" data-k="${key}" data-v="${v}" data-s="${step}" data-f="${fmt}"><button>−</button><b>${fmt.replace('#', Number(v).toLocaleString())}</b><button>+</button></div>`;
+  const SET = {
+    Targets: ['What a good day looks like for you. These drive the Today panel on the board.', [
+      ['Loads booked per day', 'The ring on the board fills toward this.', S('goal', 8, 1, '# loads')],
+      ['Margin per load', 'Booked loads under this are flagged in Stats.', S('margin', 1500, 50, '$#')],
+      ['Reply time', 'Inquiries waiting longer than this turn orange.', S('reply', 10, 1, '# min')],
+      ['Weekly gross profit', 'Shown as progress on the Stats screen.', S('gp', 30000, 1000, '$#')]]],
+    Profile: ['Who you are in the app and on every reply.', [
+      ['Name', 'Shown to teammates and in the top corner.', F('Adrian Cojan')], ['Sign-in', 'Your username or Google account.', F('adrian')],
+      ['Password', 'Last changed 3 months ago.', '<div class="lk">Change password</div>'], ['Time zone', 'Pickup and delivery times are shown in this zone.', F('Central · Chicago')]]],
+    'Gmail & replies': ['How the app reads your inbox and answers carriers.', [
+      ['Connected inbox', 'adrian@igtfreight.com · checked every 30 seconds', '<div class="lk">Disconnect</div>'],
+      ['Send exact matches automatically', 'Only when the carrier quotes a load number you have. Everything else waits for you.', T(false)],
+      ['Include the rate in replies', 'Default for new loads. You can still switch it per load.', T(true)],
+      ['Reply for covered loads', 'Sent when a carrier asks about a load you already booked.', T(true)],
+      ['Signature', 'Added to every reply.', F('Adrian Cojan\nIGT Freight\n(312) 555-0100', 1)]]],
+    Board: ['How your load board behaves.', [
+      ['Opens on', 'The tab you see first.', G(['Active', 'Proven', 'Booked'], 0)], ['Expire loads after pickup passes', 'Moves stale loads out of Active so they stop matching emails.', T(true)],
+      ['Loads missing from a new upload', 'When a CSV no longer contains a load you had.', G(['Keep', 'Ask me', 'Mark covered'], 1)], ['Row size', '', G(['Comfortable', 'Compact'], 0)]]],
+    Notifications: ['When the app should get your attention.', [
+      ['New inquiry', 'Desktop notification and the pill at the top.', T(true)], ['Inquiry waiting too long', 'Past your reply-time target.', T(true)],
+      ['A regular replied', 'A carrier who already ran the lane.', T(true)], ['Sound', '', T(false)]]],
+    Appearance: ['Small things about how it looks and moves.', [
+      ['Map behind the board', 'Turn off on slower machines.', T(true)], ['Motion', '', G(['Full', 'Reduced'], 0)], ['Accent for inquiries', '', G(['Orange', 'Blue', 'White'], 0)]]],
+  };
+  const setEl = $('#set'), nav = setEl.querySelector('nav'), sc = $('#sc'), slab = nav.querySelector('i'), vals = { goal: 8 };
+  nav.querySelector('h3').insertAdjacentHTML('afterend', Object.keys(SET).map((k, i) => `<a class="${i ? '' : 'on'}">${k}</a>`).join(''));
+  function showSet(a) { nav.querySelector('a.on')?.classList.remove('on'); a.classList.add('on'); slab.style.top = a.offsetTop + 'px'; const [sub, rows2] = SET[a.textContent]; sc.innerHTML = `<h4>${a.textContent}</h4><p>${sub}</p>` + rows2.map((r, i) => `<div class="opt" style="animation-delay:${i * .05}s"><div><b>${r[0]}</b>${r[1] ? `<small>${r[1]}</small>` : ''}</div>${r[2]}</div>`).join(''); sc.scrollTop = 0; }
+  nav.querySelectorAll('a').forEach((a) => a.addEventListener('click', () => showSet(a)));
+  function openSet() { setEl.classList.add('on'); $('#scrim').classList.add('on'); $('#board').classList.add('back'); showSet(nav.querySelector('a')); }
+  function closeSet() { setEl.classList.remove('on'); $('#scrim').classList.remove('on'); $('#board').classList.remove('back'); }
+  $('#me').addEventListener('click', openSet);
+  sc.addEventListener('click', (e) => {
+    const tg = e.target.closest('.tg'); if (tg) tg.classList.toggle('on');
+    const sg = e.target.closest('.sg span'); if (sg) { sg.parentNode.querySelector('.on').classList.remove('on'); sg.classList.add('on'); }
+    const bt = e.target.closest('.stp button'); if (!bt) return;
+    const st = bt.parentNode, v = Math.max(+st.dataset.s, +st.dataset.v + (bt.textContent === '+' ? 1 : -1) * +st.dataset.s); st.dataset.v = v; st.querySelector('b').textContent = st.dataset.f.replace('#', v.toLocaleString());
+    if (st.dataset.k === 'goal') { const arc = document.querySelector('.ringw .arc'); arc.style.animation = 'none'; arc.style.strokeDashoffset = 314 * (1 - Math.min(1, 5 / v)); document.querySelector('.ringw small').textContent = 'of ' + v; document.querySelector('#today .tx p').innerHTML = v > 5 ? `<b>${v - 5} more</b> to hit today's goal` : '<b>Goal reached</b> for today'; }
+  });
+
+  /* ---------- regulars: who already ran this lane ---------- */
+  const pop = $('#pop');
+  document.addEventListener('click', (e) => {
+    const g = e.target.closest('.rg');
+    if (!g) { if (!e.target.closest('#pop')) pop.classList.remove('on'); return; }
+    e.stopPropagation(); const l = L[+g.dataset.l], c = REG[l.id][+g.dataset.c], r = g.getBoundingClientRect();
+    pop.innerHTML = `<span class="cap" style="color:var(--gold)">Ran ${l.o} to ${l.d}</span><h4 style="margin-top:6px">${c.n}</h4><small>${c.mc}</small>
+      <div class="g"><div><span class="cap">Runs</span><b>${c.runs}</b></div><div><span class="cap">Last paid</span><b>${c.rate}</b></div><div><span class="cap">Average</span><b>${c.avg}</b></div></div>
+      <div class="ph"><span>${c.who}, dispatcher · last ran ${c.last}</span></div><div class="ph" style="margin-top:8px"><b style="font-size:16px;letter-spacing:-.02em">${c.ph}</b><span class="cp" data-id="${c.ph}" style="margin:0">Copy</span></div>
+      <div class="bt"><button>Email this load</button><button>Open carrier</button></div>`;
+    pop.style.left = Math.min(r.left, innerWidth - 320) + 'px'; pop.style.top = Math.min(r.bottom + 10, innerHeight - 330) + 'px'; pop.classList.add('on');
+  }, true);
+
+  /* ---------- copy load number ---------- */
+  function copyId(el) { navigator.clipboard?.writeText(el.dataset.id).catch(() => {}); const t = el.textContent; el.classList.add('ok'); el.textContent = 'Copied'; setTimeout(() => { el.classList.remove('ok'); el.textContent = t; }, 1100); }
+  document.addEventListener('click', (e) => { const c = e.target.closest('.cp'); if (c) { e.stopPropagation(); copyId(c); } }, true);
+
+  /* ---------- import: drag a file in, or just paste ---------- */
+  const drop = $('#drop'); let depth = 0;
+  function imported(name) { const sp = isl.querySelector('.idle span'), b = isl.querySelector('.idle b'), old = [sp.innerHTML, b.textContent]; isl.classList.remove('x'); isl.classList.add('msg'); sp.innerHTML = '<i></i>' + name + ' imported'; b.textContent = '3 new · 39 updated'; L.forEach((l, i) => setTimeout(() => ripples.push({ x: l.A[0], y: l.A[1], t: performance.now() }), i * 90)); setTimeout(() => { isl.classList.remove('msg'); sp.innerHTML = old[0]; b.textContent = old[1]; }, 4200); }
+  addEventListener('dragenter', (e) => { e.preventDefault(); depth++; drop.classList.add('on'); });
+  addEventListener('dragleave', () => { if (--depth <= 0) { depth = 0; drop.classList.remove('on'); } });
+  addEventListener('dragover', (e) => e.preventDefault());
+  addEventListener('drop', (e) => { e.preventDefault(); depth = 0; drop.classList.remove('on'); imported(e.dataTransfer.files[0]?.name || 'File'); });
+  addEventListener('paste', (e) => { if (e.target === q) return; const f = e.clipboardData.files[0]; if (f || e.clipboardData.getData('text')) { e.preventDefault(); imported(f ? f.name : 'Pasted loads'); } });
+
+  /* ---------- island ---------- */
+  const isl = $('#island');
+  function ring(i) { ripples.push({ x: L[i].A[0], y: L[i].A[1], t: performance.now() }); }
+  function openIsl() { isl.classList.add('x'); ring(0); if (!det.classList.contains('open')) setFocus(0); }
+  function closeIsl(e) { e && e.stopPropagation(); isl.classList.remove('x'); if (!det.classList.contains('open')) setFocus(cur); }
+  isl.addEventListener('click', () => { if (!isl.classList.contains('x')) openIsl(); });
+  $('#ix').addEventListener('click', closeIsl); $('#irep').addEventListener('click', (e) => { closeIsl(e); openDet(0); });
+  setTimeout(() => { if (!document.querySelector('#det.open, #spot.on')) openIsl(); }, 3800);
+  document.querySelectorAll('.fi').forEach((f, i) => f.addEventListener('click', () => { const idx = [0, 3, 1][i]; ring(idx); openDet(idx); }));
+
+  /* ---------- spotlight ---------- */
+  const spot = $('#spot'), q = $('#q'), res = $('#res'); let sel = 0, hits = [];
+  function render() {
+    const t = q.value.trim().toLowerCase(); hits = L.map((l, i) => i).filter((i) => !t || (L[i].id + L[i].o + L[i].d + L[i].os + L[i].ds).toLowerCase().includes(t)).slice(0, 5); sel = Math.min(sel, Math.max(0, hits.length - 1));
+    res.innerHTML = hits.map((i, j) => `<div class="${j === sel ? 'sel' : ''}" data-i="${i}"><span>${L[i].id}</span>${L[i].o}, ${L[i].os} to ${L[i].d}, ${L[i].ds}<em>${L[i].r}</em></div>`).join('') || '<div style="opacity:.4">Nothing matches</div>';
+    if (hits.length) setFocus(hits[sel]);
+  }
+  function openSpot() { spot.classList.add('on'); $('#scrim').classList.add('on'); q.value = ''; sel = 0; render(); setTimeout(() => q.focus(), 50); }
+  function closeSpot(keep) { spot.classList.remove('on'); if (!keep) { $('#scrim').classList.remove('on'); setFocus(cur); } }
+  q.addEventListener('input', () => { sel = 0; render(); }); res.addEventListener('click', (e) => { const d = e.target.closest('[data-i]'); if (d) { closeSpot(true); openDet(+d.dataset.i); } });
+  $('#kb').addEventListener('click', openSpot); $('#scrim').addEventListener('click', () => (setEl.classList.contains('on') ? closeSet() : spot.classList.contains('on') ? closeSpot() : closeDet()));
+  addEventListener('keydown', (e) => {
+    const so = spot.classList.contains('on'), dn = e.key === 'ArrowDown', upk = e.key === 'ArrowUp';
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); so ? closeSpot() : openSpot(); return; }
+    if (e.key === 'Escape' && pop.classList.contains('on')) { pop.classList.remove('on'); return; }
+    if (e.key === 'Escape' && setEl.classList.contains('on')) { closeSet(); return; }
+    if (e.key === 'Escape') { so ? closeSpot() : det.classList.contains('open') ? closeDet() : closeIsl(); return; }
+    if (so) { if (dn || upk) { e.preventDefault(); sel = Math.max(0, Math.min(hits.length - 1, sel + (dn ? 1 : -1))); render(); } if (e.key === 'Enter' && hits.length) { closeSpot(true); openDet(hits[sel]); } return; }
+    if (det.classList.contains('open') || setEl.classList.contains('on')) return;
+    if (dn || upk) { e.preventDefault(); mark(Math.max(0, Math.min(L.length - 1, cur + (dn ? 1 : -1)))); }
+    if (e.key === 'Enter' && cur >= 0) openDet(cur);
+    if (e.key.toLowerCase() === 'c' && !e.ctrlKey && !e.metaKey && cur >= 0) copyId(rows[cur].querySelector('.cp'));
+  });
+</script>
+</body>
+</html>
