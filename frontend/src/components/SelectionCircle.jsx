@@ -17,7 +17,7 @@ function SelectionCircle({ selected, onToggle, ariaLabel }) {
       role="checkbox"
       aria-checked={selected}
       aria-label={ariaLabel}
-      onClick={onToggle}
+      onClick={(event) => onToggle(event)}
       className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
         selected ? 'border-accent bg-accent' : 'border-border bg-transparent'
       }`}

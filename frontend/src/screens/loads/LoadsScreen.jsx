@@ -15,7 +15,7 @@ import AddLoadModal from '../../components/AddLoadModal';
 import BlastModal from '../../components/BlastModal';
 import BookingCarrierModal from '../../components/BookingCarrierModal';
 import DatExportSection from '../../components/DatExportSection';
-import BottomActionBar from '../../components/BottomActionBar';
+import SelectionBar from './SelectionBar';
 import Select from '../../components/Select';
 import Skeleton from '../../components/Skeleton';
 import { SearchIcon } from '../../components/icons';
@@ -28,10 +28,6 @@ import { useBoard } from './useBoard';
 import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, lanesFor, visibleLoads } from './boardLogic';
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
-const BULK_RATE_OPTIONS = [
-  { value: 'include', label: 'Include rate' },
-  { value: 'exclude', label: 'Exclude rate' },
-];
 const HEADLINES = { active: 'loads to cover', booked: 'loads booked', covered: 'loads covered' };
 const TOOL = 'rounded-full px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-text';
 const CHIP = 'rounded-full px-2.5 py-1 text-xs font-medium transition-colors';
@@ -199,6 +195,36 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   });
 
   const selectedIds = Array.from(selection.selectedIds);
+
+  // Shift-click selects every load between the last one clicked and this one.
+  const lastToggled = useRef(null);
+  function toggleSelect(id, event) {
+    const from = rows.findIndex((load) => load.id === lastToggled.current);
+    const to = rows.findIndex((load) => load.id === id);
+    if (event?.shiftKey && from >= 0 && to >= 0) {
+      const [a, b] = from < to ? [from, to] : [to, from];
+      selection.addMany(rows.slice(a, b + 1).map((load) => load.id));
+    } else {
+      selection.toggle(id);
+    }
+    lastToggled.current = id;
+  }
+
+  // In select mode, Ctrl+A selects every load on screen and Escape leaves.
+  useEffect(() => {
+    if (!selection.active) return undefined;
+    function onKeyDown(event) {
+      const typing = ['INPUT', 'TEXTAREA'].includes(event.target?.tagName);
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'a' && !typing) {
+        event.preventDefault();
+        selection.addMany(rows.map((load) => load.id));
+      } else if (event.key === 'Escape' && !document.querySelector('[role="dialog"]')) {
+        selection.exit();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selection, rows]);
   const emptyMessage = query.trim()
     ? `No loads match "${query}".`
     : quick === 'proven'
@@ -267,9 +293,9 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             <button type="button" onClick={() => datExport.current?.openExportFlow()} className={TOOL}>
               DAT export
             </button>
-            {rows.length > 0 && (
-              <button type="button" onClick={selection.active ? selection.exit : selection.enter} className={TOOL}>
-                {selection.active ? 'Done' : 'Select'}
+            {rows.length > 0 && !selection.active && (
+              <button type="button" onClick={selection.enter} className={TOOL}>
+                Select
               </button>
             )}
             <input
@@ -287,6 +313,21 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           </div>
         </div>
 
+        {selection.active ? (
+          <SelectionBar
+            count={selection.selectedIds.size}
+            total={rows.length}
+            busy={bulkBusy}
+            confirmingDelete={confirmingBulkDelete}
+            onToggleAll={() => selection.selectAll(rows.map((load) => load.id))}
+            onStatus={(status) => bulk(bulkUpdateLoadStatus(selectedIds, status), 'Failed to update selected loads.')}
+            onRate={(include) => bulk(bulkSetIncludeRate(selectedIds, include), 'Failed to update rate for selected loads.')}
+            onAskDelete={() => setConfirmingBulkDelete(true)}
+            onCancelDelete={() => setConfirmingBulkDelete(false)}
+            onDelete={() => bulk(bulkDeleteLoads(selectedIds), 'Failed to delete selected loads.')}
+            onDone={selection.exit}
+          />
+        ) : (
         <div className="flex flex-wrap items-center gap-2 px-5 pt-3">
           <label className="relative min-w-[10rem] flex-1">
             <span className="sr-only">Search loads</span>
@@ -320,13 +361,10 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                 {option.label} <span className="tabular-nums opacity-60">{option.count}</span>
               </button>
             ))}
-            {selection.active && (
-              <button type="button" onClick={() => selection.selectAll(rows.map((load) => load.id))} className={`${CHIP} ml-auto text-text-muted hover:text-text`}>
-                Select all
-              </button>
-            )}
           </div>
         </div>
+
+        )}
 
         <div ref={listRef} className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3.5 pt-2 [scrollbar-width:none]" onPointerLeave={() => setCurrentId(null)}>
           {board.status === 'loading' && (
@@ -367,7 +405,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                     selected={selection.isSelected(load.id)}
                     onOpen={open}
                     onHover={setCurrentId}
-                    onToggleSelect={selection.toggle}
+                    onToggleSelect={toggleSelect}
                     onEmail={(target, emails) => setBlast({ load: target, emails })}
                     onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
                   />
@@ -379,34 +417,12 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           </div>
         </div>
 
-        <div className="px-3">
-          <BottomActionBar count={selection.selectedIds.size}>
-            <Select ariaLabel="Mark selected as" value="" placeholder="Mark as…" onChange={(status) => status && bulk(bulkUpdateLoadStatus(selectedIds, status), 'Failed to update selected loads.')} options={STATUS_OPTIONS} disabled={bulkBusy} size="sm" />
-            <Select ariaLabel="Rate for selected" value="" placeholder="Rate…" onChange={(value) => value && bulk(bulkSetIncludeRate(selectedIds, value === 'include'), 'Failed to update rate for selected loads.')} options={BULK_RATE_OPTIONS} disabled={bulkBusy} size="sm" />
-            {confirmingBulkDelete ? (
-              <>
-                <span className="text-xs text-error">Delete {selectedIds.length}?</span>
-                <button type="button" onClick={() => bulk(bulkDeleteLoads(selectedIds), 'Failed to delete selected loads.')} disabled={bulkBusy} className="rounded-full bg-error px-3 py-1.5 text-xs font-semibold text-black disabled:opacity-60">
-                  {bulkBusy ? 'Deleting...' : 'Confirm'}
-                </button>
-                <button type="button" onClick={() => setConfirmingBulkDelete(false)} disabled={bulkBusy} className="rounded-full bg-white/10 px-3 py-1.5 text-xs disabled:opacity-60">
-                  Cancel
-                </button>
-              </>
-            ) : (
-              <button type="button" onClick={() => setConfirmingBulkDelete(true)} disabled={bulkBusy} className="rounded-full px-3 py-1.5 text-xs text-error hover:bg-error-bg disabled:opacity-60">
-                Delete selected
-              </button>
-            )}
-            <button type="button" onClick={selection.clear} disabled={bulkBusy} className="ml-auto rounded-full bg-white/10 px-3 py-1.5 text-xs disabled:opacity-60">
-              Clear selection
-            </button>
-          </BottomActionBar>
-        </div>
       </section>
 
       {widest && (
-        <aside className="fixed bottom-[104px] right-9 top-24 z-[9] flex w-[300px] flex-col gap-3 overflow-y-auto [scrollbar-width:none]">
+          // The padding gives the cards room to grow on hover without being
+          // clipped by the scrolling column.
+          <aside className="fixed bottom-[96px] right-5 top-[84px] z-[9] flex w-[332px] flex-col gap-3 overflow-y-auto overflow-x-hidden px-4 py-3 [scrollbar-width:none]">
           <NeedsReply inquiries={waiting} onHoverLoad={setHoveredInquiryLoad} />
           <div className="mt-auto">
             <TodayCard />

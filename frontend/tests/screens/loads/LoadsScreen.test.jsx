@@ -331,10 +331,40 @@ describe('LoadsScreen', () => {
       fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
       fireEvent.click(row('L2002'));
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-      expect(screen.getByText('2 selected')).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('combobox', { name: 'Mark selected as' }));
-      fireEvent.click(await screen.findByRole('option', { name: 'Covered' }));
+      const bar = screen.getByRole('toolbar', { name: 'Selected loads' });
+      expect(bar).toHaveTextContent('2 of 2 selected');
+      fireEvent.click(within(bar).getByRole('button', { name: 'Covered' }));
       await waitFor(() => expect(loadsApi.bulkUpdateLoadStatus).toHaveBeenCalledWith([1, 2], 'covered'));
+    });
+
+    test('the selection bar selects everything and hides the rate in one click each', async () => {
+      loadsApi.bulkSetIncludeRate.mockResolvedValue({ updated: 2 });
+      renderScreen();
+      await screen.findByText('L1001');
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      const bar = screen.getByRole('toolbar', { name: 'Selected loads' });
+      expect(within(bar).getByRole('button', { name: 'Leave rate out of replies' })).toBeDisabled();
+      fireEvent.click(within(bar).getByRole('button', { name: 'Select all' }));
+      fireEvent.click(within(bar).getByRole('button', { name: 'Leave rate out of replies' }));
+      await waitFor(() => expect(loadsApi.bulkSetIncludeRate).toHaveBeenCalledWith([1, 2], false));
+    });
+
+    test('shift-click selects every load in between', async () => {
+      loadsApi.listLoads.mockResolvedValue([DALLAS, ATLANTA, LAREDO, { ...ATLANTA, id: 4, load_number: 'L4004' }]);
+      renderScreen();
+      await screen.findByText('L1001');
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.click(row('L1001'));
+      fireEvent.click(row('L4004'), { shiftKey: true });
+      expect(screen.getByRole('toolbar', { name: 'Selected loads' })).toHaveTextContent('3 of 3 selected');
+    });
+
+    test('Ctrl+A selects every load on screen', async () => {
+      renderScreen();
+      await screen.findByText('L1001');
+      fireEvent.click(screen.getByRole('button', { name: 'Select' }));
+      fireEvent.keyDown(window, { key: 'a', ctrlKey: true });
+      expect(screen.getByRole('toolbar', { name: 'Selected loads' })).toHaveTextContent('2 of 2 selected');
     });
 
     test('selected loads can be deleted together after confirming', async () => {
@@ -343,7 +373,7 @@ describe('LoadsScreen', () => {
       await screen.findByText('L1001');
       fireEvent.click(screen.getByRole('button', { name: 'Select' }));
       fireEvent.click(screen.getByRole('checkbox', { name: 'Select L1001' }));
-      fireEvent.click(screen.getByRole('button', { name: 'Delete selected' }));
+      fireEvent.click(within(screen.getByRole('toolbar', { name: 'Selected loads' })).getByRole('button', { name: 'Delete' }));
       expect(loadsApi.bulkDeleteLoads).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
       await waitFor(() => expect(loadsApi.bulkDeleteLoads).toHaveBeenCalledWith([1]));

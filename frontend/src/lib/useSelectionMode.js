@@ -51,7 +51,16 @@ export function useSelectionMode() {
     });
   }, []);
 
+  // Adds every id in `ids` (a shift-click range) without removing any.
+  const addMany = useCallback((ids) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      ids.forEach((id) => next.add(id));
+      return next;
+    });
+  }, []);
+
   const isSelected = useCallback((id) => selectedIds.has(id), [selectedIds]);
 
-  return { active, selectedIds, enter, exit, clear, toggle, selectAll, remove, isSelected };
+  return { active, selectedIds, enter, exit, clear, toggle, selectAll, addMany, remove, isSelected };
 }

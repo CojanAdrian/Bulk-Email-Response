@@ -25,8 +25,8 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
   const origin = place(load.origin_city, load.origin_state) || 'Origin missing';
   const dest = place(load.dest_city, load.dest_state) || 'Destination missing';
 
-  function activate() {
-    if (selecting) onToggleSelect(load.id);
+  function activate(event) {
+    if (selecting) onToggleSelect(load.id, event);
     else onOpen(load);
   }
 
@@ -42,7 +42,7 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
         onKeyDown={(event) => {
           if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault();
-            activate();
+            activate(event);
           }
         }}
         className={`group relative grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-[18px] px-[18px] py-[13px] outline-none transition-colors duration-200 hover:bg-white/[0.065] focus-visible:bg-white/[0.065] ${
@@ -52,7 +52,7 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
         {proven && <span aria-hidden="true" className="absolute bottom-4 left-1.5 top-4 w-0.5 rounded-full bg-gold shadow-[0_0_12px_rgb(var(--color-gold))]" />}
 
         <span className="flex" onClick={(event) => event.stopPropagation()}>
-          {selecting && <SelectionCircle selected={selected} onToggle={() => onToggleSelect(load.id)} ariaLabel={`Select ${load.load_number}`} />}
+          {selecting && <SelectionCircle selected={selected} onToggle={(event) => onToggleSelect(load.id, event)} ariaLabel={`Select ${load.load_number}`} />}
         </span>
 
         <div className="min-w-0">
