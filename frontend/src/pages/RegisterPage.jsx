@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { register } from '../api/auth';
 import { useGoogleAuthError } from '../lib/useGoogleAuthError';
-import Card from '../components/Card';
+import AuthFrame from '../shell/AuthFrame';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import GoogleSignInButton from '../components/GoogleSignInButton';
-import logoIcon from '../assets/logo-icon.png';
 
 function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
   const googleAuthError = useGoogleAuthError();
@@ -39,13 +38,10 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
   }
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-shell-bg px-4">
-      <Card className="relative z-10 w-full max-w-sm">
+    <AuthFrame>
         <form onSubmit={handleSubmit}>
-          <div className="mb-6 flex items-center gap-3">
-            <img src={logoIcon} alt="" className="h-10 w-10 shrink-0" />
-            <h1 className="text-xl font-extrabold tracking-wide text-text">Create an account</h1>
-          </div>
+          <p className="caps">New here</p>
+          <h1 className="mb-6 mt-2 text-[34px] font-bold leading-none tracking-[-0.05em] text-text">Create an account</h1>
 
           {displayedError && (
             <p id="register-error" role="alert" className="mb-4 text-sm text-error">
@@ -55,10 +51,10 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
 
           <GoogleSignInButton label="Sign up with Google" />
 
-          <div className="my-4 flex items-center gap-3 text-xs font-medium uppercase tracking-wide text-text-muted">
-            <span className="h-px flex-1 bg-border" />
+          <div className="caps my-5 flex items-center gap-3">
+            <span className="h-px flex-1 bg-white/[0.08]" />
             or
-            <span className="h-px flex-1 bg-border" />
+            <span className="h-px flex-1 bg-white/[0.08]" />
           </div>
 
           <label className="mb-1 block text-sm text-text-muted" htmlFor="reg-username">
@@ -67,7 +63,7 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
           <input
             id="reg-username"
             name="username"
-            className="mb-4 w-full rounded-xl border border-border bg-surface-alt px-3 py-2.5 text-text outline-none transition focus:border-focus"
+            className="mb-4 w-full rounded-xl border px-3 py-2.5 text-text outline-none transition"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
@@ -108,8 +104,7 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
             Already have an account? Log in
           </button>
         </form>
-      </Card>
-    </div>
+    </AuthFrame>
   );
 }
 

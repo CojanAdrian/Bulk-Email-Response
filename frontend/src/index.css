@@ -146,6 +146,15 @@
   }
 }
 
+/* Settings > Appearance > Motion: Reduced. */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-delay: 0ms !important;
+  transition-duration: 0.01ms !important;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .gold-sweep::after {
     animation: none;

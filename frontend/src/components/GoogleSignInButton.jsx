@@ -8,7 +8,7 @@ function GoogleSignInButton({ label = 'Continue with Google' }) {
       onClick={() => {
         window.location.href = getGoogleSignInUrl();
       }}
-      className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-semibold text-text transition hover:bg-surface-alt"
+      className="flex w-full items-center justify-center gap-2 rounded-full bg-white/10 px-5 py-3 text-sm font-semibold text-text transition-[scale,background-color] duration-300 ease-spring hover:bg-white/[0.16] active:scale-95"
     >
       <GoogleIcon className="h-4 w-4" />
       {label}

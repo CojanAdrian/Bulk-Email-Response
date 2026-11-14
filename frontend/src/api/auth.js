@@ -19,3 +19,7 @@ export function register(username, password) {
 export function getGoogleSignInUrl() {
   return `${API_URL}/api/auth/google`;
 }
+
+export function changePassword(currentPassword, newPassword) {
+  return post('/api/auth/change-password', { currentPassword, newPassword });
+}

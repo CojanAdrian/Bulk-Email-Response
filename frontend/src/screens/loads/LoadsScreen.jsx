@@ -14,8 +14,6 @@ import RateModal from '../../components/RateModal';
 import AddLoadModal from '../../components/AddLoadModal';
 import BlastModal from '../../components/BlastModal';
 import BookingCarrierModal from '../../components/BookingCarrierModal';
-import CarrierDetailSheet from '../../components/CarrierDetailSheet';
-import CarrierSheet from '../../components/CarrierSheet';
 import DatExportSection from '../../components/DatExportSection';
 import BottomActionBar from '../../components/BottomActionBar';
 import Select from '../../components/Select';
@@ -24,6 +22,8 @@ import { SearchIcon } from '../../components/icons';
 import BoardRow from './BoardRow';
 import LoadSheet from './LoadSheet';
 import NeedsReply from './NeedsReply';
+import TodayCard from '../../shell/TodayCard';
+import { useSettings } from '../../shell/SettingsContext';
 import { useBoard } from './useBoard';
 import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, lanesFor, visibleLoads } from './boardLogic';
 
@@ -55,7 +55,9 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
 
   const [tab, setTab] = useState('active');
   const [quick, setQuick] = usePersistentState('loadsTable.quickFilter', 'all');
-  const [sort, setSort] = usePersistentState('board.sort', 'newest');
+  const { settings, update } = useSettings();
+  const sort = settings.board.sort || 'newest';
+  const setSort = (value) => update({ board: { sort: value } });
   const [query, setQuery] = useState('');
   const [currentId, setCurrentId] = useState(null);
   const [hoveredInquiryLoad, setHoveredInquiryLoad] = useState(null);
@@ -73,8 +75,6 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   const [adding, setAdding] = useState(false);
   const [blast, setBlast] = useState(null); // { load, emails }
   const [booking, setBooking] = useState(null);
-  const [carrierId, setCarrierId] = useState(null);
-  const [editingCarrier, setEditingCarrier] = useState(null);
   const datExport = useRef(null);
   const fileInput = useRef(null);
   const listRef = useRef(null);
@@ -105,8 +105,8 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   }, [openId, hoveredInquiryLoad, currentId]);
   useEffect(() => {
     const left = !wide ? 0 : openId === null ? MAP_INSET_LEFT : MAP_INSET_LEFT_OPEN;
-    setInsets({ left, right: widest && waiting.length > 0 ? MAP_INSET_RIGHT : 0 });
-  }, [wide, widest, waiting.length, openId]);
+    setInsets({ left, right: widest ? MAP_INSET_RIGHT : 0 });
+  }, [wide, widest, openId]);
   useEffect(
     () => () => {
       setLanes([]);
@@ -369,7 +369,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                     onHover={setCurrentId}
                     onToggleSelect={selection.toggle}
                     onEmail={(target, emails) => setBlast({ load: target, emails })}
-                    onOpenCarrier={setCarrierId}
+                    onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
                   />
               ))}
             </ul>
@@ -406,8 +406,11 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
       </section>
 
       {widest && (
-        <aside className="fixed right-9 top-24 z-[9] w-[300px]">
+        <aside className="fixed bottom-[104px] right-9 top-24 z-[9] flex w-[300px] flex-col gap-3 overflow-y-auto [scrollbar-width:none]">
           <NeedsReply inquiries={waiting} onHoverLoad={setHoveredInquiryLoad} />
+          <div className="mt-auto">
+            <TodayCard />
+          </div>
         </aside>
       )}
 
@@ -434,7 +437,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             onEdit={setEditing}
             onDelete={remove}
             onEmail={(load, emails) => setBlast({ load, emails })}
-            onOpenCarrier={setCarrierId}
+            onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
           />
         )}
       </AnimatePresence>
@@ -461,17 +464,6 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
         )}
         {blast && <BlastModal load={blast.load} initialShowRate={false} initialEmails={blast.emails} onClose={() => setBlast(null)} />}
         {booking && <BookingCarrierModal load={booking} onClose={() => setBooking(null)} />}
-        {carrierId && (
-          <CarrierDetailSheet
-            carrierId={carrierId}
-            onClose={() => setCarrierId(null)}
-            onEdit={(carrier) => {
-              setCarrierId(null);
-              setEditingCarrier(carrier);
-            }}
-          />
-        )}
-        {editingCarrier && <CarrierSheet carrier={editingCarrier} onClose={() => setEditingCarrier(null)} onSaved={() => setEditingCarrier(null)} />}
       </AnimatePresence>
     </>
   );
