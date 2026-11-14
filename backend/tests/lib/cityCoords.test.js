@@ -118,3 +118,19 @@ describe('searchCities', () => {
     expect(searchCities('zzqqx')).toEqual([]);
   });
 });
+
+describe('presentLoad', () => {
+  const { presentLoad } = require('../../src/lib/presentLoad');
+
+  test('sends pickup and delivery times as the wall-clock time, with no time zone', () => {
+    const load = presentLoad({ origin_city: 'Chicago', origin_state: 'IL', early_pu: new Date(2026, 10, 16, 8, 0, 0), late_del: null });
+    expect(load.early_pu).toBe('2026-11-16T08:00:00');
+    expect(load.late_del).toBeNull();
+    expect(load.origin_lat).toEqual(expect.any(Number));
+  });
+
+  test('does the same for an inquiry joined to its load', () => {
+    const row = presentLoad({ matched_load_early_pu: new Date(2026, 10, 16, 14, 30, 0) }, 'matched_load_');
+    expect(row.matched_load_early_pu).toBe('2026-11-16T14:30:00');
+  });
+});

@@ -1,0 +1,195 @@
+[
+  {
+    "name": "window pickup, appointment delivery, 1p2d in the comment",
+    "load": {
+      "origin_city": "Chicago",
+      "origin_state": "IL",
+      "dest_city": "Dallas",
+      "dest_state": "TX",
+      "early_pu": "2026-11-16T08:00:00",
+      "late_pu": "2026-11-16T14:00:00",
+      "early_del": "2026-11-17T09:00:00",
+      "late_del": "2026-11-17T09:00:00",
+      "weight": "42000.0 LB",
+      "target_pay": "2450.00",
+      "include_rate": 1,
+      "comment": "1p2d / lumper at del",
+      "commodity": "Grocery / food",
+      "equipment": "V"
+    },
+    "reply": "PU: CHICAGO, IL – 11/16/2026 8am-2pm FCFS\nDEL: DALLAS, TX – 11/17/2026 9am appt\nStops: 1 pick, 2 drops (1P/2D)\nCommodity: Grocery / food\nWeight: 42,000 lbs\nRate: $2,450"
+  },
+  {
+    "name": "rate hidden",
+    "load": {
+      "origin_city": "Atlanta",
+      "origin_state": "GA",
+      "dest_city": "Columbus",
+      "dest_state": "OH",
+      "early_pu": "2026-11-16T10:00:00",
+      "late_pu": null,
+      "weight": "38,500 lbs",
+      "target_pay": "1980.00",
+      "include_rate": 0,
+      "comment": ""
+    },
+    "reply": "PU: ATLANTA, GA – 11/16/2026 10am appt\nDEL: COLUMBUS, OH\nWeight: 38,500 lbs"
+  },
+  {
+    "name": "extra pickups entered on the load",
+    "load": {
+      "origin_city": "Dallas",
+      "origin_state": "TX",
+      "dest_city": "Chicago",
+      "dest_state": "IL",
+      "extra_stops": [
+        {
+          "type": "pickup",
+          "city": "Fort Worth",
+          "state": "TX",
+          "datetime": "2026-08-12 13:00:00"
+        },
+        {
+          "type": "pickup",
+          "city": "Waco",
+          "state": "TX",
+          "datetime": null
+        }
+      ],
+      "target_pay": "3100",
+      "include_rate": 1
+    },
+    "reply": "PU: DALLAS, TX\n2nd PU: FORT WORTH, TX – 08/12/2026 1pm\n3rd PU: WACO, TX\nDEL: CHICAGO, IL\nStops: 3 picks, 1 drop (3P/1D)\nRate: $3,100"
+  },
+  {
+    "name": "2P/1D written in the comment",
+    "load": {
+      "origin_city": "Savannah",
+      "origin_state": "GA",
+      "dest_city": "Charlotte",
+      "dest_state": "NC",
+      "comment": "2P/1D - tarps req",
+      "weight": "46000",
+      "target_pay": "1150.5",
+      "include_rate": 1
+    },
+    "reply": "PU: SAVANNAH, GA\nDEL: CHARLOTTE, NC\nStops: 2 picks, 1 drop (2P/1D)\nWeight: 46,000 lbs\nRate: $1,150.50"
+  },
+  {
+    "name": "multi drop with no count",
+    "load": {
+      "origin_city": "Laredo",
+      "origin_state": "TX",
+      "dest_city": "Memphis",
+      "dest_state": "TN",
+      "comment": "MULTI DROP, call for details",
+      "weight": "",
+      "target_pay": null
+    },
+    "reply": "PU: LAREDO, TX\nDEL: MEMPHIS, TN\nStops: multiple drops"
+  },
+  {
+    "name": "reefer with a temperature and a McLeod stop count",
+    "load": {
+      "origin_city": "Fresno",
+      "origin_state": "CA",
+      "dest_city": "Denver",
+      "dest_state": "CO",
+      "early_pu": "2026-11-17T23:30:00",
+      "late_pu": "2026-11-18T05:00:00",
+      "stops": 3,
+      "temperature": "34°F",
+      "commodity": "Frozen food",
+      "weight": "40200",
+      "target_pay": "3650",
+      "include_rate": "1"
+    },
+    "reply": "PU: FRESNO, CA – 11/17/2026 11:30pm – 11/18/2026 5am FCFS\nDEL: DENVER, CO\nStops: 5 stops\nCommodity: Frozen food\nWeight: 40,200 lbs\nTemp: 34°F\nRate: $3,650"
+  },
+  {
+    "name": "a load with nothing to say yet",
+    "load": {
+      "load_number": "NEW1"
+    },
+    "reply": null
+  },
+  {
+    "name": "1p1d written in the comment is a plain load",
+    "load": {
+      "origin_city": "Miami",
+      "origin_state": "FL",
+      "dest_city": "Newark",
+      "dest_state": "NJ",
+      "comment": "1p1d",
+      "target_pay": "0",
+      "include_rate": 1
+    },
+    "reply": "PU: MIAMI, FL\nDEL: NEWARK, NJ"
+  },
+  {
+    "name": "slash count in a reefer comment (1p/2d)",
+    "load": {
+      "origin_city": "Laredo",
+      "origin_state": "TX",
+      "dest_city": "Atlanta",
+      "dest_state": "GA",
+      "early_pu": "2026-11-18T06:00:00",
+      "late_pu": "2026-11-18T06:00:00",
+      "early_del": "2026-11-20T07:30:00",
+      "late_del": "2026-11-20T15:00:00",
+      "weight": "38500 LB",
+      "target_pay": "3100.00",
+      "include_rate": 1,
+      "stops": 1,
+      "extra_stops": null,
+      "commodity": "Produce",
+      "temperature": "38°F",
+      "comment": "1p/2d PRECOOL 38/IF LAST HAULED MEAT,WASHOUT REQ+RCPT/2 STRAPS"
+    },
+    "reply": "PU: LAREDO, TX – 11/18/2026 6am appt\nDEL: ATLANTA, GA – 11/20/2026 7:30am-3pm FCFS\nStops: 1 pick, 2 drops (1P/2D)\nCommodity: Produce\nWeight: 38,500 lbs\nTemp: 38°F\nRate: $3,100"
+  },
+  {
+    "name": "two picks written as 2P/1D",
+    "load": {
+      "origin_city": "Laredo",
+      "origin_state": "TX",
+      "dest_city": "Atlanta",
+      "dest_state": "GA",
+      "early_pu": "2026-11-18T06:00:00",
+      "late_pu": "2026-11-18T06:00:00",
+      "early_del": "2026-11-20T07:30:00",
+      "late_del": "2026-11-20T15:00:00",
+      "weight": "38500 LB",
+      "target_pay": "3100.00",
+      "include_rate": 1,
+      "stops": 1,
+      "extra_stops": null,
+      "commodity": "Produce",
+      "temperature": "38°F",
+      "comment": "2P/1D / Reefer / PRECOOL 38"
+    },
+    "reply": "PU: LAREDO, TX – 11/18/2026 6am appt\nDEL: ATLANTA, GA – 11/20/2026 7:30am-3pm FCFS\nStops: 2 picks, 1 drop (2P/1D)\nCommodity: Produce\nWeight: 38,500 lbs\nTemp: 38°F\nRate: $3,100"
+  },
+  {
+    "name": "only McLeod stops, no count written",
+    "load": {
+      "origin_city": "Laredo",
+      "origin_state": "TX",
+      "dest_city": "Atlanta",
+      "dest_state": "GA",
+      "early_pu": "2026-11-18T06:00:00",
+      "late_pu": "2026-11-18T06:00:00",
+      "early_del": "2026-11-20T07:30:00",
+      "late_del": "2026-11-20T15:00:00",
+      "weight": "38500 LB",
+      "target_pay": "3100.00",
+      "include_rate": 1,
+      "stops": 2,
+      "extra_stops": null,
+      "commodity": null,
+      "temperature": null,
+      "comment": "****DIRECT DELIVERY**** ROUND TRIP"
+    },
+    "reply": "PU: LAREDO, TX – 11/18/2026 6am appt\nDEL: ATLANTA, GA – 11/20/2026 7:30am-3pm FCFS\nStops: 4 stops\nWeight: 38,500 lbs\nRate: $3,100"
+  }
+]

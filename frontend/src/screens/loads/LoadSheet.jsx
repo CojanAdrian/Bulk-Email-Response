@@ -7,7 +7,7 @@ import DateRangeField from '../../components/DateRangeField';
 import Select from '../../components/Select';
 import CopyText from '../../ui/CopyText';
 import Regulars from './Regulars';
-import { SHEET_SPRING, RateHiddenIcon } from './BoardRow';
+import { SHEET_SPRING, RateEye } from './BoardRow';
 import { STATUSES, STATUS_LABELS, hasNoRate, place, schedule } from './boardLogic';
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
@@ -75,7 +75,7 @@ function LoadSheet({
 
   function copyDetails() {
     if (!navigator.clipboard?.writeText) return;
-    navigator.clipboard.writeText(buildLookupMessage(load, Boolean(load.include_rate))).then(() => {
+    navigator.clipboard.writeText(buildLookupMessage(load, Boolean(Number(load.include_rate)), { askRate: false })).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
     });
@@ -142,12 +142,8 @@ function LoadSheet({
           <div className="min-w-0">
             <dt className="caps flex items-center gap-1.5">
               Rate
-              {!hasNoRate(load) && !Number(load.include_rate) && (
-                <span className="flex items-center gap-1 normal-case tracking-normal text-text-muted" title="Replies and blasts leave the rate out">
-                  <RateHiddenIcon className="h-3.5 w-3.5" />
-                  hidden
-                </span>
-              )}
+              <RateEye load={load} onToggle={onIncludeRateChange} className="-my-1.5 !opacity-100" />
+              {!hasNoRate(load) && !Number(load.include_rate) && <span className="normal-case tracking-normal text-text-muted">hidden</span>}
             </dt>
             <dd className="mt-1 -ml-1.5">
               {rateDraft !== null ? (
@@ -203,7 +199,12 @@ function LoadSheet({
             </ul>
           </div>
         )}
-        {multiStop && extraStops.length === 0 && <p className="mt-4 text-[13px] font-medium text-hot">{multiStop}. Add the extra stops in Edit so replies include them.</p>}
+        {multiStop && (
+          <p className="mt-4 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
+            <span className="rounded-full bg-white px-2.5 py-0.5 text-[11.5px] font-bold tracking-[0.02em] text-black">{multiStop}</span>
+            {extraStops.length === 0 && <span>Add the extra stops in Edit so replies name their cities.</span>}
+          </p>
+        )}
 
         {load.comment && (
           <div className="mt-4">

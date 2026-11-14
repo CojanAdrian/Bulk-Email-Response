@@ -1,5 +1,6 @@
 import Papa from 'papaparse';
 import { EQUIPMENT_MAP } from './mcleodParser';
+import { stopCode } from './stopCount';
 
 export const DAT_HEADERS = [
   'Pickup Earliest*', 'Pickup Latest', 'Length (ft)*', 'Weight (lbs)*', 'Full/Partial*',
@@ -107,7 +108,9 @@ export function computeLength(equipment, rawComment) {
   return FLATBED_OPEN_DECK.hasOwnProperty(String(equipment || '').toUpperCase()) ? 48 : 53;
 }
 
-export function buildComment(rawComment, contactLine) {
+// The DAT comment: the stop count first ("1P/2D", "MULTI-DROP"), then the
+// drop-trailer note, then the contact line.
+export function buildComment(rawComment, contactLine, stops = null) {
   const comment = String(rawComment || '');
   let dropLabel = '';
   if (
@@ -120,6 +123,7 @@ export function buildComment(rawComment, contactLine) {
     dropLabel = 'DROP TRAILER';
   }
   const parts = [];
+  if (stops) parts.push(stops);
   if (dropLabel) parts.push(dropLabel);
   if (contactLine) parts.push(contactLine);
   return parts.join(' | ');
@@ -290,7 +294,7 @@ function buildExpandedRows(loads, options, anomalies) {
       anomalies.locationFlags.push({ order, detail: 'Destination listed as Birmingham, MO — atypical city/state combination, verify.' });
     }
 
-    const comment = buildComment(rawComment, commentContact);
+    const comment = buildComment(rawComment, commentContact, stopCode(load));
     const pickupEarliest = formatDateOnly(load.early_pu);
     const pickupLatest = formatDateOnly(load.late_pu);
 

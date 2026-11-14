@@ -4,7 +4,8 @@ import { subscribe } from '../../lib/liveSocket';
 import { ripple } from '../../map/mapStore';
 
 // Every inquiry, newest first, kept current as emails arrive and replies go
-// out. The queue (waiting for a reply) is derived from it, oldest first.
+// out. The queue (waiting for a reply) is derived from it, also newest
+// first, so a new email lands on top.
 export function useInquiries(refreshKey) {
   const [all, setAll] = useState([]);
   const [status, setStatus] = useState('loading');
@@ -55,7 +56,9 @@ export function useInquiries(refreshKey) {
     setAll((prev) => prev.map((item) => (item.id === inquiry.id ? { ...item, ...inquiry } : item)));
   }, []);
 
-  const queue = all.filter((inquiry) => inquiry.reply_status === 'pending_review').sort((a, b) => String(a.received_at).localeCompare(String(b.received_at)));
+  const newestFirst = (a, b) => String(b.received_at).localeCompare(String(a.received_at)) || b.id - a.id;
+  const sorted = [...all].sort(newestFirst);
+  const queue = sorted.filter((inquiry) => inquiry.reply_status === 'pending_review');
 
-  return { all, queue, status, error, reload, replace };
+  return { all: sorted, queue, status, error, reload, replace };
 }

@@ -1,45 +1,70 @@
+const { stopLine } = require('./stopCount');
+
+// The reply sent to a carrier who asks about a load, built only from the
+// load's own fields:
+//
+//   PU: CITY, ST – MM/DD/YYYY h:mma appt        (or h:mma-h:mma FCFS for a window)
+//   2nd PU: CITY, ST – MM/DD/YYYY h:mma         (extra pickups, in order)
+//   DEL: CITY, ST – MM/DD/YYYY h:mma appt
+//   2nd DEL: ...                                (extra deliveries, in order)
+//   Stops: 1 pick, 2 drops (1P/2D)              (only when there is more than one of either)
+//   Commodity: ...
+//   Weight: 42,000 lbs
+//   Temp: 34°F
+//   Rate: $2,450                                (only when the load's rate is shown)
+//
+// A field the load does not have is left out, never shown as "null". The
+// frontend builds the same text for Copy and Blast (src/lib/loadText.js);
+// both are checked against shared/reply-fixtures.json.
+
 function formatLocation(city, state) {
   const parts = [city, state].filter(Boolean);
   return parts.length ? parts.join(', ').toUpperCase() : null;
 }
 
-function formatDatePart(d) {
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  const yyyy = d.getFullYear();
-  return `${mm}/${dd}/${yyyy}`;
+// A load's times are the wall-clock times written in McLeod, with no time
+// zone. They are read here as exactly that: the digits of a
+// "YYYY-MM-DD HH:MM" string, or the local fields of a Date the database
+// driver made from one.
+function wallClock(value) {
+  if (!value) return null;
+  if (value instanceof Date) {
+    if (Number.isNaN(value.getTime())) return null;
+    return { y: value.getFullYear(), mo: value.getMonth() + 1, d: value.getDate(), h: value.getHours(), mi: value.getMinutes() };
+  }
+  const text = String(value);
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+  if (match && !/[zZ]|[+-]\d{2}:?\d{2}$/.test(text)) {
+    return { y: Number(match[1]), mo: Number(match[2]), d: Number(match[3]), h: Number(match[4] || 0), mi: Number(match[5] || 0) };
+  }
+  const date = new Date(text);
+  return Number.isNaN(date.getTime()) ? null : wallClock(date);
 }
 
-function formatTimePart(d) {
-  let hours = d.getHours();
-  const minutes = d.getMinutes();
-  const period = hours >= 12 ? 'pm' : 'am';
-  hours %= 12;
-  if (hours === 0) hours = 12;
-  return minutes === 0 ? `${hours}${period}` : `${hours}:${String(minutes).padStart(2, '0')}${period}`;
+const pad = (n) => String(n).padStart(2, '0');
+
+function formatDatePart(t) {
+  return `${pad(t.mo)}/${pad(t.d)}/${t.y}`;
+}
+
+function formatTimePart(t) {
+  const period = t.h >= 12 ? 'pm' : 'am';
+  const hour = t.h % 12 || 12;
+  return t.mi === 0 ? `${hour}${period}` : `${hour}:${pad(t.mi)}${period}`;
 }
 
 function formatDateTime(value) {
-  if (!value) return null;
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return null;
-  return `${formatDatePart(d)} ${formatTimePart(d)}`;
+  const t = wallClock(value);
+  return t ? `${formatDatePart(t)} ${formatTimePart(t)}` : null;
 }
 
-// Mirrors the frontend's DAT-export scheduling text (see buildPUSched in
-// datExport.js) for both PU and DEL: when the early and late times land on
-// the same minute, it's a fixed appointment ("appt") -- otherwise it's a
-// pickup/delivery window and carriers need to know it's first-come-first-
-// served ("FCFS"). A load with only one of the two set uses it for both
-// ends (single known time = an appointment at that time).
+// The same minute at both ends is an appointment ("appt"); a range is a
+// window, first come first served ("FCFS"). Only one end set means an
+// appointment at that time.
 function formatSchedRange(rawEarly, rawLate) {
-  const e = rawEarly ? new Date(rawEarly) : null;
-  const l = rawLate ? new Date(rawLate) : null;
-  const eValid = e && !Number.isNaN(e.getTime()) ? e : null;
-  const lValid = l && !Number.isNaN(l.getTime()) ? l : null;
-  if (!eValid && !lValid) return null;
-  const early = eValid || lValid;
-  const late = lValid || eValid;
+  const early = wallClock(rawEarly) || wallClock(rawLate);
+  const late = wallClock(rawLate) || wallClock(rawEarly);
+  if (!early) return null;
   const earlyDate = formatDatePart(early);
   const lateDate = formatDatePart(late);
   const earlyTime = formatTimePart(early);
@@ -53,15 +78,24 @@ function formatSchedRange(rawEarly, rawLate) {
 
 function formatRate(targetPay) {
   const amount = Number(targetPay);
-  if (Number.isNaN(amount)) return null;
-  return `$${amount.toLocaleString('en-US', { maximumFractionDigits: 2 })}`;
+  if (targetPay === null || targetPay === undefined || targetPay === '' || Number.isNaN(amount) || amount <= 0) return null;
+  // Whole dollars without cents; otherwise always two decimals ($1,150.50).
+  const whole = Number.isInteger(amount);
+  return `$${amount.toLocaleString('en-US', { minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: 2 })}`;
+}
+
+// "12845.0 LB", "43,500 lbs", "42000" -> "12,845 lbs" / "43,500 lbs" / "42,000 lbs".
+function formatWeight(weight) {
+  const digits = String(weight ?? '').replace(/,/g, '').match(/\d+(?:\.\d+)?/);
+  if (!digits) return null;
+  const pounds = Math.round(Number(digits[0]));
+  return pounds > 0 ? `${pounds.toLocaleString('en-US')} lbs` : null;
 }
 
 const ORDINALS = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];
 
-// Extra stops are additional pickups/deliveries beyond the load's primary
-// origin/destination, which is always "1st" implicitly (never labeled) --
-// so the first extra stop of a given type is "2nd", not "1st".
+// The primary origin and destination are the 1st pickup and drop, so the
+// first extra stop of a kind is "2nd".
 function extraStopLabel(indexAmongSameType) {
   const n = indexAmongSameType + 2;
   return ORDINALS[n - 1] || `${n}th`;
@@ -70,24 +104,33 @@ function extraStopLabel(indexAmongSameType) {
 function formatExtraStopLine(stop, indexAmongSameType) {
   const loc = formatLocation(stop.city, stop.state);
   if (!loc) return null;
-  const typeLabel = stop.type === 'delivery' ? 'DEL' : 'PU';
-  const label = `${extraStopLabel(indexAmongSameType)} ${typeLabel}`;
+  const label = `${extraStopLabel(indexAmongSameType)} ${stop.type === 'delivery' ? 'DEL' : 'PU'}`;
   const dateTime = formatDateTime(stop.datetime);
   return dateTime ? `${label}: ${loc} – ${dateTime}` : `${label}: ${loc}`;
 }
 
-// Format: "PU: CITY, ST – MM/DD/YYYY h:mma appt" (early/late PU match) or
-// "PU: CITY, ST – MM/DD/YYYY h:mma-h:mma FCFS" (a window) / "2nd PU: ..."
-// (extra pickups, entry order) / "DEL: ..." with the same appt/FCFS
-// treatment for early/late DEL / "2nd DEL: ..." (extra deliveries, entry
-// order) / "Weight: ..." / "Rate: $...", one field per line, in that order
-// -- any field the load doesn't have is simply omitted, never shown as
-// "null". The Rate line is additionally gated on include_rate (defaults to
-// on -- only an explicit 0/false suppresses it), which never touches
-// target_pay itself.
+function extraStopsOf(load) {
+  if (Array.isArray(load.extra_stops)) return load.extra_stops;
+  if (typeof load.extra_stops === 'string') {
+    try {
+      const parsed = JSON.parse(load.extra_stops);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function rateIsShown(load) {
+  return load.include_rate !== 0 && load.include_rate !== false && load.include_rate !== '0';
+}
+
+// Returns null when the load has nothing to say yet (no lane, weight or
+// rate), so an empty email is never queued or sent.
 function composeReply(load) {
   const lines = [];
-  const extraStops = Array.isArray(load.extra_stops) ? load.extra_stops : [];
+  const extraStops = extraStopsOf(load);
   const extraPickups = extraStops.filter((s) => s && s.type === 'pickup');
   const extraDeliveries = extraStops.filter((s) => s && s.type === 'delivery');
 
@@ -111,32 +154,27 @@ function composeReply(load) {
     if (line) lines.push(line);
   });
 
-  if (load.weight) {
-    lines.push(`Weight: ${load.weight}`);
-  }
+  const stops = stopLine(load);
+  if (stops) lines.push(stops);
+  if (load.commodity) lines.push(`Commodity: ${String(load.commodity).trim()}`);
+  const weight = formatWeight(load.weight);
+  if (weight) lines.push(`Weight: ${weight}`);
+  if (load.temperature) lines.push(`Temp: ${String(load.temperature).trim()}`);
 
-  const includeRate = load.include_rate !== 0 && load.include_rate !== false;
-  if (includeRate && load.target_pay !== null && load.target_pay !== undefined) {
+  if (rateIsShown(load)) {
     const rate = formatRate(load.target_pay);
     if (rate) lines.push(`Rate: ${rate}`);
   }
 
-  // A load with none of PU/DEL/weight/rate filled in (e.g. added via the
-  // quick-entry Add Load form, which only requires a load number) has
-  // nothing to compose a reply from -- returning null rather than '' lets
-  // callers tell "no data yet" apart from a deliberately blank line, instead
-  // of silently queuing or auto-sending an empty email.
   return lines.length > 0 ? lines.join('\n') : null;
 }
 
-// Appends the connected Gmail account's signature (if any) to an outgoing
-// reply body, blank-line separated. Applied at every send call site (auto
-// send, manual send, bulk send) so every outgoing reply carries it the same
-// way, regardless of how it was sent.
+// Adds the connected Gmail account's signature, blank-line separated, to
+// every reply that goes out, however it was sent.
 function appendSignature(body, signature) {
   const trimmedSignature = String(signature || '').trim();
   if (!trimmedSignature) return body;
   return `${body}\n\n${trimmedSignature}`;
 }
 
-module.exports = { composeReply, appendSignature };
+module.exports = { composeReply, appendSignature, wallClock, formatWeight };

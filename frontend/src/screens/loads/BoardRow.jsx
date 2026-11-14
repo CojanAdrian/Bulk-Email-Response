@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { formatMoney } from '../../lib/formatMoney';
-import { multiStopTagVariant } from '../../lib/lookupMessage';
+import { multiStopTagVariant, detectMultiStop } from '../../lib/lookupMessage';
 import SelectionCircle from '../../components/SelectionCircle';
 import CopyText from '../../ui/CopyText';
 import Regulars from './Regulars';
@@ -18,6 +18,42 @@ export function RateHiddenIcon({ className = '' }) {
   );
 }
 
+// An open eye: the rate goes out in replies and blasts.
+export function RateShownIcon({ className = '' }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <path d="M2 8s2.2-4.5 6-4.5S14 8 14 8s-2.2 4.5-6 4.5S2 8 2 8z" />
+      <circle cx="8" cy="8" r="1.8" />
+    </svg>
+  );
+}
+
+// The eye beside a rate. Click to hide the rate from replies and blasts, or
+// to show it again. A hidden rate always shows its crossed eye; a shown one
+// shows a faint open eye on hover.
+export function RateEye({ load, onToggle, className = '' }) {
+  if (hasNoRate(load)) return null;
+  const hidden = !Number(load.include_rate);
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        onToggle?.(load, hidden);
+      }}
+      onKeyDown={(event) => event.stopPropagation()}
+      aria-pressed={hidden}
+      aria-label={hidden ? `Show the rate for ${load.load_number} in replies` : `Hide the rate for ${load.load_number} from replies`}
+      title={hidden ? 'Rate hidden from replies. Click to show it.' : 'Click to hide the rate from replies.'}
+      className={`grid h-7 w-7 shrink-0 place-items-center rounded-full outline-none transition duration-150 hover:bg-white/[0.12] hover:text-text focus-visible:bg-white/[0.12] focus-visible:opacity-100 ${
+        hidden ? 'text-text/55' : 'text-text/40 opacity-0 group-hover:opacity-100'
+      } ${className}`}
+    >
+      {hidden ? <RateHiddenIcon className="h-4 w-4" /> : <RateShownIcon className="h-4 w-4" />}
+    </button>
+  );
+}
+
 export const SHEET_SPRING = { type: 'spring', stiffness: 260, damping: 28 };
 
 function LaneArrow() {
@@ -30,12 +66,13 @@ function LaneArrow() {
 
 // One load on the board. Clicking it (or Enter) opens the load; the row
 // itself grows into the detail sheet, which shares its layoutId.
-function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecting, selected, onOpen, onHover, onToggleSelect, onEmail, onOpenCarrier }) {
+function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecting, selected, onOpen, onHover, onToggleSelect, onEmail, onOpenCarrier, onToggleRate }) {
   const proven = Boolean(regulars?.length);
   const starRun = hasStarRegular(regulars);
   const pickup = schedule(load.early_pu, load.late_pu);
   const rateHidden = !hasNoRate(load) && !Number(load.include_rate);
   const stops = multiStopTagVariant(load);
+  const stopLabel = detectMultiStop(load);
   const origin = place(load.origin_city, load.origin_state) || 'Origin missing';
   const dest = place(load.dest_city, load.dest_state) || 'Destination missing';
 
@@ -98,8 +135,14 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
               </span>
             )}
             {Boolean(load.custom_reply_body) && <span className="rounded-full bg-white/[0.08] px-2 py-px text-[11px] text-text">Modified</span>}
-            {stops === 'error' && <span className="rounded-full bg-hot/15 px-2 py-px text-[11px] font-medium text-hot">Needs stops added</span>}
-            {stops === 'info' && <span className="rounded-full bg-white/[0.08] px-2 py-px text-[11px] text-text-muted">Stops added</span>}
+            {stopLabel && (
+              <span
+                title={stops === 'error' ? 'More than one stop, but not how many. Add the stops on the load.' : undefined}
+                className={`rounded-full px-2 py-px text-[11px] font-bold tracking-[0.02em] ${stops === 'error' ? 'bg-hot/15 text-hot' : 'bg-white text-black'}`}
+              >
+                {stopLabel}
+              </span>
+            )}
           </div>
           {starRun && (
             <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold px-2.5 py-[3px] text-[11px] font-bold text-black shadow-[0_0_16px_rgb(var(--color-gold)/0.45)]">
@@ -119,7 +162,7 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
             className={`flex items-center justify-end gap-1.5 text-[17px] font-semibold tabular-nums tracking-[-0.03em] ${hasNoRate(load) ? 'text-hot' : rateHidden ? 'text-text/35' : 'text-text'}`}
             title={rateHidden ? 'Rate hidden: replies and blasts leave it out' : undefined}
           >
-            {rateHidden && <RateHiddenIcon className="h-4 w-4 shrink-0" />}
+            {onToggleRate ? <RateEye load={load} onToggle={onToggleRate} className="-my-1" /> : rateHidden && <RateHiddenIcon className="h-4 w-4 shrink-0" />}
             <span className={rateHidden ? 'line-through decoration-1' : ''}>{hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}</span>
             {rateHidden && <span className="sr-only">, hidden from replies</span>}
           </p>

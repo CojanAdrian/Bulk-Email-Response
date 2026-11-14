@@ -1,5 +1,5 @@
 const { composeReply } = require('./replyComposer');
-const { withCoords } = require('./cityCoords');
+const { presentLoad } = require('./presentLoad');
 
 // Columns joined in from the matched load, aliased so they can sit
 // alongside the email_inquiries row without colliding. Deliberately
@@ -14,7 +14,8 @@ const INQUIRY_JOIN_FIELDS = `
     l.early_del AS matched_load_early_del, l.late_del AS matched_load_late_del,
     l.weight AS matched_load_weight, l.stops AS matched_load_stops, l.comment AS matched_load_comment,
     l.target_pay AS matched_load_target_pay, l.include_rate AS matched_load_include_rate,
-    l.extra_stops AS matched_load_extra_stops, l.custom_reply_body AS matched_load_custom_reply_body`;
+    l.extra_stops AS matched_load_extra_stops, l.custom_reply_body AS matched_load_custom_reply_body,
+    l.commodity AS matched_load_commodity, l.temperature AS matched_load_temperature, l.customer AS matched_load_customer`;
 
 // email_inquiries.reply_body is a one-time snapshot composed the moment the
 // carrier's email first arrived. If the load gets edited afterward (PU/DEL
@@ -38,10 +39,14 @@ function attachLiveReplyBody(row) {
     target_pay: row.matched_load_target_pay,
     include_rate: row.matched_load_include_rate,
     extra_stops: row.matched_load_extra_stops,
+    comment: row.matched_load_comment,
+    stops: row.matched_load_stops,
+    commodity: row.matched_load_commodity,
+    temperature: row.matched_load_temperature,
   };
   const liveReplyBody = row.matched_load_custom_reply_body || composeReply(loadLike);
   // Where the matched load runs, so the map can show it beside the inquiry.
-  return withCoords({ ...row, live_reply_body: liveReplyBody }, 'matched_load_');
+  return presentLoad({ ...row, live_reply_body: liveReplyBody }, 'matched_load_');
 }
 
 async function fetchInquiryWithLoad(pool, id) {

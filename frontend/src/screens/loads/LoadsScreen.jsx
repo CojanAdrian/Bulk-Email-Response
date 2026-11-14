@@ -410,6 +410,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                     onToggleSelect={toggleSelect}
                     onEmail={(target, emails) => setBlast({ load: target, emails })}
                     onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
+                    onToggleRate={changeIncludeRate}
                   />
               ))}
             </ul>

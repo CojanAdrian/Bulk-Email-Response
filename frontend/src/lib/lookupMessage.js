@@ -1,21 +1,5 @@
-import { parseLookupCommodity, parseTemp } from './mcleodParser';
-import { parseWeightNum, formatDateOnly, buildPUSched, buildDELSched } from './datExport';
-
-const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function formatShortDateRange(earliest, latest) {
-  function parse(s) {
-    const m = (s || '').match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-    return m ? { mo: +m[1], dy: +m[2] } : null;
-  }
-  const ep = parse(earliest);
-  if (!ep) return earliest || '';
-  const base = `${MONTH_NAMES[ep.mo - 1]} ${ep.dy}`;
-  const lp = parse(latest);
-  if (!lp || (lp.mo === ep.mo && lp.dy === ep.dy)) return base;
-  if (lp.mo === ep.mo) return `${base}-${lp.dy}`;
-  return `${base} – ${MONTH_NAMES[lp.mo - 1]} ${lp.dy}`;
-}
+import { composeLoadText, rateIsShown, formatRate } from './loadText';
+import { stopBadge, stopCount, extraStopsOf } from './stopCount';
 
 export function extractSched(comment, side) {
   const segs = String(comment || '').split(/[|,;\n/]/);
@@ -61,84 +45,30 @@ export function extractSched(comment, side) {
   return result.join(', ');
 }
 
+// The badge for a multi-stop load: "MULTI-DROP · 1P/2D", "MULTI-PICK", ...
+// null for a plain one-pick one-drop load.
 export function detectMultiStop(load) {
-  const c = load.comment || '';
-  const stops = load.stops || 0;
-  const isMultiPick = /\b(2nd?\s*(pu|pick(?:up)?)|multi.?pick|multiple\s*pick|add(?:itional|'?l)\s*pick|2\s*pu\b|\bpu\s*#\s*2\b)/i.test(c);
-  const isMultiDrop = /\b(2nd?\s*(del(?:ivery)?|drop)|multi.?drop|multiple\s*del|add(?:itional|'?l)\s*del|2\s*del\b|\bdel\s*#\s*2\b)/i.test(c);
-  if (isMultiPick && isMultiDrop) return 'MULTI-PICK & MULTI-DROP';
-  if (isMultiPick) return 'MULTI-PICK';
-  if (isMultiDrop) return 'MULTI-DROP';
-  if (stops > 0) return 'MULTI-STOP';
-  return null;
+  return stopBadge(load);
 }
 
-// Red until structured extra stops exist, then blue -- once real stops are
-// entered, that's the definitive resolved state, regardless of whether the
-// comment-text heuristic would also have triggered.
+// Blue once the stops are known exactly (entered on the load, or a count
+// like 1p2d in the comment); red while we only know there is more than one.
 export function multiStopTagVariant(load) {
-  const extraStops = Array.isArray(load.extra_stops) ? load.extra_stops : [];
-  if (extraStops.length > 0) return 'info';
-  if (detectMultiStop(load)) return 'error';
-  return null;
+  if (extraStopsOf(load).length > 0) return 'info';
+  const count = stopCount(load);
+  if (!count) return null;
+  return count.exact ? 'info' : 'error';
 }
 
-function formatLookupCityState(city, state, zip) {
-  if (!city && !state) return null;
-  const parts = [city, state].filter(Boolean);
-  return `${parts.join(', ')}${zip ? ' ' + zip : ''}`;
+export const RATE_QUESTION = 'How much would you need for this?';
+
+// Copy and Blast: exactly the text the server emails back (loadText.js),
+// with the rate shown or not. A blast with no rate asks the carrier for one.
+export function buildLookupMessage(load, showRate, { askRate = true } = {}) {
+  const text = composeLoadText({ ...load, include_rate: showRate ? 1 : 0 }) || '';
+  const hasRate = showRate && formatRate(load.target_pay);
+  if (!hasRate && askRate) return text ? `${text}\n${RATE_QUESTION}` : RATE_QUESTION;
+  return text;
 }
 
-export function buildLookupMessage(load, showRate) {
-  const lines = [];
-  const comment = load.comment || '';
-
-  const originLoc = formatLookupCityState(load.origin_city, load.origin_state, load.origin_zip);
-  if (originLoc) {
-    let puLine = `PU: ${originLoc}`;
-    if (load.early_pu || load.late_pu) {
-      const puSched = buildPUSched(load.early_pu, load.late_pu);
-      if (puSched) puLine += ' – ' + puSched;
-    } else {
-      const puDate = formatShortDateRange(formatDateOnly(load.early_pu), formatDateOnly(load.late_pu));
-      const puSchedAlt = extractSched(comment, 'pu');
-      if (puDate) puLine += ' – ' + puDate;
-      if (puSchedAlt) puLine += ' – ' + puSchedAlt;
-    }
-    lines.push(puLine);
-  }
-
-  const destLoc = formatLookupCityState(load.dest_city, load.dest_state, load.dest_zip);
-  if (destLoc) {
-    let delLine = `DEL: ${destLoc}`;
-    if (load.early_del || load.late_del) {
-      const delSched = buildDELSched(load.early_del, load.late_del);
-      if (delSched) delLine += ' – ' + delSched;
-    } else {
-      const delSchedAlt = extractSched(comment, 'del');
-      if (delSchedAlt) delLine += ' – ' + delSchedAlt;
-    }
-    lines.push(delLine);
-  }
-
-  const commodity = load.commodity || parseLookupCommodity(comment);
-  if (commodity) lines.push(`Commodity: ${commodity}`);
-
-  const weightNum = parseWeightNum(load.weight);
-  if (weightNum !== null && weightNum > 0) {
-    lines.push(`Weight: ${weightNum.toLocaleString()} lbs`);
-  }
-
-  const temp = load.temperature || parseTemp(comment, load.equipment);
-  if (temp) lines.push(`Temp: ${temp}`);
-
-  const targetPayNum =
-    load.target_pay === null || load.target_pay === undefined || load.target_pay === '' ? null : parseFloat(load.target_pay);
-  if (showRate && targetPayNum !== null && targetPayNum > 0) {
-    lines.push(`Rate: $${targetPayNum.toLocaleString()}`);
-  } else {
-    lines.push('How much would you need for this?');
-  }
-
-  return lines.join('\n');
-}
+export { rateIsShown };

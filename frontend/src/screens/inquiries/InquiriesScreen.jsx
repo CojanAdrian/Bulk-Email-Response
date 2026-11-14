@@ -16,13 +16,31 @@ import InboxCard from './InboxCard';
 import { useInquiries } from './useInquiries';
 import { draftFor, matchesSearch } from './inquiryText';
 
+const HOW_STEPS = ['Carrier emails', 'Matched to your load', 'You check and send'];
+
+// The three steps every inquiry goes through, in one line.
+function HowItWorks() {
+  return (
+    <ol aria-label="How inquiries work" className="mx-2 mb-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-[14px] bg-white/[0.04] px-3.5 py-2.5 text-[11.5px] text-text-muted">
+      {HOW_STEPS.map((step, i) => (
+        <li key={step} className="flex items-center gap-2">
+          {i > 0 && <span aria-hidden="true" className="text-text/25">→</span>}
+          <span className="grid h-[17px] w-[17px] place-items-center rounded-full bg-white/[0.12] text-[10px] font-bold text-text">{i + 1}</span>
+          <span>{step}</span>
+        </li>
+      ))}
+      <li className="basis-full text-[11px] text-text/40">Newest on top. Replies are written from the load's own details.</li>
+    </ol>
+  );
+}
+
 function openIdFrom(pathname) {
   const match = pathname.match(/^\/inquiries\/(\d+)/);
   return match ? Number(match[1]) : null;
 }
 
-// Carrier emails about your loads. Waiting ones are oldest first, so the
-// one that has waited longest is on top; All is everything, newest first.
+// Carrier emails about your loads, newest on top. Waiting needs a reply;
+// All is everything with what happened to it.
 function InquiriesScreen({ refreshKey }) {
   const navigate = useNavigate();
   const location = useLocation();
@@ -238,6 +256,7 @@ function InquiriesScreen({ refreshKey }) {
             {actionError}
           </p>
         )}
+        {status === 'ready' && tab === 'waiting' && <HowItWorks />}
         {status === 'ready' && source.length === 0 && (
           <EmptyNote title={tab === 'waiting' ? 'Nothing waiting for you.' : 'No inquiries yet.'}>
             {tab === 'waiting' ? 'New carrier emails about your loads land here, matched and ready to answer.' : 'Connect Gmail and carrier emails about your loads show up here.'}

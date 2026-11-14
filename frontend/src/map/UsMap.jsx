@@ -11,27 +11,23 @@ const WHITE = '255,255,255';
 const GOLD = '240,196,98';
 const RIPPLE_COLOUR = '255,150,90';
 const RIPPLE_REACH = 420;
-const LABEL_FONT = '800 8px "Inter Variable", Inter, sans-serif';
-const LABEL_TRACKING = 0.6;
+const LABEL_FAMILY = '"Inter Variable", Inter, sans-serif';
+const LABEL_TRACKING = 0.8;
+// Map units; small states get smaller codes so the Northeast does not pile up.
+const labelSize = (area) => (area < 250 ? 7.5 : area < 1200 ? 9.5 : 12.5);
 const ABBREVIATION = Object.fromEntries(Object.entries(US_STATE_NAMES).map(([code, name]) => [name, code]));
 
-// Where to write each state's name: the middle of its largest piece (so
-// Michigan's sits on the mitten, not in the lake), as its full name when it
-// fits and its two-letter code when it does not.
-function stateLabels(us, path, probe) {
-  probe.font = LABEL_FONT;
+// Each state's two-letter code, in the middle of its largest piece (so
+// Michigan's sits on the mitten, not in the lake), sized to the state.
+function stateLabels(us, path) {
   const labels = [];
   for (const state of feature(us, us.objects.states).features) {
-    const name = state.properties.name;
-    const code = ABBREVIATION[name];
+    const code = ABBREVIATION[state.properties.name];
     if (!code || code === 'DC') continue;
     const pieces = state.geometry.type === 'MultiPolygon' ? state.geometry.coordinates.map((coordinates) => ({ type: 'Polygon', coordinates })) : [state.geometry];
     const largest = pieces.reduce((best, piece) => (path.area(piece) > path.area(best) ? piece : best));
     const [x, y] = path.centroid(largest);
-    const [[x0], [x1]] = path.bounds(largest);
-    const full = name.toUpperCase();
-    const fullWidth = probe.measureText(full).width + full.length * LABEL_TRACKING;
-    labels.push({ x, y, text: fullWidth < (x1 - x0) * 0.8 ? full : code });
+    labels.push({ x, y, text: code, size: labelSize(path.area(largest)) });
   }
   return labels;
 }
@@ -50,7 +46,7 @@ async function loadShapes() {
       if (probe.isPointInPath(nation, x, y)) dots.push([x, y]);
     }
   }
-  return { nation, borders, dots, labels: stateLabels(us, path, probe) };
+  return { nation, borders, dots, labels: stateLabels(us, path) };
 }
 
 function cameraFor(lane) {
@@ -127,12 +123,18 @@ function UsMap() {
       ctx.strokeStyle = `rgba(${WHITE},.2)`;
       ctx.stroke(shapes.nation);
 
-      ctx.font = LABEL_FONT;
+      // Codes stay about the same size on screen as the camera zooms.
+      const shrink = Math.pow(k, -0.75);
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillStyle = `rgba(${WHITE},.075)`;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = `${LABEL_TRACKING}px`;
-      for (const label of shapes.labels) ctx.fillText(label.text, label.x, label.y);
+      ctx.fillStyle = `rgba(${WHITE},.46)`;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = `${LABEL_TRACKING * shrink}px`;
+      let font = '';
+      for (const label of shapes.labels) {
+        const next = `700 ${(label.size * shrink).toFixed(2)}px ${LABEL_FAMILY}`;
+        if (next !== font) ctx.font = font = next;
+        ctx.fillText(label.text, label.x, label.y);
+      }
       if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
     }
 

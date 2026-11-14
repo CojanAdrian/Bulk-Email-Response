@@ -2,8 +2,8 @@ import { motion } from 'framer-motion';
 import RelativeTime from '../../components/RelativeTime';
 import SelectionCircle from '../../components/SelectionCircle';
 import { SHEET_SPRING } from '../../ui/Sheet';
-import { detectMultiStop } from '../../lib/lookupMessage';
-import { STATUS_LABELS, senderName } from './inquiryText';
+import { detectMultiStop, multiStopTagVariant } from '../../lib/lookupMessage';
+import { STATUS_LABELS, senderName, inquiryLoad } from './inquiryText';
 
 const STATUS_TONE = {
   pending_review: 'bg-hot/15 text-hot',
@@ -17,7 +17,8 @@ const STATUS_TONE = {
 // waited; the rest show what happened to them.
 function InquiryRow({ inquiry, showStatus, current, selecting, selected, onOpen, onHover, onToggleSelect }) {
   const lane = inquiry.matched_load_origin_city && inquiry.matched_load_dest_city ? `${inquiry.matched_load_origin_city} → ${inquiry.matched_load_dest_city}` : null;
-  const multiStop = detectMultiStop({ comment: inquiry.matched_load_comment, stops: inquiry.matched_load_stops });
+  const multiStop = detectMultiStop(inquiryLoad(inquiry));
+  const stopTone = multiStopTagVariant(inquiryLoad(inquiry)) === 'error' ? 'bg-hot/15 text-hot' : 'bg-white text-black';
   const waiting = inquiry.reply_status === 'pending_review';
 
   function activate() {
@@ -61,7 +62,7 @@ function InquiryRow({ inquiry, showStatus, current, selecting, selected, onOpen,
               <span className="text-hot">No load matched</span>
             )}
             {Boolean(inquiry.ref_mismatch) && <span className="rounded-full bg-hot/15 px-2 py-px font-medium text-hot">Different load?</span>}
-            {multiStop && <span className="rounded-full bg-hot/15 px-2 py-px font-medium text-hot">{multiStop}</span>}
+            {multiStop && <span className={`rounded-full px-2 py-px font-bold tracking-[0.02em] ${stopTone}`}>{multiStop}</span>}
           </div>
         </div>
         <div className="flex flex-col items-end gap-1.5 text-right">

@@ -189,6 +189,10 @@ describe('buildComment', () => {
   test('returns an empty string when there is neither a drop label nor a contact line', () => {
     expect(buildComment('no special instructions', '')).toBe('');
   });
+
+  test('puts the stop count first', () => {
+    expect(buildComment('1p2d / drop trailer', 'Call 555-1234', '1P/2D')).toBe('1P/2D | DROP TRAILER | Call 555-1234');
+  });
 });
 
 describe('detectCrossPosts', () => {

@@ -157,7 +157,7 @@ describe('composeReply', () => {
       target_pay: '1440.50',
     };
     const reply = composeReply(load);
-    expect(reply).toContain('Rate: $1,440.5');
+    expect(reply).toContain('Rate: $1,440.50');
   });
 
   test('never renders the literal string "null" or "undefined" anywhere in the reply', () => {
@@ -207,7 +207,8 @@ describe('composeReply', () => {
       'PU: DALLAS, TX\n' +
       '2nd PU: FORT WORTH, TX – 08/12/2026 1pm\n' +
       '3rd PU: WACO, TX\n' +
-      'DEL: CHICAGO, IL'
+      'DEL: CHICAGO, IL\n' +
+      'Stops: 3 picks, 1 drop (3P/1D)'
     );
   });
 
@@ -224,7 +225,8 @@ describe('composeReply', () => {
       'PU: DALLAS, TX\n' +
       'DEL: CHICAGO, IL\n' +
       '2nd DEL: JOLIET, IL – 08/14/2026 9am\n' +
-      '3rd DEL: PEORIA, IL'
+      '3rd DEL: PEORIA, IL\n' +
+      'Stops: 1 pick, 3 drops (1P/3D)'
     );
   });
 
@@ -243,6 +245,7 @@ describe('composeReply', () => {
       '2nd PU: FORT WORTH, TX\n' +
       'DEL: CHICAGO, IL\n' +
       '2nd DEL: JOLIET, IL\n' +
+      'Stops: 2 picks, 2 drops (2P/2D)\n' +
       'Rate: $1,500'
     );
   });
@@ -295,5 +298,14 @@ describe('appendSignature', () => {
 
   test('trims the signature before appending', () => {
     expect(appendSignature('PU: DALLAS, TX', '  John Doe  ')).toBe('PU: DALLAS, TX\n\nJohn Doe');
+  });
+});
+
+// The same examples are checked by the frontend's Copy and Blast text, so
+// the two can never drift apart.
+describe('shared reply examples', () => {
+  const examples = require('../../../shared/reply-fixtures.json');
+  test.each(examples.map((example) => [example.name, example]))('%s', (_name, example) => {
+    expect(composeReply(example.load)).toBe(example.reply);
   });
 });

@@ -69,13 +69,13 @@ describe('InquiriesScreen', () => {
     });
   });
 
-  test('lists waiting inquiries oldest first and counts them', async () => {
+  test('lists waiting inquiries newest first and counts them', async () => {
     renderScreen();
     await screen.findByText('Redline Haul');
     const rows = screen.getAllByTestId('inquiry-row');
-    expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining('Redline Haul'), expect.stringContaining('ops@northstar.com')]);
+    expect(rows.map((r) => r.textContent)).toEqual([expect.stringContaining('ops@northstar.com'), expect.stringContaining('Redline Haul')]);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('2 need a reply');
-    expect(within(rows[1]).getByText('No load matched')).toBeInTheDocument();
+    expect(within(rows[0]).getByText('No load matched')).toBeInTheDocument();
   });
 
   test('All shows every inquiry with what happened to it', async () => {
@@ -177,7 +177,7 @@ describe('InquiriesScreen', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select' }));
     fireEvent.click(screen.getByRole('button', { name: 'Select all' }));
     fireEvent.click(screen.getByRole('button', { name: 'Send 2' }));
-    await waitFor(() => expect(inquiriesApi.bulkSendInquiries).toHaveBeenCalledWith([{ id: 1, body: OLDER.live_reply_body }, { id: 2, body: '' }]));
+    await waitFor(() => expect(inquiriesApi.bulkSendInquiries).toHaveBeenCalledWith([{ id: 2, body: '' }, { id: 1, body: OLDER.live_reply_body }]));
     await waitFor(() => expect(screen.queryAllByTestId('inquiry-row')).toHaveLength(0));
   });
 

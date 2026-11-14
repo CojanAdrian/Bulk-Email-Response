@@ -4,6 +4,7 @@ const { composeReply } = require('../lib/replyComposer');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 const { cleanCustomerName } = require('../lib/customerName');
 const { withCoords } = require('../lib/cityCoords');
+const { presentLoad } = require('../lib/presentLoad');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -91,7 +92,7 @@ function createLoadsRouter(pool, wsHub) {
     }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const [rows] = await pool.query(`SELECT * FROM loads ${whereClause} ORDER BY created_at DESC`, params);
-    res.json(rows.map((row) => withCoords(row)));
+    res.json(rows.map((row) => presentLoad(row)));
   }));
 
   // Booked loads with whatever rate/gp/carrier info was logged for them
@@ -190,7 +191,7 @@ function createLoadsRouter(pool, wsHub) {
 
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [insertId]);
     if (wsHub) wsHub.emitToUser(userId, 'load:changed', { loadId: insertId });
-    res.status(201).json(rows[0]);
+    res.status(201).json(presentLoad(rows[0]));
   }));
 
   // Exact load-number lookup for the carrier lane-history form (see
@@ -211,7 +212,7 @@ function createLoadsRouter(pool, wsHub) {
       params.push(req.session.userId);
     }
     const [rows] = await pool.query(`SELECT * FROM loads WHERE ${conditions.join(' AND ')}`, params);
-    res.json(rows[0] || null);
+    res.json(rows[0] ? presentLoad(rows[0]) : null);
   }));
 
   router.get('/:id', asyncHandler(async (req, res) => {
@@ -221,7 +222,7 @@ function createLoadsRouter(pool, wsHub) {
     if (!load || (!isAdmin && load.user_id !== req.session.userId)) {
       return res.status(404).json({ error: 'Load not found' });
     }
-    res.json(load);
+    res.json(presentLoad(load));
   }));
 
   // Previews the auto-generated PU/DEL/Weight/Rate reply for a load, using
@@ -268,7 +269,7 @@ function createLoadsRouter(pool, wsHub) {
     await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: rows[0].id });
-    res.json(rows[0]);
+    res.json(presentLoad(rows[0]));
   }));
 
   router.delete('/:id', asyncHandler(async (req, res) => {
