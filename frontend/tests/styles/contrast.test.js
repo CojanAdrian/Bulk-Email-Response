@@ -3,8 +3,7 @@ import { resolve } from 'node:path';
 import { describe, test, expect } from 'vitest';
 
 // Reads tokens.css and checks every text-on-background pair the app relies
-// on meets WCAG AA (4.5:1) in both themes. Catches regressions like lime
-// text on a white card.
+// on meets WCAG AA (4.5:1).
 const css = readFileSync(resolve(__dirname, '../../src/styles/tokens.css'), 'utf8');
 
 function parseBlock(selector) {
@@ -18,8 +17,7 @@ function parseBlock(selector) {
   return tokens;
 }
 
-const light = parseBlock(':root');
-const dark = { ...light, ...parseBlock('.dark') };
+const tokens = parseBlock(':root');
 
 function luminance([r, g, b]) {
   const lin = (c) => {
@@ -63,10 +61,7 @@ const PAIRS = [
   ['info', 'surface'],
 ];
 
-describe.each([
-  ['light', light],
-  ['dark', dark],
-])('%s theme contrast', (_name, tokens) => {
+describe('token contrast', () => {
   test.each(PAIRS)('%s on %s meets WCAG AA', (fg, bg) => {
     expect(tokens[fg], `missing token ${fg}`).toBeDefined();
     expect(tokens[bg], `missing token ${bg}`).toBeDefined();

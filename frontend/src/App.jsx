@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { me, logout } from './api/auth';
 import { connect as connectLiveSocket, disconnect as disconnectLiveSocket } from './lib/liveSocket';
 import LoginPage from './pages/LoginPage';
@@ -64,9 +65,11 @@ function App() {
   }
 
   return (
-    <ToastProvider>
-      <MainToolPage username={username} onLogout={handleLogout} />
-    </ToastProvider>
+    <BrowserRouter>
+      <ToastProvider>
+        <MainToolPage username={username} onLogout={handleLogout} />
+      </ToastProvider>
+    </BrowserRouter>
   );
 }
 

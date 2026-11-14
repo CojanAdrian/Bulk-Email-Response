@@ -97,7 +97,7 @@ function sortLoads(loads, sort) {
 // The Loads/Inquiries tabs unmount this table (see MainToolPage), which
 // would otherwise reset the sort back to unsorted every time the user
 // switches tabs and comes back -- persist it across that, and across full
-// page reloads, the same way useTheme persists the color theme.
+// page reloads.
 const SORT_STORAGE_KEY = 'loadsTable.sort';
 
 function getInitialSort() {

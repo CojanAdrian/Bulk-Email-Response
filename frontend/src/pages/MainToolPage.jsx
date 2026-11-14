@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import UploadPanel from '../components/UploadPanel';
 import LoadsTable from '../components/LoadsTable';
@@ -16,10 +17,8 @@ import StatsPage from './StatsPage';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
 import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
-import TopNav from '../components/TopNav';
-import AuroraBackground from '../components/AuroraBackground';
-import { useInquiryAlerts } from '../components/InquiryAlertBanner';
-import { subscribe } from '../lib/liveSocket';
+import AppShell from '../shell/AppShell';
+import { tabFromPath } from '../shell/routes';
 import { useMotionPreset } from '../lib/motionConfig';
 import { useHotkeys, focusPageSearch } from '../lib/useHotkeys';
 import CustomersPage from './CustomersPage';
@@ -71,7 +70,9 @@ function CarriersViewToggle({ carriersView, onChange }) {
 }
 
 function MainToolPage({ username, onLogout }) {
-  const [tab, setTab] = useState('loads'); // 'loads' | 'inquiries'
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = tabFromPath(location.pathname);
   const [refreshKey, setRefreshKey] = useState(0);
   const [loadsStatus, setLoadsStatus] = useState('active');
   const [selectedLoad, setSelectedLoad] = useState(null);
@@ -80,7 +81,6 @@ function MainToolPage({ username, onLogout }) {
   const [focusedMatchLoad, setFocusedMatchLoad] = useState(null);
   const [carriersView, setCarriersView] = useState('find'); // 'find' | 'manage'
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
-  const { pushAlert, viewport: inquiryAlertViewport } = useInquiryAlerts();
   const preset = useMotionPreset();
   const datExportRef = useRef(null);
 
@@ -99,16 +99,14 @@ function MainToolPage({ username, onLogout }) {
   function handleViewMatches(load) {
     setFocusedMatchLoad(load);
     setCarriersView('find');
-    setTab('carriers');
+    navigate('/carriers');
   }
 
+  // The bare address opens the Loads board; the query string (Google
+  // sign-in results) is kept for the hooks that read it.
   useEffect(() => {
-    return subscribe('inquiry:new', (inquiry) => {
-      pushAlert(`New inquiry from ${inquiry.from_address}`, {
-        onView: () => setTab('inquiries'),
-      });
-    });
-  }, [pushAlert]);
+    if (location.pathname === '/') navigate({ pathname: '/loads', search: location.search }, { replace: true });
+  }, [location.pathname, location.search, navigate]);
 
   useHotkeys({
     '/': focusPageSearch,
@@ -118,10 +116,7 @@ function MainToolPage({ username, onLogout }) {
   });
 
   return (
-    <div className="relative min-h-screen overflow-x-clip bg-shell-bg text-shell-text">
-      <AuroraBackground />
-      {inquiryAlertViewport}
-      <TopNav tab={tab} onTabChange={setTab} username={username} onLogout={onLogout} />
+    <AppShell username={username} onLogout={onLogout}>
       <div className="relative z-10 min-w-0">
         {!(tab === 'carriers' && carriersView === 'find') && (
           <header className="mx-auto flex w-full max-w-[1400px] items-end justify-between gap-3 px-4 pt-6 sm:px-6 sm:pt-8">
@@ -179,7 +174,7 @@ function MainToolPage({ username, onLogout }) {
             </motion.main>
           )}
           {tab === 'carriers' && carriersView === 'find' && (
-            <motion.main key="carriers-find" {...preset.crossfade} className="relative w-full pb-[4.5rem] md:h-[calc(100dvh-3.5rem)] md:overflow-hidden md:pb-0">
+            <motion.main key="carriers-find" {...preset.crossfade} className="relative w-full pb-[4.5rem] md:h-[calc(100dvh-72px)] md:overflow-hidden md:pb-0">
               <CarrierMapPage focusedLoad={focusedMatchLoad} onClearFocusedLoad={() => setFocusedMatchLoad(null)} />
               {/* Floats over the globe instead of sitting in a separate header
                   strip above it, so the whole tab reads as one continuous
@@ -218,7 +213,7 @@ function MainToolPage({ username, onLogout }) {
           <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
         )}
       </AnimatePresence>
-    </div>
+    </AppShell>
   );
 }
 

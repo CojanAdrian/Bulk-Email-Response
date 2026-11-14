@@ -5,8 +5,6 @@ import Card from '../components/Card';
 import PasswordInput from '../components/PasswordInput';
 import PrimaryButton from '../components/PrimaryButton';
 import GoogleSignInButton from '../components/GoogleSignInButton';
-import ThemeToggle from '../components/ThemeToggle';
-import AuroraBackground from '../components/AuroraBackground';
 import logoIcon from '../assets/logo-icon.png';
 
 function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
@@ -42,10 +40,6 @@ function RegisterPage({ onRegisterSuccess, onSwitchToLogin }) {
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-shell-bg px-4">
-      <AuroraBackground />
-      <div className="absolute right-4 top-4 z-10">
-        <ThemeToggle />
-      </div>
       <Card className="relative z-10 w-full max-w-sm">
         <form onSubmit={handleSubmit}>
           <div className="mb-6 flex items-center gap-3">

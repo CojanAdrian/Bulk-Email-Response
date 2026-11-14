@@ -1,5 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, act, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import Papa from 'papaparse';
 import MainToolPage from '../../src/pages/MainToolPage';
 import { ToastProvider } from '../../src/components/Toast';
@@ -23,9 +24,11 @@ vi.mock('../../src/components/CarrierLaneMap', () => ({
 
 function renderPage(props) {
   return render(
-    <ToastProvider>
-      <MainToolPage {...props} />
-    </ToastProvider>
+    <MemoryRouter>
+      <ToastProvider>
+        <MainToolPage {...props} />
+      </ToastProvider>
+    </MemoryRouter>
   );
 }
 
