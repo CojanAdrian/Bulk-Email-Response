@@ -12,7 +12,7 @@ describe('ModalCard', () => {
     render(<ModalCard>Hello</ModalCard>);
     const outer = screen.getByText('Hello').parentElement;
     expect(outer.className).toContain('overflow-hidden');
-    expect(outer.className).toContain('rounded-3xl');
+    expect(outer.className).toContain('mat');
   });
 
   test('the inner body owns the scroll, inside a shell capped at maxHeight', () => {
@@ -30,7 +30,7 @@ describe('ModalCard', () => {
     const body = screen.getByText('Hello');
     const footer = screen.getByRole('button', { name: 'Save' }).parentElement;
     expect(body.contains(footer)).toBe(false);
-    expect(footer.className).toContain('bg-surface');
+    expect(footer.className).toContain('border-t');
     expect(body.nextElementSibling).toBe(footer);
   });
 
@@ -44,6 +44,6 @@ describe('ModalCard', () => {
     let ref;
     render(<ModalCard ref={(el) => { ref = el; }}>Hello</ModalCard>);
     expect(ref).toBeInstanceOf(HTMLElement);
-    expect(ref.className).toContain('rounded-3xl');
+    expect(ref.className).toContain('mat');
   });
 });

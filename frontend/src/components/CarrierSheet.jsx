@@ -235,44 +235,44 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
   return (
     <AnimatePresence>
       <BottomSheet onClose={handleRequestClose}>
-        <h2 className="mb-4 text-lg font-semibold text-text">{isEditing ? `Edit ${carrier.company_name}` : 'Add a carrier'}</h2>
+        <h2 className="mb-5 text-[28px] font-bold leading-none tracking-[-0.045em] text-text">{isEditing ? `Edit ${carrier.company_name}` : 'Add a carrier'}</h2>
 
         <div className="mb-4 grid grid-cols-2 gap-3">
           <div className="col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-company">
+            <label className="caps mb-1.5 block" htmlFor="carrier-company">
               Company name
             </label>
             <input
               id="carrier-company"
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-mc">
+            <label className="caps mb-1.5 block" htmlFor="carrier-mc">
               MC number
             </label>
             <input
               id="carrier-mc"
               value={mcNumber}
               onChange={(e) => setMcNumber(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-dispatcher-phone">
+            <label className="caps mb-1.5 block" htmlFor="carrier-dispatcher-phone">
               Dispatcher phone
             </label>
             <input
               id="carrier-dispatcher-phone"
               value={dispatcherPhone}
               onChange={(e) => setDispatcherPhone(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
             />
           </div>
           <div>
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-dispatcher-email">
+            <label className="caps mb-1.5 block" htmlFor="carrier-dispatcher-email">
               Dispatcher email
             </label>
             <input
@@ -280,24 +280,24 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
               type="email"
               value={dispatcherEmail}
               onChange={(e) => setDispatcherEmail(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
             />
           </div>
           <div className="col-span-2">
-            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-dispatcher-name">
+            <label className="caps mb-1.5 block" htmlFor="carrier-dispatcher-name">
               Dispatcher name
             </label>
             <input
               id="carrier-dispatcher-name"
               value={dispatcherName}
               onChange={(e) => setDispatcherName(e.target.value)}
-              className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+              className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
             />
           </div>
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted">Equipment</label>
+          <label className="caps mb-1.5 block">Equipment</label>
           <div className="flex flex-wrap gap-1.5">
             {EQUIPMENT_OPTIONS.map((option) => (
               <button
@@ -316,7 +316,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-equipment-notes">
+          <label className="caps mb-1.5 block" htmlFor="carrier-equipment-notes">
             Equipment notes
           </label>
           <textarea
@@ -324,24 +324,24 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             value={equipmentNotes}
             onChange={(e) => setEquipmentNotes(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-operating-states">
+          <label className="caps mb-1.5 block" htmlFor="carrier-operating-states">
             Operating states (comma-separated, e.g. TX, OK, AR)
           </label>
           <input
             id="carrier-operating-states"
             value={operatingStatesText}
             onChange={(e) => setOperatingStatesText(e.target.value)}
-            className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-operating-notes">
+          <label className="caps mb-1.5 block" htmlFor="carrier-operating-notes">
             Where they operate (notes)
           </label>
           <textarea
@@ -349,12 +349,12 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             value={operatingNotes}
             onChange={(e) => setOperatingNotes(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
         </div>
 
         <div className="mb-4">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="carrier-comment">
+          <label className="caps mb-1.5 block" htmlFor="carrier-comment">
             Comment
           </label>
           <textarea
@@ -362,12 +362,12 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             value={comment}
             onChange={(e) => setComment(e.target.value)}
             rows={2}
-            className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
         </div>
 
         {isEditing && (
-          <div className="mb-4 border-t border-border pt-4">
+          <div className="mb-4 border-t border-white/[0.07] pt-4">
             <div className="mb-2 flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wide text-text-muted">Lane history</label>
               {!addingHistory && (
@@ -383,7 +383,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             )}
             <ul className="space-y-2">
               {history.map((entry) => (
-                <li key={entry.id} className="flex items-center justify-between rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm">
+                <li key={entry.id} className="flex items-center justify-between rounded-[14px] bg-white/[0.06] px-3.5 py-2.5 text-[13px]">
                   <span className="text-text">
                     {entry.origin_city}, {entry.origin_state} → {entry.dest_city}, {entry.dest_state}
                     {entry.rate ? ` — $${Number(entry.rate).toLocaleString()}` : ''}
@@ -401,14 +401,14 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
             </ul>
 
             {addingHistory && (
-              <div className="mt-3 rounded-lg border border-border p-3">
+              <div className="mt-3 rounded-[18px] bg-white/[0.05] p-4">
                 {historyError && (
                   <p role="alert" className="mb-2 text-xs text-error">
                     {historyError}
                   </p>
                 )}
                 <div className="mb-2">
-                  <label className="mb-1 block text-[10px] text-text-muted" htmlFor="lane-load-number">
+                  <label className="caps mb-1 block !text-[9.5px]" htmlFor="lane-load-number">
                     Load # (optional — autofills the lane below)
                   </label>
                   <input
@@ -421,7 +421,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                       setLoadLookupStatus('idle');
                     }}
                     onBlur={handleLoadNumberBlur}
-                    className="w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="w-full rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   {loadLookupStatus === 'checking' && (
                     <p className="mt-1 text-xs text-text-muted">Checking load {historyDraft.load_number.trim()}...</p>
@@ -441,14 +441,14 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                     value={historyDraft.origin_city}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, origin_city: e.target.value }))}
                     onPlaceSelected={({ city, state }) => setHistoryDraft((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <StateSelect
                     id="lane-origin-state"
                     ariaLabel="Origin state"
                     value={historyDraft.origin_state}
                     onChange={(state) => setHistoryDraft((prev) => ({ ...prev, origin_state: state }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <CityStateAutocomplete
                     id="lane-dest-city"
@@ -457,56 +457,56 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                     value={historyDraft.dest_city}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, dest_city: e.target.value }))}
                     onPlaceSelected={({ city, state }) => setHistoryDraft((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <StateSelect
                     id="lane-dest-state"
                     ariaLabel="Destination state"
                     value={historyDraft.dest_state}
                     onChange={(state) => setHistoryDraft((prev) => ({ ...prev, dest_state: state }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Rate"
                     placeholder="Rate"
                     value={historyDraft.rate}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, rate: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Gross profit"
                     placeholder="GP"
                     value={historyDraft.gp}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, gp: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Date"
                     type="date"
                     value={historyDraft.ran_at}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, ran_at: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Customer"
                     placeholder="Customer (optional)"
                     value={historyDraft.customer}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, customer: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Driver name"
                     placeholder="Driver name (optional)"
                     value={historyDraft.driver_name}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, driver_name: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                   <input
                     aria-label="Driver phone"
                     placeholder="Driver phone (optional)"
                     value={historyDraft.driver_phone}
                     onChange={(e) => setHistoryDraft((prev) => ({ ...prev, driver_phone: e.target.value }))}
-                    className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                    className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                   />
                 </div>
                 <textarea
@@ -515,7 +515,7 @@ function CarrierSheet({ carrier, onClose, onSaved }) {
                   value={historyDraft.comment}
                   onChange={(e) => setHistoryDraft((prev) => ({ ...prev, comment: e.target.value }))}
                   rows={2}
-                  className="mb-2 w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+                  className="mb-2 w-full rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
                 />
                 <div className="flex justify-end gap-2">
                   <SecondaryButton

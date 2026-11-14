@@ -56,7 +56,7 @@ function EquipmentPicker({ id, value, onChange }) {
         onKeyDown={(e) => nav.handleKeyDown(e)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
-        className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+        className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
       />
       {open && (
         <ListboxPanel

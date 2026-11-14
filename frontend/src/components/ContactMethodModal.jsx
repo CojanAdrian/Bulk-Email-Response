@@ -27,11 +27,11 @@ function ContactMethodModal({ onCancel, onConfirm }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="contact-modal-title"
-        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-md sm:items-center sm:px-4"
         {...preset.modal.backdrop}
       >
         <MotionModalCard className="w-full max-w-md" {...preset.modal.card}>
-          <h2 id="contact-modal-title" className="mb-4 text-lg font-semibold text-text">
+          <h2 id="contact-modal-title" className="mb-5 text-[28px] font-bold leading-none tracking-[-0.045em] text-text">
             DAT Contact Method
           </h2>
 
@@ -60,7 +60,7 @@ function ContactMethodModal({ onCancel, onConfirm }) {
                 onChange={(e) => setCommentContact(e.target.value)}
                 placeholder="e.g. Call John 555-1234"
                 aria-label="Contact line text"
-                className="mt-2 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="mt-2 w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             )}
           </fieldset>

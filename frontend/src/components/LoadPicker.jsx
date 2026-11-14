@@ -51,19 +51,19 @@ function LoadPicker({ ariaLabel, onSelect, autoFocus = false }) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder="Search by load #, city, or state"
-        className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+        className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
       />
       {status === 'loading' && <p className="mt-1 text-xs text-text-muted">Loading loads...</p>}
       {status === 'error' && <p className="mt-1 text-xs text-error">Failed to load your active loads.</p>}
       {status === 'ready' && (
-        <ul className="mt-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
+        <ul className="mat mt-1 max-h-48 overflow-y-auto rounded-[16px]">
           {results.length === 0 && <li className="px-3 py-2 text-sm text-text-muted">No matching loads</li>}
           {results.map((load) => (
             <li key={load.id}>
               <button
                 type="button"
                 onClick={() => onSelect(load)}
-                className="block w-full px-3 py-2 text-left text-sm text-text hover:bg-surface-alt"
+                className="block w-full px-3.5 py-2 text-left text-[13px] text-text hover:bg-white/[0.08]"
               >
                 {loadLabel(load)}
               </button>

@@ -63,7 +63,7 @@ function DateTimePopover({ id, label, ariaLabel, value, onChange, labelClassName
           anchorEl={buttonRef.current}
           role="dialog"
           ariaLabel={ariaLabel || label || 'Choose date and time'}
-          className="z-50 rounded-2xl border border-border bg-surface p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+          className="z-50 mat rounded-[22px] p-3"
         >
           <DateTimeCalendar value={value} onChange={onChange} idPrefix={id} />
         </PopoverPanel>

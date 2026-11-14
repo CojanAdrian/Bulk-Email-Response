@@ -16,6 +16,6 @@ describe('BottomActionBar', () => {
 
   test('is translucent/blurred (reads as a floating sheet, not a plain bordered box)', () => {
     render(<BottomActionBar count={1}>content</BottomActionBar>);
-    expect(screen.getByText('1 selected').closest('div').className).toContain('backdrop-blur');
+    expect(screen.getByText('1 selected').closest('div').className).toContain('mat');
   });
 });

@@ -32,12 +32,12 @@ const SECTIONS = [
 function AnomalyReport({ anomalies }) {
   return (
     <Card>
-      <h2 className="mb-4 text-lg font-semibold text-text">Anomaly Report</h2>
+      <h2 className="mb-5 text-[28px] font-bold leading-none tracking-[-0.045em] text-text">Anomaly Report</h2>
       <div className="space-y-4">
         {SECTIONS.map((section) => {
           const rows = anomalies[section.key] || [];
           return (
-            <div key={section.key} className="rounded-xl border border-border bg-surface-alt p-4">
+            <div key={section.key} className="rounded-[18px] bg-white/[0.05] p-4">
               <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-text">
                 {section.title}
                 <Badge>{rows.length}</Badge>
@@ -47,7 +47,7 @@ function AnomalyReport({ anomalies }) {
               ) : (
                 <table className="w-full text-left text-sm text-text">
                   <thead>
-                    <tr className="border-b border-border text-text-muted">
+                    <tr className="border-b border-white/[0.07] text-text-muted">
                       {section.columns.map((c) => (
                         <th key={c.key} className="py-1 pr-4">
                           {c.label}
@@ -57,7 +57,7 @@ function AnomalyReport({ anomalies }) {
                   </thead>
                   <tbody>
                     {rows.map((row, i) => (
-                      <tr key={i} className="border-b border-border/60">
+                      <tr key={i} className="border-b border-white/[0.05]">
                         {section.columns.map((c) => (
                           <td key={c.key} className="py-1 pr-4">
                             {row[c.key]}

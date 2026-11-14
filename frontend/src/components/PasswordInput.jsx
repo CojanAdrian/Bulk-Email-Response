@@ -41,14 +41,14 @@ function PasswordInput({ className = '', onKeyUp, onKeyDown, onBlur, ...inputPro
             onBlur?.(e);
           }}
           aria-describedby={[inputProps['aria-describedby'], capsLock ? hintId : null].filter(Boolean).join(' ') || undefined}
-          className="w-full rounded-xl border border-border bg-surface-alt py-2.5 pl-3 pr-11 text-text outline-none transition focus:border-focus"
+          className="w-full rounded-xl border py-2.5 pl-3.5 pr-11 text-text outline-none transition-colors"
         />
         <button
           type="button"
           onClick={() => setVisible((v) => !v)}
           aria-pressed={visible}
           aria-label={visible ? 'Hide characters' : 'Show characters'}
-          className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-text-muted transition hover:bg-surface hover:text-text"
+          className="absolute right-1.5 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-text-muted transition hover:bg-white/10 hover:text-text"
         >
           <EyeIcon open={visible} className="h-4 w-4" />
         </button>

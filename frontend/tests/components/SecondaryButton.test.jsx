@@ -13,7 +13,7 @@ describe('SecondaryButton', () => {
   test('applies the outlined pill secondary styling', () => {
     render(<SecondaryButton>Cancel</SecondaryButton>);
     expect(screen.getByRole('button').className).toContain('rounded-full');
-    expect(screen.getByRole('button').className).toContain('border-control-border');
+    expect(screen.getByRole('button').className).toContain('bg-white/10');
   });
 
   test('respects the disabled prop', () => {

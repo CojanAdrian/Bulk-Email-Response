@@ -16,7 +16,7 @@ function ToastViewport({ toasts, onDismiss }) {
             key={toast.id}
             role="status"
             {...preset.popIn}
-            className="pointer-events-auto flex items-center gap-3 rounded-2xl border border-border bg-surface px-4 py-3 text-sm text-text shadow-[0_8px_30px_rgba(10,11,16,0.18)]"
+            className="mat pointer-events-auto flex items-center gap-3 rounded-full px-5 py-3 text-[13px] text-text"
           >
             <button
               type="button"

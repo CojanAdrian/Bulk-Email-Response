@@ -160,7 +160,7 @@ function DateTimeCalendar({ value, onChange, idPrefix, mode = 'datetime' }) {
         })}
       </div>
       {!isDateOnly && (
-        <div className="mt-3 border-t border-border pt-3">
+        <div className="mt-3 border-t border-white/[0.07] pt-3">
           <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-text-muted">Time</p>
           <div className="flex flex-wrap items-center gap-1">
             {QUICK_TIMES.map((qt) => (

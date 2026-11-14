@@ -119,24 +119,24 @@ function AddLoadModal({ onClose, onCreated }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-load-title"
-        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-md sm:items-center sm:px-4"
         {...preset.modal.backdrop}
       >
         <MotionModalCard className="w-full max-w-lg" footer={footer} {...preset.modal.card}>
-          <h2 id="add-load-title" className="mb-4 text-lg font-semibold text-text">
+          <h2 id="add-load-title" className="mb-5 text-[28px] font-bold leading-none tracking-[-0.045em] text-text">
             Add a load
           </h2>
 
           <div className="mb-4 grid gap-2 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="load_number">
+              <label className="caps mb-1.5 block" htmlFor="load_number">
                 Load #
               </label>
               <input
                 id="load_number"
                 value={fields.load_number}
                 onChange={(e) => handleFieldChange('load_number', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             </div>
             <CustomerField value={fields.customer} onChange={(value) => handleFieldChange('customer', value)} />
@@ -144,7 +144,7 @@ function AddLoadModal({ onClose, onCreated }) {
 
           <div className="mb-4 grid grid-cols-3 gap-2">
             <div className="col-span-1">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_city">
+              <label className="caps mb-1.5 block" htmlFor="origin_city">
                 Origin city
               </label>
               <CityStateAutocomplete
@@ -153,11 +153,11 @@ function AddLoadModal({ onClose, onCreated }) {
                 value={fields.origin_city}
                 onChange={(e) => handleFieldChange('origin_city', e.target.value)}
                 onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, origin_city: city, origin_state: state }))}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_state">
+              <label className="caps mb-1.5 block" htmlFor="origin_state">
                 State
               </label>
               <StateSelect
@@ -165,21 +165,21 @@ function AddLoadModal({ onClose, onCreated }) {
                 ariaLabel="Origin state"
                 value={fields.origin_state}
                 onChange={(state) => handleFieldChange('origin_state', state)}
-                className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="origin_zip">
+              <label className="caps mb-1.5 block" htmlFor="origin_zip">
                 Zip
               </label>
               <input id="origin_zip" value={fields.origin_zip} onChange={(e) => handleFieldChange('origin_zip', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
           </div>
 
           <div className="mb-4 grid grid-cols-3 gap-2">
             <div className="col-span-1">
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_city">
+              <label className="caps mb-1.5 block" htmlFor="dest_city">
                 Dest city
               </label>
               <CityStateAutocomplete
@@ -188,11 +188,11 @@ function AddLoadModal({ onClose, onCreated }) {
                 value={fields.dest_city}
                 onChange={(e) => handleFieldChange('dest_city', e.target.value)}
                 onPlaceSelected={({ city, state }) => setFields((prev) => ({ ...prev, dest_city: city, dest_state: state }))}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_state">
+              <label className="caps mb-1.5 block" htmlFor="dest_state">
                 State
               </label>
               <StateSelect
@@ -200,15 +200,15 @@ function AddLoadModal({ onClose, onCreated }) {
                 ariaLabel="Destination state"
                 value={fields.dest_state}
                 onChange={(state) => handleFieldChange('dest_state', state)}
-                className="rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+                className="rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
               />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="dest_zip">
+              <label className="caps mb-1.5 block" htmlFor="dest_zip">
                 Zip
               </label>
               <input id="dest_zip" value={fields.dest_zip} onChange={(e) => handleFieldChange('dest_zip', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
           </div>
 
@@ -237,42 +237,42 @@ function AddLoadModal({ onClose, onCreated }) {
 
           <div className="mb-4 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="equipment">
+              <label className="caps mb-1.5 block" htmlFor="equipment">
                 Equipment
               </label>
               <EquipmentPicker id="equipment" value={fields.equipment} onChange={(code) => handleFieldChange('equipment', code)} />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="weight">
+              <label className="caps mb-1.5 block" htmlFor="weight">
                 Weight
               </label>
               <input id="weight" value={fields.weight} onChange={(e) => handleFieldChange('weight', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
           </div>
 
           <div className="mb-4 grid grid-cols-2 gap-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="commodity">
+              <label className="caps mb-1.5 block" htmlFor="commodity">
                 Commodity
               </label>
               <input id="commodity" value={fields.commodity} onChange={(e) => handleFieldChange('commodity', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="temperature">
+              <label className="caps mb-1.5 block" htmlFor="temperature">
                 Temperature
               </label>
               <input id="temperature" value={fields.temperature} onChange={(e) => handleFieldChange('temperature', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
           </div>
 
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="comment">
+          <label className="caps mb-1.5 block" htmlFor="comment">
             Comment
           </label>
           <textarea id="comment" value={fields.comment} onChange={(e) => handleFieldChange('comment', e.target.value)} rows={2}
-            className="mb-4 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text" />
+            className="mb-4 w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
 
           <div className="mb-4 grid grid-cols-2 gap-2">
             <div>
@@ -280,7 +280,7 @@ function AddLoadModal({ onClose, onCreated }) {
                 Target pay
               </label>
               <input id="targetPay" type="number" step="0.01" value={targetPay} onChange={(e) => setTargetPay(e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-text" />
+                className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors" />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm text-text" htmlFor="includeRate">

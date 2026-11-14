@@ -10,14 +10,14 @@ function UnsavedChangesBar({ onDiscard, onKeepEditing }) {
       <button
         type="button"
         onClick={onDiscard}
-        className="rounded-lg bg-error px-3 py-1.5 text-xs font-medium text-surface hover:opacity-90"
+        className="rounded-full bg-error px-3.5 py-1.5 text-xs font-semibold text-black hover:opacity-90"
       >
         Discard
       </button>
       <button
         type="button"
         onClick={onKeepEditing}
-        className="rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-surface-alt"
+        className="rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold hover:bg-white/[0.16]"
       >
         Keep editing
       </button>

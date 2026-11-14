@@ -18,15 +18,15 @@ const ModalCard = forwardRef(function ModalCard({ children, className = '', body
   return (
     <div
       ref={ref}
-      className={`flex w-full flex-col overflow-hidden rounded-t-3xl border border-border bg-surface text-text shadow-[0_24px_60px_rgba(0,0,0,0.45)] sm:rounded-3xl ${className}`}
+      className={`mat flex w-full flex-col overflow-hidden rounded-t-[30px] text-text sm:rounded-[34px] ${className}`}
       style={{ ...style, maxHeight }}
       {...rest}
     >
-      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-5 sm:p-6 ${footer ? '' : 'pb-[max(1.25rem,env(safe-area-inset-bottom))]'} ${bodyClassName}`}>
+      <div className={`min-h-0 flex-1 overflow-y-auto overscroll-contain p-6 [scrollbar-width:none] sm:p-8 ${footer ? '' : 'pb-[max(1.25rem,env(safe-area-inset-bottom))]'} ${bodyClassName}`}>
         {children}
       </div>
       {footer && (
-        <div className="shrink-0 border-t border-border bg-surface px-5 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6 sm:pb-3">
+        <div className="shrink-0 border-t border-white/[0.07] bg-black/20 px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8 sm:pb-4">
           {footer}
         </div>
       )}

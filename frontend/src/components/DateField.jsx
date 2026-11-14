@@ -102,7 +102,7 @@ function DateField({ value, onChange, ariaLabel, placeholder = 'mm/dd/yyyy', cla
           anchorEl={wrapperRef.current}
           role="dialog"
           ariaLabel={ariaLabel}
-          className="rounded-2xl border border-border bg-surface p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)]"
+          className="mat rounded-[22px] p-3"
         >
           <DateTimeCalendar
             mode="date"

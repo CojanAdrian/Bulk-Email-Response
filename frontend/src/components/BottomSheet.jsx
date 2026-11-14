@@ -20,7 +20,7 @@ function BottomSheet({ onClose, children, className = '' }) {
         animate={preset.sheet.backdrop.animate}
         exit={preset.sheet.backdrop.exit}
         transition={preset.sheet.backdrop.transition}
-        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-md sm:items-center sm:px-4"
       >
         <motion.div
           role="dialog"
@@ -34,10 +34,10 @@ function BottomSheet({ onClose, children, className = '' }) {
           // and padding live on the plain (unrounded) div below instead, so a
           // long body's scrollbar is clipped to the shell's rounded corners
           // rather than rendering as a straight bar poking past them.
-          className={`w-full max-w-lg overflow-hidden rounded-t-4xl border border-border bg-surface shadow-[0_12px_40px_rgba(10,11,16,0.18)] ${className}`}
+          className={`mat w-full max-w-lg overflow-hidden rounded-t-[30px] text-text sm:rounded-[34px] ${className}`}
         >
-          <div className="max-h-[85vh] overflow-y-auto p-6">
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+          <div className="max-h-[85vh] overflow-y-auto p-6 [scrollbar-width:none] sm:p-8">
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-white/20 sm:hidden" aria-hidden="true" />
             {children}
           </div>
         </motion.div>

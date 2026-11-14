@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { loadGoogleMapsLibrary, hasGoogleMapsKey } from '../lib/googleMapsLoader';
-import { createCitySearch } from '../lib/citySearch';
+import { createCitySearch, bundledSearch, withFallback } from '../lib/citySearch';
+import { suggestCities } from '../api/places';
 import { useListboxNav } from '../lib/useListboxNav';
 import ListboxPanel from './ListboxPanel';
 
@@ -13,9 +14,9 @@ const MIN_QUERY_LENGTH = 2;
 // Gary, SD instead of assuming. Up/Down move through the suggestions and
 // Enter (or Tab) picks one, so the mouse is never needed.
 //
-// Falls back to a plain text input when no VITE_GOOGLE_MAPS_API_KEY is
-// configured (or Google can't be reached) -- the field still works, just
-// without suggestions.
+// Suggestions come from Google Places when a VITE_GOOGLE_MAPS_API_KEY is
+// set, and from the app's own list of US and Canadian places otherwise (or
+// whenever Google fails), so there are always suggestions.
 function CityStateAutocomplete({ id, ariaLabel, placeholder, value, onChange, onPlaceSelected, className, dark = false }) {
   const [suggestions, setSuggestions] = useState([]);
   const [open, setOpen] = useState(false);
@@ -26,11 +27,13 @@ function CityStateAutocomplete({ id, ariaLabel, placeholder, value, onChange, on
   const listId = `${useId()}-cities`;
 
   useEffect(() => {
+    const builtIn = bundledSearch(suggestCities);
+    searchRef.current = builtIn;
     if (!hasGoogleMapsKey()) return undefined;
     let cancelled = false;
     loadGoogleMapsLibrary('places')
       .then((placesLib) => {
-        if (!cancelled) searchRef.current = createCitySearch(placesLib);
+        if (!cancelled) searchRef.current = withFallback(createCitySearch(placesLib), builtIn);
       })
       .catch(() => {});
     return () => {

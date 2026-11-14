@@ -7,7 +7,7 @@ import DateRangeField from '../../components/DateRangeField';
 import Select from '../../components/Select';
 import CopyText from '../../ui/CopyText';
 import Regulars from './Regulars';
-import { SHEET_SPRING } from './BoardRow';
+import { SHEET_SPRING, RateHiddenIcon } from './BoardRow';
 import { STATUSES, STATUS_LABELS, hasNoRate, place, schedule } from './boardLogic';
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
@@ -140,7 +140,15 @@ function LoadSheet({
 
         <dl className="mt-5 grid grid-cols-2 gap-x-6 gap-y-4 border-y border-white/[0.07] py-[18px] sm:grid-cols-4">
           <div className="min-w-0">
-            <dt className="caps">Rate</dt>
+            <dt className="caps flex items-center gap-1.5">
+              Rate
+              {!hasNoRate(load) && !Number(load.include_rate) && (
+                <span className="flex items-center gap-1 normal-case tracking-normal text-text-muted" title="Replies and blasts leave the rate out">
+                  <RateHiddenIcon className="h-3.5 w-3.5" />
+                  hidden
+                </span>
+              )}
+            </dt>
             <dd className="mt-1 -ml-1.5">
               {rateDraft !== null ? (
                 <input

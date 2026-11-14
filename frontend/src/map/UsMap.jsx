@@ -3,6 +3,7 @@ import { geoPath } from 'd3-geo';
 import { feature, mesh } from 'topojson-client';
 import { MAP_WIDTH, MAP_HEIGHT, pointOnLane } from './geo';
 import { getState, useMapStore, RIPPLE_MS } from './mapStore';
+import { US_STATE_NAMES } from '../lib/usStates';
 
 const DOT_SPACING = 7.5;
 const HOME = { x: MAP_WIDTH / 2, y: 300, k: 1 };
@@ -10,6 +11,30 @@ const WHITE = '255,255,255';
 const GOLD = '240,196,98';
 const RIPPLE_COLOUR = '255,150,90';
 const RIPPLE_REACH = 420;
+const LABEL_FONT = '800 8px "Inter Variable", Inter, sans-serif';
+const LABEL_TRACKING = 0.6;
+const ABBREVIATION = Object.fromEntries(Object.entries(US_STATE_NAMES).map(([code, name]) => [name, code]));
+
+// Where to write each state's name: the middle of its largest piece (so
+// Michigan's sits on the mitten, not in the lake), as its full name when it
+// fits and its two-letter code when it does not.
+function stateLabels(us, path, probe) {
+  probe.font = LABEL_FONT;
+  const labels = [];
+  for (const state of feature(us, us.objects.states).features) {
+    const name = state.properties.name;
+    const code = ABBREVIATION[name];
+    if (!code || code === 'DC') continue;
+    const pieces = state.geometry.type === 'MultiPolygon' ? state.geometry.coordinates.map((coordinates) => ({ type: 'Polygon', coordinates })) : [state.geometry];
+    const largest = pieces.reduce((best, piece) => (path.area(piece) > path.area(best) ? piece : best));
+    const [x, y] = path.centroid(largest);
+    const [[x0], [x1]] = path.bounds(largest);
+    const full = name.toUpperCase();
+    const fullWidth = probe.measureText(full).width + full.length * LABEL_TRACKING;
+    labels.push({ x, y, text: fullWidth < (x1 - x0) * 0.8 ? full : code });
+  }
+  return labels;
+}
 
 // The state shapes are heavy, so they load after first paint.
 async function loadShapes() {
@@ -25,7 +50,7 @@ async function loadShapes() {
       if (probe.isPointInPath(nation, x, y)) dots.push([x, y]);
     }
   }
-  return { nation, borders, dots };
+  return { nation, borders, dots, labels: stateLabels(us, path, probe) };
 }
 
 function cameraFor(lane) {
@@ -101,6 +126,14 @@ function UsMap() {
       ctx.lineWidth = 1 / k;
       ctx.strokeStyle = `rgba(${WHITE},.2)`;
       ctx.stroke(shapes.nation);
+
+      ctx.font = LABEL_FONT;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillStyle = `rgba(${WHITE},.075)`;
+      if ('letterSpacing' in ctx) ctx.letterSpacing = `${LABEL_TRACKING}px`;
+      for (const label of shapes.labels) ctx.fillText(label.text, label.x, label.y);
+      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
     }
 
     // rest: how visible a lane is when nothing is focused. A full board

@@ -77,3 +77,44 @@ describe('withCoords', () => {
     expect(withCoords(load)).toBe(load);
   });
 });
+
+describe('places the post-office list does not name', () => {
+  test.each([
+    ['Holiday City', 'OH'],
+    ['Pleasant Prairie', 'WI'],
+    ['Commerce', 'CA'],
+    ['Birmingham', 'MO'],
+    ['Brantford', 'ON'],
+    ['Saint-Hyacinthe', 'QC'],
+  ])('finds %s, %s', (city, state) => {
+    expect(lookupCity(city, state)).toEqual({ lat: expect.any(Number), lng: expect.any(Number) });
+  });
+
+  test('does not shorten a name that ends in City', () => {
+    expect(lookupCity('Oklahoma City', 'OK').lat).toBeCloseTo(35.5, 0);
+  });
+});
+
+describe('searchCities', () => {
+  const { searchCities } = require('../../src/lib/cityCoords');
+  const names = (hits) => hits.map((hit) => `${hit.city}, ${hit.state}`);
+
+  test('puts the biggest matching city first', () => {
+    expect(names(searchCities('chi'))[0]).toBe('Chicago, IL');
+    expect(names(searchCities('dal'))[0]).toBe('Dallas, TX');
+  });
+
+  test('narrows to a state when one is typed after the city', () => {
+    expect(names(searchCities('springfield, mo'))).toEqual(['Springfield, MO']);
+    expect(names(searchCities('springfield mo'))).toEqual(['Springfield, MO']);
+  });
+
+  test('understands abbreviations', () => {
+    expect(names(searchCities('st louis'))[0]).toBe('St. Louis, MO');
+  });
+
+  test('respects the limit and returns nothing for nonsense', () => {
+    expect(searchCities('san', 3)).toHaveLength(3);
+    expect(searchCities('zzqqx')).toEqual([]);
+  });
+});

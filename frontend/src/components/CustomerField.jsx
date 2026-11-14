@@ -45,7 +45,7 @@ function CustomerField({ id = 'customer', value, onChange, label = 'Customer', c
 
   return (
     <div className={className}>
-      <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor={id}>
+      <label className="caps mb-1.5 block" htmlFor={id}>
         {label}
       </label>
       <input
@@ -55,7 +55,7 @@ function CustomerField({ id = 'customer', value, onChange, label = 'Customer', c
         onChange={(e) => onChange(e.target.value)}
         autoComplete="off"
         placeholder="e.g. ALDI, Inc"
-        className="w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text placeholder:text-text-muted"
+        className="w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
       />
       <datalist id={listId}>
         {names.map((name) => (

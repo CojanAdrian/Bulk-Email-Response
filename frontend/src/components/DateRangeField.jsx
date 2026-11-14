@@ -40,7 +40,7 @@ function DateRangeField({
   return (
     <div>
       {showLegend && (
-        <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted">{legend}</label>
+        <label className="caps mb-1.5 block">{legend}</label>
       )}
       <button
         ref={buttonRef}
@@ -65,10 +65,10 @@ function DateRangeField({
           anchorEl={buttonRef.current}
           role="dialog"
           ariaLabel={`${legend} window`}
-          className="z-50 flex max-h-[85vh] max-w-[calc(100vw-1rem)] flex-col gap-4 overflow-y-auto rounded-2xl border border-border bg-surface p-3 shadow-[0_18px_50px_rgba(0,0,0,0.45)] sm:flex-row"
+          className="mat z-50 flex max-h-[85vh] max-w-[calc(100vw-1rem)] flex-col gap-4 overflow-y-auto rounded-[22px] p-3 sm:flex-row"
         >
           <div role="group" aria-label="Early">
-            <span className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-text-muted">Early</span>
+            <span className="caps mb-1.5 block">Early</span>
             <DateTimeCalendar value={earlyValue} onChange={onEarlyChange} idPrefix={earlyId} />
           </div>
           <div role="group" aria-label="Late">

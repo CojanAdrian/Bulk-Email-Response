@@ -111,3 +111,30 @@ export function createCitySearch(placesLib) {
     }
   };
 }
+
+// City search over the app's own list of places, used when there is no
+// Google key or Google fails. Same shape as the Google search.
+export function bundledSearch(suggest) {
+  return async function predict(query) {
+    const results = await suggest(query);
+    return (Array.isArray(results) ? results : []).map(({ city, state }) => ({
+      id: `${city}|${state}`,
+      main: city,
+      secondary: state,
+      resolve: async () => ({ city, state }),
+    }));
+  };
+}
+
+// Google first; the app's own list when Google errors or finds nothing.
+export function withFallback(primary, fallback) {
+  return async function predict(query) {
+    try {
+      const results = await primary(query);
+      if (results.length > 0) return results;
+    } catch (err) {
+      console.warn('Google city search failed; using the built-in city list.', err);
+    }
+    return fallback(query);
+  };
+}

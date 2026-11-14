@@ -29,9 +29,9 @@ function ExtraStopsEditor({ stops, onChange }) {
       <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-text-muted">Extra stops</label>
       <div className="space-y-2">
         {stops.map((stop, index) => (
-          <div key={index} className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-2">
+          <div key={index} className="flex flex-wrap items-end gap-2 rounded-[16px] bg-white/[0.05] p-3">
             <div className="w-24">
-              <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-type-${index}`}>
+              <label className="caps mb-1 block !text-[9.5px]" htmlFor={`extra-stop-type-${index}`}>
                 Type
               </label>
               <Select
@@ -47,7 +47,7 @@ function ExtraStopsEditor({ stops, onChange }) {
               />
             </div>
             <div className="min-w-[6rem] flex-1">
-              <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-city-${index}`}>
+              <label className="caps mb-1 block !text-[9.5px]" htmlFor={`extra-stop-city-${index}`}>
                 City
               </label>
               <input
@@ -55,11 +55,11 @@ function ExtraStopsEditor({ stops, onChange }) {
                 aria-label={`Stop ${index + 1} city`}
                 value={stop.city}
                 onChange={(e) => updateStop(index, 'city', e.target.value)}
-                className="w-full rounded-lg border border-border bg-surface-alt px-2 py-2 text-sm text-text"
+                className="w-full rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
               />
             </div>
             <div className="w-16">
-              <label className="mb-1 block text-[10px] text-text-muted" htmlFor={`extra-stop-state-${index}`}>
+              <label className="caps mb-1 block !text-[9.5px]" htmlFor={`extra-stop-state-${index}`}>
                 State
               </label>
               <StateSelect
@@ -67,14 +67,14 @@ function ExtraStopsEditor({ stops, onChange }) {
                 ariaLabel={`Stop ${index + 1} state`}
                 value={stop.state}
                 onChange={(state) => updateStop(index, 'state', state)}
-                className="rounded-lg border border-border bg-surface-alt px-2 py-2 text-sm text-text"
+                className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
               />
             </div>
             <div className="w-36">
               <DateTimePopover
                 id={`extra-stop-datetime-${index}`}
                 label="Date/time"
-                labelClassName="mb-1 block text-[10px] text-text-muted"
+                labelClassName="caps mb-1 block !text-[9.5px]"
                 ariaLabel={`Stop ${index + 1} date/time`}
                 value={stop.datetime}
                 onChange={(value) => updateStop(index, 'datetime', value)}
@@ -94,7 +94,7 @@ function ExtraStopsEditor({ stops, onChange }) {
       <button
         type="button"
         onClick={addStop}
-        className="mt-3 rounded-lg border border-border px-3 py-1.5 text-xs hover:bg-surface-alt"
+        className="mt-3 rounded-full bg-white/10 px-3.5 py-1.5 text-xs font-semibold hover:bg-white/[0.16]"
       >
         + Add a stop
       </button>

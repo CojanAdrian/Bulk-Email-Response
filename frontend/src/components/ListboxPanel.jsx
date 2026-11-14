@@ -23,7 +23,7 @@ function ListboxPanel({ id, anchorEl, options, activeIndex, selectedValue, onPic
       // Keeps focus in the input/trigger while clicking an option, so the
       // field doesn't blur (and close the list) before the click lands.
       onMouseDown={(e) => e.preventDefault()}
-      className="max-w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-xl border border-border bg-surface text-text shadow-[0_18px_50px_rgba(0,0,0,0.45)] ring-1 ring-black/5"
+      className="mat max-w-[min(26rem,calc(100vw-1rem))] overflow-hidden rounded-[18px] text-text"
     >
       <ul ref={listRef} id={id} role="listbox" aria-label={ariaLabel} className="max-h-64 overflow-y-auto overscroll-contain p-1">
         {options.length === 0 && <li className="px-3 py-2.5 text-sm text-text-muted">{emptyText}</li>}

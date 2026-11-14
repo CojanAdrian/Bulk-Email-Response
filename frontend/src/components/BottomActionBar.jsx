@@ -16,7 +16,7 @@ function BottomActionBar({ count, children }) {
           animate={preset.sheet.panel.animate}
           exit={preset.sheet.panel.exit}
           transition={preset.sheet.panel.transition}
-          className="sticky bottom-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-surface/85 px-4 py-3 text-sm shadow-[0_12px_40px_rgba(10,11,16,0.18)] backdrop-blur-xl"
+          className="mat sticky bottom-2 z-10 mb-3 flex flex-wrap items-center gap-2 rounded-[20px] px-4 py-3 text-sm"
         >
           <span className="font-medium text-text">{count} selected</span>
           {children}

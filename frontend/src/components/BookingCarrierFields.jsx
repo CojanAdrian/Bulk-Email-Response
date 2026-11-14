@@ -113,14 +113,14 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
 
   if (status === 'saved') {
     return (
-      <p className="mb-4 rounded-lg border border-success/40 bg-success-bg px-3 py-2 text-sm text-success">
+      <p className="mb-4 rounded-[14px] bg-success-bg px-3.5 py-2.5 text-[13px] text-success">
         Carrier logged for this load.
       </p>
     );
   }
 
   return (
-    <div className="mb-4 rounded-lg border border-border p-3">
+    <div className="mb-4 rounded-[18px] bg-white/[0.05] p-4">
       <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-muted">Who ran this load?</p>
       {error && (
         <p role="alert" className="mb-2 text-xs text-error">
@@ -134,14 +134,14 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           value={mcNumber}
           onChange={(e) => setMcNumber(e.target.value)}
           onBlur={handleMcBlur}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Carrier company name"
           placeholder="Company name"
           value={companyName}
           onChange={(e) => setCompanyName(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
       </div>
       {mcLookupStatus === 'checking' && <p className="mb-2 text-xs text-text-muted">Checking MC {mcNumber.trim()}...</p>}
@@ -155,14 +155,14 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           placeholder="Dispatcher name"
           value={dispatcherName}
           onChange={(e) => setDispatcherName(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Dispatcher phone"
           placeholder="Dispatcher phone"
           value={dispatcherPhone}
           onChange={(e) => setDispatcherPhone(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Dispatcher email"
@@ -170,14 +170,14 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
           placeholder="Dispatcher email (optional)"
           value={dispatcherEmail}
           onChange={(e) => setDispatcherEmail(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Rate paid"
           placeholder="Rate"
           value={rate}
           onChange={(e) => handleRateChange(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Gross profit"
@@ -187,21 +187,21 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
             setGp(e.target.value);
             setGpTouched(true);
           }}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Driver name"
           placeholder="Driver name (optional)"
           value={driverName}
           onChange={(e) => setDriverName(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
         <input
           aria-label="Driver phone"
           placeholder="Driver phone (optional)"
           value={driverPhone}
           onChange={(e) => setDriverPhone(e.target.value)}
-          className="rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+          className="rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
         />
       </div>
       <textarea
@@ -210,7 +210,7 @@ function BookingCarrierFields({ loadId, originCity, originState, destCity, destS
         value={comment}
         onChange={(e) => setComment(e.target.value)}
         rows={2}
-        className="mb-2 w-full rounded-lg border border-border bg-surface-alt px-2 py-1.5 text-sm text-text"
+        className="mb-2 w-full rounded-xl border px-3 py-2 text-[13px] text-text transition-colors"
       />
       <div className="flex justify-end">
         <PrimaryButton onClick={handleLogCarrier} disabled={status === 'saving'} className="px-3 py-1 text-xs">

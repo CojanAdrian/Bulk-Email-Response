@@ -105,14 +105,14 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
           role="dialog"
           aria-modal="true"
           aria-labelledby="blast-modal-title"
-          className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+          className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-md sm:items-center sm:px-4"
           onClick={(e) => {
             if (e.target === e.currentTarget) onClose();
           }}
           {...preset.modal.backdrop}
         >
           <MotionCard className="w-full max-w-md" {...preset.modal.card}>
-            <h2 id="blast-modal-title" className="mb-3 text-lg font-semibold text-text">
+            <h2 id="blast-modal-title" className="mb-4 text-[28px] font-bold leading-none tracking-[-0.045em] text-text">
               Blast Email
             </h2>
             <p role="alert" className="text-sm text-error">
@@ -134,7 +134,7 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="blast-modal-title"
-        className="fixed inset-0 z-40 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center sm:px-4"
+        className="fixed inset-0 z-40 flex items-end justify-center bg-black/45 backdrop-blur-md sm:items-center sm:px-4"
         onClick={(e) => {
           if (e.target === e.currentTarget) handleRequestClose();
         }}
@@ -142,7 +142,7 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
       >
         <MotionCard className="w-full max-w-lg" {...preset.modal.card}>
           <div className="mb-1 flex items-start justify-between">
-            <h2 id="blast-modal-title" className="text-lg font-semibold text-text">
+            <h2 id="blast-modal-title" className="text-[28px] font-bold leading-none tracking-[-0.045em] text-text">
               Blast Email
             </h2>
             <button onClick={handleRequestClose} aria-label="Close" className="text-text-muted hover:text-text">
@@ -153,7 +153,7 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
             Order {load.load_number} · {load.origin_city}, {load.origin_state} → {load.dest_city}, {load.dest_state} · {load.equipment}
           </div>
 
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastSubject">
+          <label className="caps mb-1.5 block" htmlFor="blastSubject">
             Subject
           </label>
           <input
@@ -161,10 +161,10 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
             type="text"
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
-            className="mb-3 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="mb-3 w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
 
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastBody">
+          <label className="caps mb-1.5 block" htmlFor="blastBody">
             Message
           </label>
           <textarea
@@ -172,14 +172,14 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={6}
-            className="mb-2 w-full rounded-lg border border-border bg-surface-alt px-3 py-2 text-sm text-text"
+            className="mb-2 w-full rounded-xl border px-3.5 py-2.5 text-[13.5px] text-text transition-colors"
           />
           <label className="mb-4 flex items-center gap-2 text-sm text-text">
             <input type="checkbox" checked={showRate} onChange={handleRateToggle} />
             {showRate ? 'Rate shown' : 'Rate hidden'}
           </label>
 
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-text-muted" htmlFor="blastEmails">
+          <label className="caps mb-1.5 block" htmlFor="blastEmails">
             Carrier Emails ({validEmails.length} valid) — or drop a CSV / TXT file
           </label>
           <div
@@ -203,7 +203,7 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
               }`}
             />
             {dragActive && (
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-accent-strong bg-accent/10 text-sm font-semibold text-text">
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center gap-2 rounded-xl border-[1.5px] border-dashed border-white/50 bg-black/60 text-sm font-semibold text-text backdrop-blur-sm">
                 ↓ Drop file to import emails
               </div>
             )}
@@ -223,7 +223,7 @@ function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
                 {/* Gmail's own brand blue, deliberately not the app's lime accent — matches the original tool's identical choice for this one external-service button. */}
                 <button
                   onClick={handleOpenGmail}
-                  className="rounded-lg bg-[#1a73e8] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
+                  className="rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-accent-ink transition-[scale] duration-300 ease-spring active:scale-95"
                 >
                   Open in Gmail →
                 </button>

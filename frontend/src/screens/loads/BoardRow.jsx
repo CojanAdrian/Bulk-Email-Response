@@ -6,6 +6,17 @@ import CopyText from '../../ui/CopyText';
 import Regulars from './Regulars';
 import { hasNoRate, place, schedule } from './boardLogic';
 
+// An eye with a line through it: the rate is left out of replies.
+export function RateHiddenIcon({ className = '' }) {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className={className}>
+      <path d="M2 8s2.2-4.5 6-4.5S14 8 14 8s-2.2 4.5-6 4.5S2 8 2 8z" />
+      <circle cx="8" cy="8" r="1.8" />
+      <path d="M2.5 13.5l11-11" />
+    </svg>
+  );
+}
+
 export const SHEET_SPRING = { type: 'spring', stiffness: 260, damping: 28 };
 
 function LaneArrow() {
@@ -21,6 +32,7 @@ function LaneArrow() {
 function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecting, selected, onOpen, onHover, onToggleSelect, onEmail, onOpenCarrier }) {
   const proven = Boolean(regulars?.length);
   const pickup = schedule(load.early_pu, load.late_pu);
+  const rateHidden = !hasNoRate(load) && !Number(load.include_rate);
   const stops = multiStopTagVariant(load);
   const origin = place(load.origin_city, load.origin_state) || 'Origin missing';
   const dest = place(load.dest_city, load.dest_state) || 'Destination missing';
@@ -95,8 +107,13 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
         </div>
 
         <div className="self-start text-right">
-          <p className={`text-[17px] font-semibold tabular-nums tracking-[-0.03em] ${hasNoRate(load) ? 'text-hot' : 'text-text'}`}>
-            {hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}
+          <p
+            className={`flex items-center justify-end gap-1.5 text-[17px] font-semibold tabular-nums tracking-[-0.03em] ${hasNoRate(load) ? 'text-hot' : rateHidden ? 'text-text/35' : 'text-text'}`}
+            title={rateHidden ? 'Rate hidden: replies and blasts leave it out' : undefined}
+          >
+            {rateHidden && <RateHiddenIcon className="h-4 w-4 shrink-0" />}
+            <span className={rateHidden ? 'line-through decoration-1' : ''}>{hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}</span>
+            {rateHidden && <span className="sr-only">, hidden from replies</span>}
           </p>
           {asking > 0 && <p className="mt-0.5 text-[11.5px] font-semibold text-hot">{asking} asking</p>}
         </div>
