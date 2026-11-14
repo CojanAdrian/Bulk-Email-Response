@@ -75,6 +75,25 @@ function createAuthRouter(pool) {
     res.json({ username: req.session.username, role: req.session.role });
   });
 
+  // Signed-in users change their own password. An account made with Google
+  // has none yet, so it can set one without giving a current password.
+  router.post('/change-password', requireAuth, asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+    if (typeof newPassword !== 'string' || newPassword.length < MIN_PASSWORD_LENGTH) {
+      return res.status(400).json({ error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters` });
+    }
+    const [rows] = await pool.query('SELECT password_hash FROM users WHERE id = ?', [req.session.userId]);
+    const user = rows[0];
+    if (!user) return res.status(401).json({ error: 'Unauthorized' });
+    if (user.password_hash) {
+      const valid = typeof currentPassword === 'string' && (await bcrypt.compare(currentPassword, user.password_hash));
+      if (!valid) return res.status(400).json({ error: 'Current password is wrong' });
+    }
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await pool.query('UPDATE users SET password_hash = ? WHERE id = ?', [passwordHash, req.session.userId]);
+    res.json({ ok: true });
+  }));
+
   router.get('/google', (req, res) => {
     res.redirect(getSignInAuthUrl());
   });

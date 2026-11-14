@@ -10,6 +10,8 @@ const createInquiriesRouter = require('./routes/inquiries');
 const createCarriersRouter = require('./routes/carriers');
 const createCarrierMatchesRouter = require('./routes/carrierMatches');
 const createCustomersRouter = require('./routes/customers');
+const createSettingsRouter = require('./routes/settings');
+const createStatsRouter = require('./routes/stats');
 const requireAuth = require('./middleware/requireAuth');
 const { createMemoryStore } = require('./lib/sessionStore');
 
@@ -51,6 +53,8 @@ function createApp(pool, wsHub, store) {
   app.use('/api/carriers', requireAuth, createCarriersRouter(pool));
   app.use('/api/carrier-matches', requireAuth, createCarrierMatchesRouter(pool));
   app.use('/api/customers', requireAuth, createCustomersRouter(pool));
+  app.use('/api/settings', requireAuth, createSettingsRouter(pool, wsHub));
+  app.use('/api/stats', requireAuth, createStatsRouter(pool));
 
   if (fs.existsSync(FRONTEND_INDEX_PATH)) {
     app.use(express.static(FRONTEND_DIST_PATH));

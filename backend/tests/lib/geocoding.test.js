@@ -82,11 +82,24 @@ describe('geocodeCityState', () => {
     expect(result).toBeNull();
   });
 
-  test('returns null and does not call the API when GOOGLE_MAPS_API_KEY is not set', async () => {
+  test('uses the bundled city list, without calling the API, when GOOGLE_MAPS_API_KEY is not set', async () => {
     delete process.env.GOOGLE_MAPS_API_KEY;
     const result = await geocodeCityState(pool, 'Dallas', 'TX');
-    expect(result).toBeNull();
+    expect(result.lat).toBeCloseTo(32.8, 0);
+    expect(result.lng).toBeCloseTo(-96.8, 0);
     expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('without a key, a city equal to its state gives the middle of that state', async () => {
+    delete process.env.GOOGLE_MAPS_API_KEY;
+    const result = await geocodeCityState(pool, 'TX', 'TX');
+    expect(result.lat).toBeCloseTo(31, 0);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('without a key, a city missing from the bundled list is null', async () => {
+    delete process.env.GOOGLE_MAPS_API_KEY;
+    expect(await geocodeCityState(pool, 'Nonexistentville', 'TX')).toBeNull();
   });
 
   test('returns null for a blank city and state without querying the API', async () => {

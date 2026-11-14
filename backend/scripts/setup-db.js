@@ -338,6 +338,14 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS user_settings (
+      user_id INT PRIMARY KEY,
+      settings JSON NOT NULL,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )
+  `);
+
   // Strip McLeod's "<CODE> - " prefix from customers saved before names were
   // cleaned on import (see src/lib/customerName.js). Case-sensitive match
   // ('c'), so only an all-caps code is ever removed. Safe to re-run.

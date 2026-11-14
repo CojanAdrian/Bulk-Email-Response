@@ -144,7 +144,7 @@ function createLoadsRouter(pool, wsHub) {
       ORDER BY ${sortColumn} ${sortDirection}
     `;
     const [rawRows] = await pool.query(sql, params);
-    const rows = rawRows.map(({ booked_at_raw: _sortOnly, ...row }) => row);
+    const rows = rawRows.map(({ booked_at_raw: _sortOnly, ...row }) => withCoords(row));
 
     const totals = rows.reduce(
       (acc, row) => ({

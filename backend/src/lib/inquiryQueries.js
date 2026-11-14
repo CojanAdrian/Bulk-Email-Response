@@ -1,4 +1,5 @@
 const { composeReply } = require('./replyComposer');
+const { withCoords } = require('./cityCoords');
 
 // Columns joined in from the matched load, aliased so they can sit
 // alongside the email_inquiries row without colliding. Deliberately
@@ -39,7 +40,8 @@ function attachLiveReplyBody(row) {
     extra_stops: row.matched_load_extra_stops,
   };
   const liveReplyBody = row.matched_load_custom_reply_body || composeReply(loadLike);
-  return { ...row, live_reply_body: liveReplyBody };
+  // Where the matched load runs, so the map can show it beside the inquiry.
+  return withCoords({ ...row, live_reply_body: liveReplyBody }, 'matched_load_');
 }
 
 async function fetchInquiryWithLoad(pool, id) {

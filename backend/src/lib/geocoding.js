@@ -1,3 +1,5 @@
+const { lookupCity, lookupState } = require('./cityCoords');
+
 // Resolves a city/state pair to {lat, lng} via the Google Maps Geocoding
 // API, caching every result in the geocode_cache table so the same city is
 // never geocoded twice -- a 300-load CSV upload that mostly repeats a
@@ -14,8 +16,13 @@ async function geocodeCityState(pool, city, state) {
     return { lat: Number(cached[0].lat), lng: Number(cached[0].lng) };
   }
 
+  // Without a Google key, the bundled US city list answers instead. A
+  // "city" equal to its state is how callers ask for a state's middle.
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    const sameAsState = String(city || '').trim().toUpperCase() === String(state || '').trim().toUpperCase();
+    return (sameAsState ? lookupState(state) : lookupCity(city, state)) || null;
+  }
 
   try {
     const query = encodeURIComponent(`${city}, ${state}, USA`);

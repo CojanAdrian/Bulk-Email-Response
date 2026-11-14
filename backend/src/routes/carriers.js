@@ -3,6 +3,7 @@ const asyncHandler = require('../lib/asyncHandler');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 const { cleanCustomerName } = require('../lib/customerName');
 const { geocodeCityState } = require('../lib/geocoding');
+const { withCoords } = require('../lib/cityCoords');
 
 const CARRIER_FIELDS = [
   'mc_number', 'company_name', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email',
@@ -154,7 +155,7 @@ function createCarriersRouter(pool) {
        ORDER BY h.ran_at DESC, h.created_at DESC`,
       [req.params.id]
     );
-    res.json(rows);
+    res.json(rows.map((row) => withCoords(row)));
   }));
 
   router.post('/:id/history', asyncHandler(async (req, res) => {

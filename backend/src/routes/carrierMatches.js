@@ -4,6 +4,7 @@ const { geocodeCityState } = require('../lib/geocoding');
 const { findMatchesForLane } = require('../lib/carrierMatching');
 const { findProvenCarriers } = require('../lib/provenLanes');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
+const { withCoords } = require('../lib/cityCoords');
 
 // Selects every one of the user's carrier_lane_history rows joined with
 // their carrier's name/equipment (what findMatchesForLane needs), plus
@@ -12,7 +13,8 @@ const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 async function loadCandidates(pool, userId) {
   const [historyRows] = await pool.query(
     `SELECT h.id, h.carrier_id, c.company_name AS carrier_company_name, c.equipment_types AS carrier_equipment_types,
-            l.equipment AS load_equipment, h.origin_lat, h.origin_lng, h.dest_lat, h.dest_lng
+            l.equipment AS load_equipment, h.origin_lat, h.origin_lng, h.dest_lat, h.dest_lng,
+            h.origin_city, h.origin_state, h.dest_city, h.dest_state
      FROM carrier_lane_history h
      JOIN carriers c ON c.id = h.carrier_id
      LEFT JOIN loads l ON l.id = h.load_id
@@ -26,7 +28,8 @@ async function loadCandidates(pool, userId) {
        AND NOT EXISTS (SELECT 1 FROM carrier_lane_history h WHERE h.carrier_id = c.id)`,
     [userId]
   );
-  return { historyRows, regionalCarriers };
+  // Runs saved before their cities could be located still count.
+  return { historyRows: historyRows.map((row) => withCoords(row)), regionalCarriers };
 }
 
 // Normalizes state codes to uppercase before anything compares them against

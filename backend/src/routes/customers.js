@@ -1,6 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { isEquipmentCompatible } = require('../lib/equipmentCompat');
+const { withCoords } = require('../lib/cityCoords');
 
 const RANGE_DAYS = { 30: 30, 90: 90 };
 
@@ -115,7 +116,8 @@ function createCustomersRouter(pool) {
     );
 
     const equipment = req.query.equipment ? String(req.query.equipment).trim().toUpperCase() : null;
-    const filtered = equipment ? rows.filter((row) => isEquipmentCompatible(equipment, row.equipment ? [row.equipment] : [])) : rows;
+    const located = rows.map((row) => withCoords(row));
+    const filtered = equipment ? located.filter((row) => isEquipmentCompatible(equipment, row.equipment ? [row.equipment] : [])) : located;
 
     const available = filtered
       .filter((row) => row.status === 'active')
