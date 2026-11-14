@@ -105,7 +105,7 @@ function SearchPalette({ onClose, onGo }) {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, transition: { duration: 0.15 } }}
         transition={{ type: 'spring', stiffness: 380, damping: 28 }}
-        className="mat fixed left-1/2 top-[18vh] z-[51] w-[min(660px,calc(100vw-24px))] -translate-x-1/2 overflow-hidden rounded-[28px] text-text"
+        className="mat fixed inset-x-0 top-[18vh] z-[51] mx-auto w-[min(660px,calc(100vw-24px))] overflow-hidden rounded-[28px] text-text"
       >
         <input
           ref={input}

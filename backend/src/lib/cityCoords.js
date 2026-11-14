@@ -77,7 +77,10 @@ function hasCoords(lat, lng) {
 // stored, so the map can draw its lane. prefix is '' for a load or lane
 // history row, 'matched_load_' for an inquiry joined to its load.
 function withCoords(row, prefix = '') {
-  const field = (name) => `${prefix}${name}`;
+  // Ignores anything but a string, so rows.map(withCoords) (which passes the
+  // index) still works.
+  const p = typeof prefix === 'string' ? prefix : '';
+  const field = (name) => `${p}${name}`;
   const origin = hasCoords(row[field('origin_lat')], row[field('origin_lng')]) ? null : lookupCity(row[field('origin_city')], row[field('origin_state')]);
   const dest = hasCoords(row[field('dest_lat')], row[field('dest_lng')]) ? null : lookupCity(row[field('dest_city')], row[field('dest_state')]);
   if (!origin && !dest) return row;

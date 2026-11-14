@@ -62,6 +62,16 @@ describe('withCoords', () => {
     expect(load.dest_lat).toEqual(expect.any(Number));
   });
 
+  test('works when handed straight to Array.map', () => {
+    const [load] = [{ origin_city: 'Chicago', origin_state: 'IL', dest_city: 'Dallas', dest_state: 'TX' }].map(withCoords);
+    expect(load.origin_lat).toBeCloseTo(41.85, 0);
+  });
+
+  test("fills an inquiry's matched load when given its prefix", () => {
+    const row = withCoords({ matched_load_origin_city: 'Chicago', matched_load_origin_state: 'IL', matched_load_dest_city: 'Dallas', matched_load_dest_state: 'TX' }, 'matched_load_');
+    expect(row.matched_load_dest_lng).toBeCloseTo(-96.8, 0);
+  });
+
   test('leaves a load with unknown cities untouched', () => {
     const load = { origin_city: 'Nowhereville', origin_state: 'TX', dest_city: null, dest_state: null };
     expect(withCoords(load)).toBe(load);

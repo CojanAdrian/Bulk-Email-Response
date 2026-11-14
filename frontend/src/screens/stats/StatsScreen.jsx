@@ -232,7 +232,7 @@ function StatsScreen() {
             <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-white/[0.07] pt-3.5">
               <div>
                 <dt className="caps">Avg per load</dt>
-                <dd className={`mt-1 text-[20px] font-semibold tabular-nums tracking-[-0.03em] ${avgGp !== null && avgGp < marginPerLoad ? 'text-hot' : ''}`}>{avgGp === null ? '—' : formatMoney(Math.round(avgGp))}</dd>
+                <dd className={`mt-1 text-[20px] font-semibold tabular-nums tracking-[-0.03em] ${avgGp !== null && avgGp < marginPerLoad ? 'text-hot' : ''}`}>{avgGp === null ? 'None yet' : formatMoney(Math.round(avgGp))}</dd>
               </div>
               <div>
                 <dt className="caps">Rate paid</dt>

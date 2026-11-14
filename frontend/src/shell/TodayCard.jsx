@@ -73,9 +73,9 @@ function TodayCard() {
 
       <div className="col-span-2 flex items-end justify-between gap-3.5 border-t border-white/[0.07] pt-3.5">
         <div>
-          <p className="caps">Avg margin, 7 days</p>
-          <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${avg !== null && avg < marginPerLoad ? 'text-hot' : ''}`}>{avg === null ? '—' : formatMoney(avg)}</p>
-          <p className="text-[11.5px] text-text-muted">target {formatMoney(marginPerLoad)}</p>
+          <p className="caps">Avg margin</p>
+          <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${avg !== null && avg < marginPerLoad ? 'text-hot' : ''}`}>{avg === null ? 'None yet' : formatMoney(avg)}</p>
+          <p className="text-[11.5px] text-text-muted">7 days · target {formatMoney(marginPerLoad)}</p>
         </div>
         <Sparkline values={recentGp} label="Average gross profit per load, last 7 days" />
       </div>
@@ -83,7 +83,7 @@ function TodayCard() {
       <div className="col-span-2 flex items-end justify-between gap-3.5 border-t border-white/[0.07] pt-3.5">
         <div>
           <p className="caps">Reply time</p>
-          <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${slow ? 'text-hot' : ''}`}>{today.medianReplyMinutes === null ? '—' : `${today.medianReplyMinutes} min`}</p>
+          <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${slow ? 'text-hot' : ''}`}>{today.medianReplyMinutes === null ? 'None yet' : `${today.medianReplyMinutes} min`}</p>
           <p className="text-[11.5px] text-text-muted">{today.repliedToday} replied today</p>
         </div>
         <Bars values={hours} highlight={2} label="Replies per hour, last 8 hours" />

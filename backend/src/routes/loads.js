@@ -91,7 +91,7 @@ function createLoadsRouter(pool, wsHub) {
     }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const [rows] = await pool.query(`SELECT * FROM loads ${whereClause} ORDER BY created_at DESC`, params);
-    res.json(rows.map(withCoords));
+    res.json(rows.map((row) => withCoords(row)));
   }));
 
   // Booked loads with whatever rate/gp/carrier info was logged for them
