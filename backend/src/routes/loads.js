@@ -3,6 +3,7 @@ const asyncHandler = require('../lib/asyncHandler');
 const { composeReply } = require('../lib/replyComposer');
 const { titleCaseCity, upperState } = require('../lib/normalizeLocation');
 const { cleanCustomerName } = require('../lib/customerName');
+const { withCoords } = require('../lib/cityCoords');
 
 const LOAD_COLUMNS = [
   'load_number', 'origin_city', 'origin_state', 'origin_zip',
@@ -90,7 +91,7 @@ function createLoadsRouter(pool, wsHub) {
     }
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const [rows] = await pool.query(`SELECT * FROM loads ${whereClause} ORDER BY created_at DESC`, params);
-    res.json(rows);
+    res.json(rows.map(withCoords));
   }));
 
   // Booked loads with whatever rate/gp/carrier info was logged for them

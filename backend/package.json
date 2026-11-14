@@ -19,7 +19,8 @@
     "express-session": "^1.18.0",
     "googleapis": "^174.0.1",
     "mysql2": "^3.11.0",
-    "ws": "^8.21.3"
+    "ws": "^8.21.3",
+    "zipcodes": "^8.0.0"
   },
   "devDependencies": {
     "jest": "^29.7.0",
