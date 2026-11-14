@@ -29,7 +29,7 @@ const ScreenPanel = forwardRef(function ScreenPanel(
         </div>
         {action && <div className="mb-1 ml-auto shrink-0">{action}</div>}
       </header>
-      {tabs && <div className="flex items-center gap-5 border-b border-white/[0.07] px-7 pt-5">{tabs}</div>}
+      {tabs && <div className="flex flex-wrap items-center gap-x-5 border-b border-white/[0.07] px-7 pt-5">{tabs}</div>}
       {toolbar && <div className="flex flex-wrap items-center gap-2 px-5 pt-3">{toolbar}</div>}
       <div ref={ref} onPointerLeave={onPointerLeave} className="min-h-0 flex-1 overflow-y-auto px-2.5 pb-3.5 pt-2 [scrollbar-width:none]">
         {children}

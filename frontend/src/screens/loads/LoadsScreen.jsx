@@ -239,7 +239,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           </button>
         </header>
 
-        <div className="flex items-center gap-5 border-b border-white/[0.07] px-7 pt-5">
+        <div className="flex flex-wrap items-center gap-x-5 border-b border-white/[0.07] px-7 pt-5">
           <div role="group" aria-label="Show loads by status" className="flex gap-5">
             {STATUSES.map((status) => (
               <button
@@ -260,7 +260,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
               </button>
             ))}
           </div>
-          <div className="ml-auto flex items-center pb-2">
+          <div className="-mx-3 flex items-center pb-2 sm:mx-0 sm:ml-auto">
             <button type="button" onClick={() => fileInput.current?.click()} className={TOOL}>
               Import
             </button>

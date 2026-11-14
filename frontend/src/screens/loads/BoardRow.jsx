@@ -56,10 +56,10 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
         </span>
 
         <div className="min-w-0">
-          <p className={`flex min-w-0 items-center gap-[9px] text-[15.5px] font-semibold tracking-[-0.022em] ${proven ? 'text-gold' : 'text-text'}`}>
-            <span className="truncate">{origin}</span>
+          <p className={`flex min-w-0 flex-wrap items-center gap-x-[9px] text-[15.5px] font-semibold tracking-[-0.022em] md:flex-nowrap ${proven ? 'text-gold' : 'text-text'}`}>
+            <span className="md:truncate">{origin}</span>
             <LaneArrow />
-            <span className="truncate">{dest}</span>
+            <span className="md:truncate">{dest}</span>
           </p>
           <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
             <CopyText value={load.load_number} label={`Copy load number ${load.load_number}`} />
