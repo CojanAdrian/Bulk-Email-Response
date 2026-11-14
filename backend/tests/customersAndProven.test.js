@@ -74,7 +74,19 @@ describe('proven lanes and customers routes', () => {
       await makeRun(carrierId, { origin_city: 'atlanta', dest_city: 'CHICAGO', ran_at: '2026-08-02', rate: 1900 });
       const res = await agent.post('/api/carrier-matches/proven').send({ loadIds: [loadId] });
       expect(res.status).toBe(200);
-      expect(res.body[loadId]).toEqual([{ carrierId, carrierName: 'Swift Haul', runs: 2, lastRanAt: '2026-08-02', lastRate: 1900 }]);
+      expect(res.body[loadId]).toEqual([{ carrierId, carrierName: 'Swift Haul', starred: false, runs: 2, lastRanAt: '2026-08-02', lastRate: 1900 }]);
+    });
+
+    test('says which carriers are starred and lists them first', async () => {
+      const loadId = await makeLoad({ load_number: 'P4' });
+      const busy = await makeCarrier('Busy Haul', ['V']);
+      const star = await makeCarrier('Star Haul', ['V']);
+      await pool.query('UPDATE carriers SET starred = 1 WHERE id = ?', [star]);
+      await makeRun(busy);
+      await makeRun(busy);
+      await makeRun(star);
+      const res = await agent.post('/api/carrier-matches/proven').send({ loadIds: [loadId] });
+      expect(res.body[loadId].map((c) => [c.carrierName, c.starred])).toEqual([['Star Haul', true], ['Busy Haul', false]]);
     });
 
     test('omits a carrier whose equipment does not overlap', async () => {

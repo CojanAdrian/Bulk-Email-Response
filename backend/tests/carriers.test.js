@@ -181,6 +181,17 @@ describe('carriers routes', () => {
   });
 
   describe('PATCH /:id', () => {
+    test('stars and unstars a carrier', async () => {
+      const [result] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
+      const starred = await agent.patch(`/api/carriers/${result.insertId}`).send({ starred: true });
+      expect(starred.body.starred).toBe(1);
+      const list = await agent.get('/api/carriers?starred=1');
+      expect(list.body.map((c) => c.company_name)).toEqual(['ABC Trucking']);
+      const unstarred = await agent.patch(`/api/carriers/${result.insertId}`).send({ starred: false });
+      expect(unstarred.body.starred).toBe(0);
+      expect((await agent.get('/api/carriers?starred=1')).body).toEqual([]);
+    });
+
     test('updates the given fields', async () => {
       const [result] = await pool.query("INSERT INTO carriers (user_id, company_name) VALUES (?, 'ABC Trucking')", [userId]);
       const res = await agent.patch(`/api/carriers/${result.insertId}`).send({ dispatcher_phone: '555-1234' });

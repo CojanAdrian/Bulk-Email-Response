@@ -338,6 +338,15 @@ async function migrateSchema(databaseName) {
     }
   }
 
+  // Your own best carriers, marked with a star.
+  const [starredCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'carriers' AND COLUMN_NAME = 'starred'`,
+    [databaseName]
+  );
+  if (starredCol[0].count === 0) {
+    await conn.query(`ALTER TABLE carriers ADD COLUMN starred TINYINT(1) NOT NULL DEFAULT 0`);
+  }
+
   await conn.query(`
     CREATE TABLE IF NOT EXISTS user_settings (
       user_id INT PRIMARY KEY,

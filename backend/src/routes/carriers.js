@@ -7,8 +7,15 @@ const { withCoords } = require('../lib/cityCoords');
 
 const CARRIER_FIELDS = [
   'mc_number', 'company_name', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email',
-  'equipment_types', 'equipment_notes', 'operating_states', 'operating_notes', 'comment',
+  'equipment_types', 'equipment_notes', 'operating_states', 'operating_notes', 'comment', 'starred',
 ];
+
+// The stored value for a field: JSON for the lists, 1 / 0 for the star.
+function storedValue(field, value) {
+  if (JSON_CARRIER_FIELDS.has(field)) return JSON.stringify(value);
+  if (field === 'starred') return value ? 1 : 0;
+  return value;
+}
 const JSON_CARRIER_FIELDS = new Set(['equipment_types', 'operating_states']);
 
 function createCarriersRouter(pool) {
@@ -18,6 +25,7 @@ function createCarriersRouter(pool) {
     const { q } = req.query;
     const params = [req.session.userId];
     let sql = 'SELECT * FROM carriers WHERE user_id = ?';
+    if (req.query.starred === '1' || req.query.starred === 'true') sql += ' AND starred = 1';
     if (q) {
       sql += ' AND (company_name LIKE ? OR mc_number LIKE ? OR dispatcher_name LIKE ?)';
       const like = `%${q}%`;
@@ -74,7 +82,7 @@ function createCarriersRouter(pool) {
       for (const field of CARRIER_FIELDS) {
         if (body[field] !== undefined) {
           updates.push(`${field} = ?`);
-          values.push(JSON_CARRIER_FIELDS.has(field) ? JSON.stringify(body[field]) : body[field]);
+          values.push(storedValue(field, body[field]));
         }
       }
       if (updates.length > 0) {
@@ -91,7 +99,7 @@ function createCarriersRouter(pool) {
       if (field === 'company_name') continue;
       if (body[field] !== undefined) {
         columns.push(field);
-        values.push(JSON_CARRIER_FIELDS.has(field) ? JSON.stringify(body[field]) : body[field]);
+        values.push(storedValue(field, body[field]));
       }
     }
     const placeholders = columns.map(() => '?').join(', ');
@@ -119,7 +127,7 @@ function createCarriersRouter(pool) {
     for (const field of CARRIER_FIELDS) {
       if (req.body[field] !== undefined) {
         updates.push(`${field} = ?`);
-        values.push(JSON_CARRIER_FIELDS.has(field) ? JSON.stringify(req.body[field]) : req.body[field]);
+        values.push(storedValue(field, req.body[field]));
       }
     }
     if (updates.length === 0) {

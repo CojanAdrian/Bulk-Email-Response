@@ -24,8 +24,8 @@ describe('findProvenCarriers', () => {
       hist({ carrier_id: 2, carrier_name: 'Blue Line', ran_at: '2026-06-01', rate: null }),
     ]);
     expect(result[10]).toEqual([
-      { carrierId: 1, carrierName: 'Swift Haul', runs: 2, lastRanAt: '2026-08-02', lastRate: 1900 },
-      { carrierId: 2, carrierName: 'Blue Line', runs: 1, lastRanAt: '2026-06-01', lastRate: null },
+      { carrierId: 1, carrierName: 'Swift Haul', starred: false, runs: 2, lastRanAt: '2026-08-02', lastRate: 1900 },
+      { carrierId: 2, carrierName: 'Blue Line', starred: false, runs: 1, lastRanAt: '2026-06-01', lastRate: null },
     ]);
   });
   test('ignores a different lane', () => {

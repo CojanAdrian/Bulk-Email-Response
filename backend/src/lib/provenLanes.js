@@ -45,7 +45,7 @@ function findProvenCarriers(loads, historyRows) {
       const ranAt = toDateString(row.ran_at) || toDateString(row.created_at);
       const rate = row.rate === null || row.rate === undefined ? null : Number(row.rate);
       const entry = perCarrier.get(row.carrier_id) || {
-        carrierId: row.carrier_id, carrierName: row.carrier_name, runs: 0, lastRanAt: null, lastRate: null,
+        carrierId: row.carrier_id, carrierName: row.carrier_name, starred: Boolean(Number(row.carrier_starred)), runs: 0, lastRanAt: null, lastRate: null,
       };
       entry.runs += 1;
       if (entry.lastRanAt === null || (ranAt && ranAt > entry.lastRanAt)) {
@@ -56,8 +56,9 @@ function findProvenCarriers(loads, historyRows) {
       perCarrier.set(row.carrier_id, entry);
     }
     if (perCarrier.size === 0) continue;
+    // Starred carriers first, then whoever ran it most.
     result[load.id] = [...perCarrier.values()].sort(
-      (a, b) => b.runs - a.runs || String(b.lastRanAt).localeCompare(String(a.lastRanAt))
+      (a, b) => Number(b.starred) - Number(a.starred) || b.runs - a.runs || String(b.lastRanAt).localeCompare(String(a.lastRanAt))
     );
   }
   return result;

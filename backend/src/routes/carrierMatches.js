@@ -68,7 +68,7 @@ async function attachStateCentroids(pool, regionalMatches) {
   return regionalMatches;
 }
 
-const CONTACT_FIELDS = ['mc_number', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email', 'equipment_types', 'operating_states', 'comment'];
+const CONTACT_FIELDS = ['mc_number', 'dispatcher_name', 'dispatcher_phone', 'dispatcher_email', 'equipment_types', 'operating_states', 'comment', 'starred'];
 
 // Merges the carrier's own contact/equipment fields into each match so the
 // match list (and the detail sheet opened from it) can show everything
@@ -188,7 +188,7 @@ function createCarrierMatchesRouter(pool) {
     // Dates are formatted in SQL so a DATE never shifts a day through a
     // JS Date's timezone conversion.
     const [historyRows] = await pool.query(
-      `SELECT h.carrier_id, c.company_name AS carrier_name, c.equipment_types AS carrier_equipment_types,
+      `SELECT h.carrier_id, c.company_name AS carrier_name, c.equipment_types AS carrier_equipment_types, c.starred AS carrier_starred,
               l.equipment AS load_equipment, h.origin_city, h.origin_state, h.dest_city, h.dest_state, h.rate,
               DATE_FORMAT(h.ran_at, '%Y-%m-%d') AS ran_at, DATE_FORMAT(h.created_at, '%Y-%m-%d') AS created_at
        FROM carrier_lane_history h
