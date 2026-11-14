@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { subscribe } from '../lib/liveSocket';
 import { useGmailConnected } from '../lib/useGmailConnected';
 import { usePendingReviewCount } from '../lib/usePendingReviewCount';
@@ -9,6 +9,8 @@ import Island from './Island';
 import AccountPill from './AccountPill';
 import CommandBar from './CommandBar';
 import ImportDropzone from './ImportDropzone';
+import ShellContext from './ShellContext';
+import { importLoads } from '../lib/importLoads';
 
 const ALERT_FOR_MS = 8000;
 const NOTICE_FOR_MS = 4500;
@@ -71,6 +73,17 @@ function AppShell({ username, onLogout, mapDimmed = true, onLoadsImported, child
   );
   const handleImportError = useCallback((message) => showNotice({ tone: 'error', title: message }), [showNotice]);
 
+  const shell = useMemo(
+    () => ({
+      notify: showNotice,
+      importFile: (file) =>
+        importLoads(file)
+          .then((result) => handleImported(result, file.name))
+          .catch((err) => handleImportError(err.message)),
+    }),
+    [showNotice, handleImported, handleImportError]
+  );
+
   useEffect(() => {
     setDimmed(mapDimmed);
   }, [mapDimmed]);
@@ -90,7 +103,9 @@ function AppShell({ username, onLogout, mapDimmed = true, onLoadsImported, child
           <AccountPill username={username} onLogout={onLogout} />
         </div>
       </header>
-      <div className="relative z-10 min-w-0 pt-[72px]">{children}</div>
+      <ShellContext.Provider value={shell}>
+        <div className="relative z-10 min-w-0 pt-[72px]">{children}</div>
+      </ShellContext.Provider>
       <ImportDropzone onImported={handleImported} onError={handleImportError} />
       <CommandBar pendingCount={pendingCount} gmailConnected={gmailConnected} />
     </div>

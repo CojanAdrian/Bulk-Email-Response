@@ -32,14 +32,14 @@ function extractEmailsFromText(text) {
   return out;
 }
 
-function BlastModal({ load, initialShowRate, onClose }) {
+function BlastModal({ load, initialShowRate, initialEmails = '', onClose }) {
   const preset = useMotionPreset();
   const [showRate, setShowRate] = useState(Boolean(initialShowRate));
   const [subject, setSubject] = useState(
     `Load Available | ${load.origin_city} ${load.origin_state} → ${load.dest_city} ${load.dest_state} | ${load.equipment}`
   );
   const [body, setBody] = useState(buildLookupMessage(load, Boolean(initialShowRate)));
-  const [emailsText, setEmailsText] = useState('');
+  const [emailsText, setEmailsText] = useState(initialEmails);
   const [dragActive, setDragActive] = useState(false);
   const [invalidFlash, setInvalidFlash] = useState(false);
   const [fileError, setFileError] = useState(null);

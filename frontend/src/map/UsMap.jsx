@@ -34,17 +34,16 @@ function cameraFor(lane) {
   return {
     x: C[0] * 0.4 + (A[0] + B[0]) * 0.3,
     y: C[1] * 0.4 + (A[1] + B[1]) * 0.3,
-    k: Math.max(1.25, Math.min(2.4, 430 / Math.max(length, 1))),
+    // Short lanes zoom in; a coast-to-coast lane stays at full-map scale so
+    // both ends remain in view.
+    k: Math.max(1, Math.min(2.4, 430 / Math.max(length, 1))),
   };
 }
 
 // The United States as a dot field with the board's lanes drawn across it.
-// insetLeft / insetRight are the widths of the panels floating over the
-// map; it fits itself into the space between them.
-function UsMap({ insetLeft = 0, insetRight = 0 }) {
+// It fits itself into the part of the window the store says is free.
+function UsMap() {
   const canvasRef = useRef(null);
-  const insets = useRef({ left: insetLeft, right: insetRight });
-  insets.current = { left: insetLeft, right: insetRight };
   const dimmed = useMapStore((s) => s.dimmed);
 
   useEffect(() => {
@@ -104,7 +103,9 @@ function UsMap({ insetLeft = 0, insetRight = 0 }) {
       ctx.stroke(shapes.nation);
     }
 
-    function drawLane(lane, index, k, now, focusId) {
+    // rest: how visible a lane is when nothing is focused. A full board
+    // draws many lanes, so each one is fainter.
+    function drawLane(lane, index, k, now, focusId, rest) {
       const { A, B, C } = lane.geometry;
       const focused = focusId === lane.id;
       const faded = focusId !== null && !focused;
@@ -112,7 +113,7 @@ function UsMap({ insetLeft = 0, insetRight = 0 }) {
 
       ctx.lineCap = 'round';
       ctx.lineWidth = (focused ? 1.6 : 1) / k;
-      ctx.strokeStyle = `rgba(${colour},${faded ? 0.06 : focused ? 0.4 : 0.3})`;
+      ctx.strokeStyle = `rgba(${colour},${faded ? Math.min(0.06, rest) : focused ? 0.4 : rest})`;
       ctx.beginPath();
       ctx.moveTo(A[0], A[1]);
       ctx.quadraticCurveTo(C[0], C[1], B[0], B[1]);
@@ -140,7 +141,7 @@ function UsMap({ insetLeft = 0, insetRight = 0 }) {
 
       const eastbound = A[0] < B[0];
       for (const [point, label, isOrigin] of [[A, lane.fromLabel, true], [B, lane.toLabel, false]]) {
-        ctx.fillStyle = `rgba(${colour},${faded ? 0.15 : 1})`;
+        ctx.fillStyle = `rgba(${colour},${faded ? 0.15 : focused ? 1 : Math.min(1, rest * 3.2)})`;
         ctx.beginPath();
         ctx.arc(point[0], point[1], (focused ? 3.4 : 2.2) / k, 0, Math.PI * 2);
         ctx.fill();
@@ -175,14 +176,14 @@ function UsMap({ insetLeft = 0, insetRight = 0 }) {
       frameId = requestAnimationFrame(frame);
       if (document.hidden) return;
       const now = Date.now();
-      const { lanes, focusId, ripples } = getState();
+      const { lanes, focusId, ripples, insets } = getState();
       const target = cameraFor(lanes.find((lane) => lane.id === focusId));
       const ease = still ? 1 : 0.07;
       camera.x += (target.x - camera.x) * ease;
       camera.y += (target.y - camera.y) * ease;
       camera.k += (target.k - camera.k) * ease;
 
-      const { left, right } = insets.current;
+      const { left, right } = insets;
       const freeLeft = left;
       const freeRight = Math.max(freeLeft + 320, width - right);
       const fit = Math.min((freeRight - freeLeft) / MAP_WIDTH, (height - 210) / MAP_HEIGHT);
@@ -200,7 +201,8 @@ function UsMap({ insetLeft = 0, insetRight = 0 }) {
 
       ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (anchorX - camera.x * k), dpr * (anchorY - camera.y * k));
       if (shapes) drawLand(k, now, ripples);
-      lanes.forEach((lane, index) => drawLane(lane, index, k, now, focusId));
+      const rest = Math.max(0.08, Math.min(0.3, 14 / Math.max(lanes.length, 1)));
+      lanes.forEach((lane, index) => drawLane(lane, index, k, now, focusId, rest));
     }
 
     resize();

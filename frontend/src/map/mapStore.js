@@ -3,7 +3,7 @@ import { laneGeometry, project, roadMiles } from './geo';
 
 // What the map should show. Screens write here; UsMap draws it. Neither
 // side knows about the other.
-let state = { lanes: [], focusId: null, ripples: [], dimmed: false };
+let state = { lanes: [], focusId: null, ripples: [], dimmed: false, insets: { left: 0, right: 0 } };
 const listeners = new Set();
 
 function set(patch) {
@@ -52,8 +52,15 @@ export function setDimmed(dimmed) {
   set({ dimmed: Boolean(dimmed) });
 }
 
+// How much of the window's left and right edges is covered by panels, in
+// pixels. The map fits itself into what is left.
+export function setInsets({ left = 0, right = 0 }) {
+  if (state.insets.left === left && state.insets.right === right) return;
+  set({ insets: { left, right } });
+}
+
 export function resetMapStore() {
-  set({ lanes: [], focusId: null, ripples: [], dimmed: false });
+  set({ lanes: [], focusId: null, ripples: [], dimmed: false, insets: { left: 0, right: 0 } });
 }
 
 export const RIPPLE_MS = 2600;

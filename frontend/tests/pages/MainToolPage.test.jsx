@@ -22,15 +22,23 @@ vi.mock('../../src/components/CarrierLaneMap', () => ({
   default: () => <div data-testid="globe-mock" />,
 }));
 
-function renderPage(props) {
+const LOAD = {
+  id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
+  dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
+};
+
+function renderPage(start = '/loads') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[start]}>
       <ToastProvider>
-        <MainToolPage {...props} />
+        <MainToolPage username="admin" onLogout={vi.fn()} />
       </ToastProvider>
     </MemoryRouter>
   );
 }
+
+const tab = (name) => screen.getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
+const boardFetches = () => loadsApi.listLoads.mock.calls.filter((call) => call[0] === undefined).length;
 
 describe('MainToolPage', () => {
   let liveHandlers;
@@ -42,6 +50,7 @@ describe('MainToolPage', () => {
     inquiriesApi.listInquiries.mockResolvedValue([]);
     carriersApi.listCarriers.mockResolvedValue([]);
     carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({});
+    carrierMatchesApi.getProvenCarriers.mockResolvedValue({});
     liveHandlers = {};
     liveSocket.subscribe.mockImplementation((event, handler) => {
       liveHandlers[event] = handler;
@@ -51,132 +60,72 @@ describe('MainToolPage', () => {
     });
   });
 
-  test('renders the upload panel and the loads table by default', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    expect(screen.getByText(/upload loads csv/i)).toBeInTheDocument();
-    await waitFor(() => {
-      expect(screen.getByText(/no loads found/i)).toBeInTheDocument();
-    });
+  test('opens on the Loads board', async () => {
+    renderPage('/');
+    expect(await screen.findByText('No loads found.')).toBeInTheDocument();
+    expect(tab('Loads')).toHaveAttribute('aria-current', 'page');
   });
 
-  test('renders the DAT export section on the Loads tab, plus a quick-access button next to Add Load', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /generate dat export/i })).toHaveLength(2);
-    });
-    expect(screen.getByText(/dat export/i, { selector: 'h2' })).toBeInTheDocument();
+  test('opens on the tab named in the address', async () => {
+    renderPage('/inquiries');
+    expect(tab('Inquiries')).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('region', { name: 'Load board' })).not.toBeInTheDocument();
   });
 
-  test('the quick-access DAT export button opens the same export flow as the section\'s own button', async () => {
-    loadsApi.listLoads.mockResolvedValue([
-      { id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', status: 'active' },
-    ]);
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    await waitFor(() => screen.getAllByRole('button', { name: /generate dat export/i }));
-
-    const [quickButton] = screen.getAllByRole('button', { name: /generate dat export/i });
-    fireEvent.click(quickButton);
-
-    expect(await screen.findByText(/dat contact method/i)).toBeInTheDocument();
-  });
-
-  test('only fetches the pending-review count for the nav badge until the Inquiries tab is opened', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalled());
-    // the top nav itself checks Gmail status (for its "not connected" nudge)
-    // and the pending-review count (for its badge) regardless of tab, so
-    // both are called from mount -- but the full review queue / stats / log
-    // fetches still wait until the Inquiries tab is actually opened.
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledWith('pending_review'));
-    expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(1);
+  test('on Loads, only inquiries waiting for a reply are fetched, not the whole log', async () => {
+    renderPage();
+    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalled());
+    await screen.findByText('No loads found.');
+    for (const call of inquiriesApi.listInquiries.mock.calls) {
+      expect(call[0]).toBe('pending_review');
+    }
   });
 
   test('switches to the Inquiries tab and renders its panels', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+    renderPage();
+    fireEvent.click(tab('Inquiries'));
 
-    await waitFor(() => {
-      expect(gmailApi.getGmailStatus).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(gmailApi.getGmailStatus).toHaveBeenCalled());
     expect(screen.getByText(/gmail connection/i)).toBeInTheDocument();
     expect(screen.getByText(/review queue/i)).toBeInTheDocument();
     expect(screen.getByText(/inquiry log/i)).toBeInTheDocument();
-    // the outgoing Loads content may still be mid-exit-animation briefly
-    await waitFor(() => {
-      expect(screen.queryByText(/upload loads csv/i)).not.toBeInTheDocument();
-    });
+    expect(screen.queryByRole('region', { name: 'Load board' })).not.toBeInTheDocument();
   });
 
-  // Regression coverage: the review queue (actionable work) used to sit
-  // below the Gmail connection panel (a settings card, configured once),
-  // forcing a scroll past setup UI to reach what actually needs attention.
   test('shows the review queue above the Gmail connection panel on the Inquiries tab', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+    renderPage('/inquiries');
     await waitFor(() => screen.getByText(/gmail connection/i));
 
     const main = screen.getByText(/gmail connection/i).closest('main');
     const reviewQueueHeading = within(main).getByText(/review queue/i);
     const gmailHeading = within(main).getByText(/gmail connection/i);
-    // DOCUMENT_POSITION_FOLLOWING (4): gmailHeading comes AFTER
-    // reviewQueueHeading in document order.
     const position = reviewQueueHeading.compareDocumentPosition(gmailHeading);
     expect(position & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   test('the Refresh button on the Inquiries tab re-fetches inquiries', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    // the top nav's pending-review badge already fetched once, from mount
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(1));
-    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
-    // ReviewQueue + InquiriesLog + InquiriesStatsRow each fetch independently on mount
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(4));
+    renderPage('/inquiries');
+    await screen.findByText(/inquiry log/i);
+    await waitFor(() => expect(inquiriesApi.listInquiries.mock.calls.some((call) => call[0] === undefined)).toBe(true));
+    const before = inquiriesApi.listInquiries.mock.calls.length;
 
     fireEvent.click(screen.getByRole('button', { name: /^refresh$/i }));
-    await waitFor(() => expect(inquiriesApi.listInquiries).toHaveBeenCalledTimes(7));
+    // The review queue, the log and the stats row each fetch again.
+    await waitFor(() => expect(inquiriesApi.listInquiries.mock.calls.length).toBe(before + 3));
   });
 
-  test('switching back to Loads keeps the loads table working as before', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    fireEvent.click(screen.getByRole('button', { name: /^inquiries$/i }));
+  test('switching back to Loads shows the board again', async () => {
+    renderPage('/inquiries');
     await waitFor(() => screen.getByText(/gmail connection/i));
 
-    fireEvent.click(screen.getByRole('button', { name: /^loads$/i }));
-    await waitFor(() => {
-      expect(screen.getByText(/upload loads csv/i)).toBeInTheDocument();
-    });
+    fireEvent.click(tab('Loads'));
+    expect(await screen.findByRole('region', { name: 'Load board' })).toBeInTheDocument();
     // the outgoing Inquiries content may still be mid-exit-animation briefly
-    await waitFor(() => {
-      expect(screen.queryByText(/gmail connection/i)).not.toBeInTheDocument();
-    });
+    await waitFor(() => expect(screen.queryByText(/gmail connection/i)).not.toBeInTheDocument());
   });
 
-  test('opens the rate modal when a load row is selected, and refreshes the table on save', async () => {
-    const load = {
-      id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
-      dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
-    };
-    loadsApi.listLoads.mockResolvedValue([load]);
-    loadsApi.updateLoad.mockResolvedValue({ ...load, target_pay: '1700', status: 'active' });
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-
-    await waitFor(() => screen.getByText('L1001'));
-    fireEvent.click(screen.getByRole('button', { name: /^edit$/i }));
-    expect(screen.getByText(/edit load L1001/i)).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: /^save$/i }));
-
-    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
-    await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
-    });
-  });
-
-  // Regression coverage for the reported request: a new-inquiry
-  // notification that's hard to miss no matter which tab is open, and that
-  // still gets you to the review queue -- not just the small corner toast.
-  test('shows a prominent alert when a live inquiry:new event arrives, and clicking it switches to Inquiries', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
+  test('a new inquiry opens the island, and clicking it switches to Inquiries', async () => {
+    renderPage();
     await waitFor(() => expect(liveHandlers['inquiry:new']).toBeTruthy());
 
     act(() => {
@@ -186,28 +135,12 @@ describe('MainToolPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('New inquiry from dispatch@carrierco.com');
 
     fireEvent.click(screen.getByText(/dispatch@carrierco.com/));
-    await waitFor(() => {
-      expect(screen.getByText(/gmail connection/i)).toBeInTheDocument();
-    });
-  });
-
-  test('opens the blast modal from a load row\'s "Blast" button', async () => {
-    const load = {
-      id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
-      dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
-    };
-    loadsApi.listLoads.mockResolvedValue([load]);
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-
-    await waitFor(() => screen.getByText('L1001'));
-    fireEvent.click(screen.getByRole('button', { name: /^blast$/i }));
-
-    expect(screen.getByText(/blast email/i, { selector: 'h2' })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/gmail connection/i)).toBeInTheDocument());
   });
 
   test('switches to the Carriers tab and shows the find-matches view by default', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+    renderPage();
+    fireEvent.click(tab('Carriers'));
 
     expect(await screen.findByTestId('globe-mock')).toBeInTheDocument();
     expect(screen.getByLabelText(/origin city/i)).toBeInTheDocument();
@@ -215,97 +148,47 @@ describe('MainToolPage', () => {
   });
 
   test('the "All carriers" toggle switches to the plain carrier list', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    fireEvent.click(screen.getByRole('button', { name: /^carriers$/i }));
+    renderPage('/carriers');
     fireEvent.click(screen.getByRole('button', { name: /^all carriers$/i }));
 
-    await waitFor(() => {
-      expect(carriersApi.listCarriers).toHaveBeenCalled();
-    });
+    await waitFor(() => expect(carriersApi.listCarriers).toHaveBeenCalled());
     expect(screen.getByText(/^carriers$/i, { selector: 'h2' })).toBeInTheDocument();
   });
 
-  test('clicking a load\'s carrier-match badge switches to Carriers with that load focused', async () => {
-    const load = {
-      id: 1, load_number: 'L1001', origin_city: 'Dallas', origin_state: 'TX',
-      dest_city: 'Chicago', dest_state: 'IL', equipment: 'V', target_pay: '1500.00', status: 'active',
-    };
-    loadsApi.listLoads.mockResolvedValue([load]);
-    carrierMatchesApi.bulkCarrierMatches.mockResolvedValue({ [load.id]: { tier: 'perfect', count: 1 } });
+  test('"Find carriers" on an open load switches to Carriers with that load focused', async () => {
+    loadsApi.listLoads.mockResolvedValue([LOAD]);
     carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue({ laneMatches: [], regionalMatches: [] });
-    renderPage({ username: 'admin', onLogout: vi.fn() });
+    renderPage();
 
-    await waitFor(() => screen.getByRole('button', { name: /^1 match$/i }));
-    fireEvent.click(screen.getByRole('button', { name: /^1 match$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^open load L1001/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Find carriers' }));
 
-    await waitFor(() => {
-      expect(carrierMatchesApi.getCarrierMatchesForLoad).toHaveBeenCalledWith(1);
-    });
+    await waitFor(() => expect(carrierMatchesApi.getCarrierMatchesForLoad).toHaveBeenCalledWith(1));
     expect(screen.getByText(/^carriers$/i, { selector: 'h1' })).toBeInTheDocument();
     expect(screen.getByText(/matched carriers/i)).toBeInTheDocument();
   });
 
-  test('refreshes the table when an upload completes', async () => {
-    const validFields = [
-      'Order', 'Origin City', 'Origin State', 'Dest City', 'Dest State',
-      'Equip Type', 'Weight', 'Target Pay', 'Early P/U Dt', 'Late P/U Dt', 'Planning Comment',
-    ];
-    const validRow = {
-      Order: '0078033',
-      'Origin City': 'NEWPORT',
-      'Origin State': 'AR',
-      'Dest City': 'O FALLON',
-      'Dest State': 'MO',
-      'Equip Type': 'FGT',
-      Weight: '12845.0 LB',
-      'Target Pay': '$1,100.00',
-      'Early P/U Dt': '07/01/2026 1200',
-      'Late P/U Dt': '07/01/2026 1200',
-      'Planning Comment': '1p1d / $90 LUMP AT DEL',
-    };
+  test('importing a CSV from the board uploads it and reloads the board', async () => {
     Papa.parse.mockImplementation((file, options) => {
-      options.complete({ meta: { fields: validFields }, data: [validRow] });
+      options.complete({
+        meta: { fields: ['Order', 'Origin City', 'Origin State', 'Dest City', 'Dest State', 'Equip Type', 'Weight', 'Target Pay', 'Early P/U Dt', 'Late P/U Dt', 'Planning Comment'] },
+        data: [{
+          Order: '0078033', 'Origin City': 'NEWPORT', 'Origin State': 'AR', 'Dest City': 'O FALLON', 'Dest State': 'MO', 'Equip Type': 'FGT',
+          Weight: '12845.0 LB', 'Target Pay': '$1,100.00', 'Early P/U Dt': '07/01/2026 1200', 'Late P/U Dt': '07/01/2026 1200', 'Planning Comment': '1p1d',
+        }],
+      });
     });
     loadsApi.uploadLoads.mockResolvedValue({ inserted: 1, updated: 0 });
 
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount
-    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledTimes(3));
+    renderPage();
+    await screen.findByText('No loads found.');
+    const before = boardFetches();
 
     const file = new File(['irrelevant'], 'loads.csv', { type: 'text/csv' });
-    fireEvent.change(screen.getByLabelText(/upload loads csv/i), { target: { files: [file] } });
+    fireEvent.change(screen.getByLabelText('Upload loads CSV'), { target: { files: [file] } });
 
-    await waitFor(() => {
-      expect(loadsApi.uploadLoads).toHaveBeenCalledTimes(1);
-    });
-    await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
-    });
-  });
-
-  test('opens the Add Load modal and refreshes the table after creating a load', async () => {
-    loadsApi.createLoad.mockResolvedValue({ id: 9, load_number: 'NEW1' });
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    await waitFor(() => screen.getByText(/no loads found/i));
-
-    fireEvent.click(screen.getByRole('button', { name: /\+ add load/i }));
-    expect(screen.getByText(/^add a load$/i)).toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText(/load #/i), { target: { value: 'NEW1' } });
-    fireEvent.click(screen.getByRole('button', { name: /^add load$/i }));
-
-    // LoadsStatsRow + LoadsTable + DatExportSection each fetch independently on mount and on refreshKey change
-    await waitFor(() => {
-      expect(loadsApi.listLoads).toHaveBeenCalledTimes(6);
-    });
-  });
-
-  test('clicking the Booked counter filters the board to booked loads', async () => {
-    renderPage({ username: 'admin', onLogout: vi.fn() });
-    const booked = await screen.findByRole('button', { name: /^booked: \d+ loads$/i });
-    fireEvent.click(booked);
-    await waitFor(() => expect(loadsApi.listLoads).toHaveBeenCalledWith('booked'));
-    expect(booked).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('combobox', { name: /filter by status/i })).toHaveTextContent('Booked');
+    await waitFor(() => expect(loadsApi.uploadLoads).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(boardFetches()).toBeGreaterThan(before));
+    expect(await screen.findByText('loads.csv imported')).toBeInTheDocument();
   });
 });

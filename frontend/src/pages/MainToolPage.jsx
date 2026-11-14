@@ -1,13 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import UploadPanel from '../components/UploadPanel';
-import LoadsTable from '../components/LoadsTable';
-import LoadsStatsRow from '../components/LoadsStatsRow';
-import RateModal from '../components/RateModal';
-import AddLoadModal from '../components/AddLoadModal';
-import BlastModal from '../components/BlastModal';
-import PrimaryButton from '../components/PrimaryButton';
 import GmailConnectionPanel from '../components/GmailConnectionPanel';
 import ReviewQueue from '../components/ReviewQueue';
 import InquiriesLog from '../components/InquiriesLog';
@@ -15,16 +8,15 @@ import CarriersPanel from '../components/CarriersPanel';
 import CarrierMapPage from './CarrierMapPage';
 import StatsPage from './StatsPage';
 import InquiriesStatsRow from '../components/InquiriesStatsRow';
-import DatExportSection from '../components/DatExportSection';
 import SecondaryButton from '../components/SecondaryButton';
 import AppShell from '../shell/AppShell';
 import { tabFromPath } from '../shell/routes';
 import { useMotionPreset } from '../lib/motionConfig';
 import { useHotkeys, focusPageSearch } from '../lib/useHotkeys';
 import CustomersPage from './CustomersPage';
+import LoadsScreen from '../screens/loads/LoadsScreen';
 
 const TAB_TITLES = {
-  loads: 'Loads',
   inquiries: 'Inquiries',
   carriers: 'Carriers',
   customers: 'Customers',
@@ -32,7 +24,6 @@ const TAB_TITLES = {
 };
 
 const TAB_SUBTITLES = {
-  loads: 'Your board. Gold rows are lanes a carrier has already run.',
   inquiries: 'Carrier emails about your loads, matched and ready to answer.',
   carriers: 'Every carrier you work with and the lanes they run.',
   customers: 'Every customer’s loads and the carriers who hauled them.',
@@ -74,25 +65,12 @@ function MainToolPage({ username, onLogout }) {
   const navigate = useNavigate();
   const tab = tabFromPath(location.pathname);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [loadsStatus, setLoadsStatus] = useState('active');
-  const [selectedLoad, setSelectedLoad] = useState(null);
-  const [addLoadOpen, setAddLoadOpen] = useState(false);
-  const [blastTarget, setBlastTarget] = useState(null);
   const [focusedMatchLoad, setFocusedMatchLoad] = useState(null);
   const [carriersView, setCarriersView] = useState('find'); // 'find' | 'manage'
   const [inquiriesRefreshKey, setInquiriesRefreshKey] = useState(0);
   const preset = useMotionPreset();
-  const datExportRef = useRef(null);
 
   function handleUploadComplete() {
-    setRefreshKey((k) => k + 1);
-  }
-
-  function handleLoadCreated() {
-    setRefreshKey((k) => k + 1);
-  }
-
-  function handleSaved() {
     setRefreshKey((k) => k + 1);
   }
 
@@ -108,17 +86,12 @@ function MainToolPage({ username, onLogout }) {
     if (location.pathname === '/') navigate({ pathname: '/loads', search: location.search }, { replace: true });
   }, [location.pathname, location.search, navigate]);
 
-  useHotkeys({
-    '/': focusPageSearch,
-    n: () => {
-      if (tab === 'loads') setAddLoadOpen(true);
-    },
-  });
+  useHotkeys({ '/': focusPageSearch });
 
   return (
-    <AppShell username={username} onLogout={onLogout} onLoadsImported={handleUploadComplete}>
+    <AppShell username={username} onLogout={onLogout} onLoadsImported={handleUploadComplete} mapDimmed={tab !== 'loads'}>
       <div className="relative z-10 min-w-0">
-        {!(tab === 'carriers' && carriersView === 'find') && (
+        {tab !== 'loads' && !(tab === 'carriers' && carriersView === 'find') && (
           <header className="mx-auto flex w-full max-w-[1400px] items-end justify-between gap-3 px-4 pt-6 sm:px-6 sm:pt-8">
             <div className="min-w-0">
               <h1 className="font-display text-[28px] font-bold leading-tight tracking-tight text-shell-text sm:text-[32px]">{TAB_TITLES[tab]}</h1>
@@ -131,34 +104,14 @@ function MainToolPage({ username, onLogout }) {
             )}
           </header>
         )}
+        {/* Outside AnimatePresence: the board's panels are position: fixed,
+            and a fading wrapper would become their containing block. */}
+        {tab === 'loads' && (
+          <main>
+            <LoadsScreen refreshKey={refreshKey} onViewMatches={handleViewMatches} />
+          </main>
+        )}
         <AnimatePresence>
-          {tab === 'loads' && (
-            <motion.main key="loads" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
-              <LoadsStatsRow refreshKey={refreshKey} activeStatus={loadsStatus} onSelectStatus={setLoadsStatus} />
-              <UploadPanel
-                onUploadComplete={handleUploadComplete}
-                headerActions={
-                  <div className="flex gap-2">
-                    <SecondaryButton onClick={() => datExportRef.current?.openExportFlow()} className="px-3 py-1.5 text-xs">
-                      Generate DAT Export
-                    </SecondaryButton>
-                    <PrimaryButton onClick={() => setAddLoadOpen(true)} className="px-3 py-1.5 text-xs">
-                      + Add Load
-                    </PrimaryButton>
-                  </div>
-                }
-              />
-              <LoadsTable
-                refreshKey={refreshKey}
-                onSelectLoad={setSelectedLoad}
-                onOpenBlast={(load, showRate) => setBlastTarget({ load, showRate })}
-                onViewMatches={handleViewMatches}
-                statusFilter={loadsStatus}
-                onStatusFilterChange={setLoadsStatus}
-              />
-              <DatExportSection ref={datExportRef} refreshKey={refreshKey} />
-            </motion.main>
-          )}
           {tab === 'inquiries' && (
             <motion.main key="inquiries" {...preset.crossfade} className={`${PAGE_CLASS} space-y-4 sm:space-y-6`}>
               <InquiriesStatsRow refreshKey={inquiriesRefreshKey} />
@@ -202,17 +155,6 @@ function MainToolPage({ username, onLogout }) {
           )}
         </AnimatePresence>
       </div>
-      <AnimatePresence>
-        {selectedLoad && (
-          <RateModal load={selectedLoad} onClose={() => setSelectedLoad(null)} onSaved={handleSaved} />
-        )}
-        {addLoadOpen && (
-          <AddLoadModal onClose={() => setAddLoadOpen(false)} onCreated={handleLoadCreated} />
-        )}
-        {blastTarget && (
-          <BlastModal load={blastTarget.load} initialShowRate={blastTarget.showRate} onClose={() => setBlastTarget(null)} />
-        )}
-      </AnimatePresence>
     </AppShell>
   );
 }
