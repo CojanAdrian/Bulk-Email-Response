@@ -25,7 +25,7 @@ import NeedsReply from './NeedsReply';
 import TodayCard from '../../shell/TodayCard';
 import { useSettings } from '../../shell/SettingsContext';
 import { useBoard } from './useBoard';
-import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, lanesFor, visibleLoads } from './boardLogic';
+import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, hasStarRegular, lanesFor, visibleLoads } from './boardLogic';
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
 const HEADLINES = { active: 'loads to cover', booked: 'loads booked', covered: 'loads covered' };
@@ -82,6 +82,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   const inTab = useMemo(() => loads.filter((load) => load.status === tab), [loads, tab]);
   const provenCount = useMemo(() => inTab.filter((load) => proven[load.id]?.length).length, [inTab, proven]);
   const needsRateCount = useMemo(() => inTab.filter(hasNoRate).length, [inTab]);
+  const starCount = useMemo(() => inTab.filter((load) => hasStarRegular(proven[load.id])).length, [inTab, proven]);
   const rows = useMemo(() => visibleLoads({ loads, status: tab, quick, query, sort, proven }), [loads, tab, quick, query, sort, proven]);
 
   const openId = openIdFrom(location.pathname);
@@ -346,6 +347,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           <div role="group" aria-label="Quick filter" className="flex w-full gap-1">
             {[
               { value: 'all', label: 'All', count: inTab.length },
+              { value: 'starred', label: '★ Starred', count: starCount },
               { value: 'proven', label: 'Proven', count: provenCount },
               { value: 'needs_rate', label: 'Needs rate', count: needsRateCount },
             ].map((option) => (
@@ -355,7 +357,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                 aria-pressed={quick === option.value}
                 onClick={() => setQuick(option.value)}
                 className={`${CHIP} ${quick === option.value ? 'bg-white/[0.12] text-text' : 'text-text-muted hover:text-text'} ${
-                  option.value === 'proven' && quick === 'proven' ? '!text-gold' : ''
+                  (option.value === 'proven' || option.value === 'starred') && quick === option.value ? '!text-gold' : ''
                 }`}
               >
                 {option.label} <span className="tabular-nums opacity-60">{option.count}</span>

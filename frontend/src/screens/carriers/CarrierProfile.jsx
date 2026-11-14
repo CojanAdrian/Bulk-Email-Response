@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { getCarrier } from '../../api/carriers';
 import Sheet, { PILL_DANGER, PILL_PRIMARY, PILL_QUIET } from '../../ui/Sheet';
 import CopyText from '../../ui/CopyText';
+import StarButton from '../../ui/StarButton';
 import { formatMoney } from '../../lib/formatMoney';
 import { formatDayAgo } from '../../lib/formatDay';
 import { EQUIPMENT_OPTIONS } from '../../lib/equipmentOptions';
@@ -22,7 +23,7 @@ function totals(history) {
 
 // One carrier: how to reach them, what they pull, where they run, and
 // every run they have done for you. Hovering a run focuses it on the map.
-function CarrierProfile({ carrierId, history, refreshKey = 0, onClose, onEdit, onDelete, onHoverRun, deleting }) {
+function CarrierProfile({ carrierId, history, refreshKey = 0, onClose, onEdit, onDelete, onStar, onHoverRun, deleting }) {
   const [carrier, setCarrier] = useState(null);
   const [status, setStatus] = useState('loading');
   const [confirming, setConfirming] = useState(false);
@@ -60,11 +61,26 @@ function CarrierProfile({ carrierId, history, refreshKey = 0, onClose, onEdit, o
       {status === 'ready' && carrier && (
         <>
           <div className="flex items-center gap-4 pr-10">
-            <span aria-hidden="true" className="grid h-14 w-14 shrink-0 place-items-center rounded-[18px] bg-accent text-lg font-bold text-accent-ink">
+            <span
+              aria-hidden="true"
+              className={`grid h-14 w-14 shrink-0 place-items-center rounded-[18px] text-lg font-bold ${Number(carrier.starred) ? 'bg-gold text-black shadow-[0_0_28px_rgb(var(--color-gold)/0.4)]' : 'bg-accent text-accent-ink'}`}
+            >
               {initials(carrier.company_name)}
             </span>
             <div className="min-w-0">
-              <h2 className="truncate text-[32px] font-bold leading-none tracking-[-0.05em]">{carrier.company_name}</h2>
+              <h2 className={`flex items-center gap-2 text-[32px] font-bold leading-none tracking-[-0.05em] ${Number(carrier.starred) ? 'text-gold' : ''}`}>
+                <span className="truncate">{carrier.company_name}</span>
+                {onStar && (
+                  <StarButton
+                    starred={Boolean(Number(carrier.starred))}
+                    name={carrier.company_name}
+                    onToggle={(next) => {
+                      setCarrier((prev) => ({ ...prev, starred: next ? 1 : 0 }));
+                      onStar(carrier, next);
+                    }}
+                  />
+                )}
+              </h2>
               <p className="mt-1.5 text-[13px] text-text-muted">{carrier.mc_number ? <CopyText value={carrier.mc_number} label="Copy MC number">MC {carrier.mc_number}</CopyText> : 'No MC on file'}</p>
             </div>
           </div>

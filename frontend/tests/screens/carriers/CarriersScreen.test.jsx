@@ -71,6 +71,44 @@ describe('CarriersScreen', () => {
     });
   });
 
+  describe('starred carriers', () => {
+    test('starring a carrier saves it, lists it first and puts it in the Starred tab', async () => {
+      carriersApi.updateCarrier.mockResolvedValue({ ...NORTHSTAR, starred: 1 });
+      renderScreen();
+      await screen.findByText('Northstar Carriers');
+      fireEvent.click(screen.getByRole('button', { name: 'Star Northstar Carriers' }));
+      expect(carriersApi.updateCarrier).toHaveBeenCalledWith(8, { starred: true });
+      expect(screen.getByRole('button', { name: 'Unstar Northstar Carriers' })).toHaveAttribute('aria-pressed', 'true');
+      const names = screen.getAllByRole('button', { name: /^Open / }).map((button) => button.getAttribute('aria-label'));
+      expect(names).toEqual(['Open Northstar Carriers', 'Open Redline Haul']);
+      fireEvent.click(screen.getByRole('button', { name: /^starred 1$/i }));
+      expect(screen.getByTestId('path')).toHaveTextContent('/carriers/starred');
+      expect(screen.getAllByRole('button', { name: /^Open / })).toHaveLength(1);
+    });
+
+    test('a failed star goes back', async () => {
+      carriersApi.updateCarrier.mockRejectedValue(new Error('Network error'));
+      renderScreen();
+      await screen.findByText('Northstar Carriers');
+      fireEvent.click(screen.getByRole('button', { name: 'Star Northstar Carriers' }));
+      expect(await screen.findByRole('button', { name: 'Star Northstar Carriers' })).toHaveAttribute('aria-pressed', 'false');
+    });
+
+    test('the Starred tab explains how to star when there are none', async () => {
+      renderScreen('/carriers/starred');
+      expect(await screen.findByText('No starred carriers yet.')).toBeInTheDocument();
+    });
+
+    test('a carrier can be starred from their profile', async () => {
+      carriersApi.updateCarrier.mockResolvedValue({ ...REDLINE, starred: 1 });
+      renderScreen('/carriers/7');
+      const sheet = await screen.findByRole('dialog', { name: 'Redline Haul' });
+      fireEvent.click(await within(sheet).findByRole('button', { name: 'Star Redline Haul' }));
+      expect(carriersApi.updateCarrier).toHaveBeenCalledWith(7, { starred: true });
+      expect(within(sheet).getByRole('button', { name: 'Unstar Redline Haul' })).toBeInTheDocument();
+    });
+  });
+
   describe('a carrier', () => {
     test('opens with contacts, equipment, averages and every run', async () => {
       renderScreen();

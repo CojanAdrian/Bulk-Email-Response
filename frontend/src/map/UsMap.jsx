@@ -142,17 +142,18 @@ function UsMap() {
       const { A, B, C } = lane.geometry;
       const focused = focusId === lane.id;
       const faded = focusId !== null && !focused;
-      const colour = lane.gold ? GOLD : WHITE;
+      const colour = lane.gold || lane.star ? GOLD : WHITE;
 
       ctx.lineCap = 'round';
-      ctx.lineWidth = (focused ? 1.6 : 1) / k;
-      ctx.strokeStyle = `rgba(${colour},${faded ? Math.min(0.06, rest) : focused ? 0.4 : rest})`;
+      ctx.lineWidth = (focused ? 1.6 : lane.star ? 1.4 : 1) / k;
+      ctx.strokeStyle = `rgba(${colour},${faded ? Math.min(0.06, rest) : focused ? 0.4 : lane.star ? 0.55 : rest})`;
       ctx.beginPath();
       ctx.moveTo(A[0], A[1]);
       ctx.quadraticCurveTo(C[0], C[1], B[0], B[1]);
       ctx.stroke();
 
-      if (focused && !still) {
+      // A starred carrier's lane always carries its light; others only when focused.
+      if ((focused || (lane.star && !faded)) && !still) {
         const head = (now / 1500 + index * 0.31) % 1.4;
         ctx.shadowColor = `rgba(${colour},.9)`;
         ctx.shadowBlur = 16;

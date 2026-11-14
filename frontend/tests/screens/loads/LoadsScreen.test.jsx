@@ -186,6 +186,34 @@ describe('LoadsScreen', () => {
     });
   });
 
+  describe('star carriers', () => {
+    beforeEach(() => {
+      carrierMatchesApi.getProvenCarriers.mockResolvedValue({ 1: [{ ...REGULAR, starred: true }], 2: [{ ...REGULAR, carrierId: 9, carrierName: 'Plain Haul' }] });
+    });
+
+    test('a load your starred carrier ran is marked above a plain proven lane', async () => {
+      renderScreen();
+      expect(await screen.findByText('Your star carrier ran this lane')).toBeInTheDocument();
+      const rows = screen.getAllByTestId('load-row');
+      expect(rows[0]).toHaveAttribute('data-star', 'true');
+      expect(rows[1]).toHaveAttribute('data-proven', 'true');
+      expect(rows[1]).not.toHaveAttribute('data-star');
+    });
+
+    test('the Starred filter keeps only those loads', async () => {
+      renderScreen();
+      await screen.findByText('Your star carrier ran this lane');
+      fireEvent.click(screen.getByRole('button', { name: /starred 1$/i }));
+      expect(screen.getAllByTestId('load-row')).toHaveLength(1);
+    });
+
+    test('its lane on the map is marked as a star lane', async () => {
+      renderScreen();
+      await screen.findByText('Your star carrier ran this lane');
+      await waitFor(() => expect(getState().lanes.find((lane) => lane.id === 1)).toMatchObject({ gold: true, star: true }));
+    });
+  });
+
   describe('an open load', () => {
     async function openDallas() {
       renderScreen();

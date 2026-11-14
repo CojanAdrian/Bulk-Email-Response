@@ -215,7 +215,7 @@ function LoadSheet({
         <div className="mt-4">
           {regulars?.length > 0 ? (
             <>
-              <p className="caps mb-2 !text-gold">Regulars on this lane</p>
+              <p className="caps mb-2 !text-gold">{regulars.some((r) => r.starred) ? 'Your star carrier ran this lane' : 'Regulars on this lane'}</p>
               <Regulars load={load} regulars={regulars} onEmail={onEmail} onOpenCarrier={onOpenCarrier} />
             </>
           ) : (

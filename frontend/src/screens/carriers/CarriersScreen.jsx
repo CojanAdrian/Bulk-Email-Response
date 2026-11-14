@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { listCarriers, deleteCarrier } from '../../api/carriers';
+import { listCarriers, deleteCarrier, updateCarrier } from '../../api/carriers';
 import { getCarrierMatchesForLoad, searchCarrierMatches } from '../../api/carrierMatches';
 import { useHotkeys } from '../../lib/useHotkeys';
 import { EQUIPMENT_OPTIONS } from '../../lib/equipmentOptions';
@@ -10,6 +10,7 @@ import CarrierSheet from '../../components/CarrierSheet';
 import Skeleton from '../../components/Skeleton';
 import ScreenPanel, { PanelTabs, PanelSearch, PlusButton, EmptyNote } from '../../ui/ScreenPanel';
 import { SheetBackdrop, SHEET_SPRING } from '../../ui/Sheet';
+import StarButton, { StarIcon } from '../../ui/StarButton';
 import CarrierProfile from './CarrierProfile';
 import LaneSearch, { blankLane, laneFromLoad, laneIsComplete } from './LaneSearch';
 import { useCarrierHistory, lanesForHistory } from './useCarrierHistory';
@@ -30,39 +31,44 @@ function initials(name) {
 
 function routeFrom(pathname) {
   if (pathname.startsWith('/carriers/find')) return { mode: 'find', openId: null };
+  if (pathname.startsWith('/carriers/starred')) return { mode: 'starred', openId: null };
   const match = pathname.match(/^\/carriers\/(\d+)/);
   return { mode: 'directory', openId: match ? Number(match[1]) : null };
 }
 
-function CarrierRow({ carrier, current, onOpen, onHover }) {
+function CarrierRow({ carrier, current, onOpen, onHover, onStar }) {
   const equipment = Array.isArray(carrier.equipment_types) ? carrier.equipment_types : [];
+  const starred = Boolean(Number(carrier.starred));
   return (
     <li onPointerEnter={() => onHover(carrier.id)} data-row-id={carrier.id}>
-      <motion.button
-        type="button"
+      <motion.div
         layoutId={`carrier-${carrier.id}`}
         transition={SHEET_SPRING}
-        onClick={() => onOpen(carrier.id)}
-        aria-label={`Open ${carrier.company_name}`}
-        className={`flex w-full items-center gap-3.5 rounded-[18px] px-[14px] py-[11px] text-left transition-colors hover:bg-white/[0.065] ${current ? 'bg-white/[0.065]' : ''}`}
+        className={`flex items-center gap-1 rounded-[18px] pr-2 transition-colors hover:bg-white/[0.065] ${current ? 'bg-white/[0.065]' : ''}`}
       >
-        <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-[13px] bg-white/[0.08] text-[12px] font-bold text-text-muted">
-          {initials(carrier.company_name)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-semibold tracking-[-0.02em]">{carrier.company_name}</span>
-          <span className="mt-0.5 block truncate text-[12px] text-text-muted">
-            {[carrier.mc_number && `MC ${carrier.mc_number}`, carrier.dispatcher_name, carrier.dispatcher_phone].filter(Boolean).join(' · ') || 'No contact on file'}
+        <button type="button" onClick={() => onOpen(carrier.id)} aria-label={`Open ${carrier.company_name}`} className="flex min-w-0 flex-1 items-center gap-3.5 px-[14px] py-[11px] text-left">
+          <span
+            aria-hidden="true"
+            className={`grid h-10 w-10 shrink-0 place-items-center rounded-[13px] text-[12px] font-bold ${starred ? 'bg-gold text-black shadow-[0_0_18px_rgb(var(--color-gold)/0.35)]' : 'bg-white/[0.08] text-text-muted'}`}
+          >
+            {initials(carrier.company_name)}
           </span>
-        </span>
-        <span className="flex shrink-0 gap-1">
-          {equipment.slice(0, 3).map((code) => (
-            <span key={code} title={EQUIPMENT_LABEL[code] || code} className="rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[10.5px] font-semibold text-text-muted">
-              {code}
+          <span className="min-w-0 flex-1">
+            <span className={`block truncate text-[15px] font-semibold tracking-[-0.02em] ${starred ? 'text-gold' : ''}`}>{carrier.company_name}</span>
+            <span className="mt-0.5 block truncate text-[12px] text-text-muted">
+              {[carrier.mc_number && `MC ${carrier.mc_number}`, carrier.dispatcher_name, carrier.dispatcher_phone].filter(Boolean).join(' · ') || 'No contact on file'}
             </span>
-          ))}
-        </span>
-      </motion.button>
+          </span>
+          <span className="flex shrink-0 gap-1">
+            {equipment.slice(0, 3).map((code) => (
+              <span key={code} title={EQUIPMENT_LABEL[code] || code} className="rounded-md bg-white/[0.08] px-1.5 py-0.5 text-[10.5px] font-semibold text-text-muted">
+                {code}
+              </span>
+            ))}
+          </span>
+        </button>
+        <StarButton starred={starred} onToggle={(next) => onStar(carrier, next)} name={carrier.company_name} size="sm" />
+      </motion.div>
     </li>
   );
 }
@@ -81,7 +87,10 @@ function MatchRow({ match, searchedEquipment, current, onOpen, onHover }) {
         className={`grid w-full grid-cols-[1fr_auto] gap-x-3 rounded-[18px] px-[18px] py-[12px] text-left transition-colors hover:bg-white/[0.065] ${current ? 'bg-white/[0.065]' : ''}`}
       >
         <span className="min-w-0">
-          <span className="block truncate text-[15px] font-semibold tracking-[-0.02em]">{match.carrierName}</span>
+          <span className={`flex items-center gap-1.5 truncate text-[15px] font-semibold tracking-[-0.02em] ${Number(match.starred) ? 'text-gold' : ''}`}>
+            {Number(match.starred) ? <StarIcon filled className="h-3.5 w-3.5 shrink-0" /> : null}
+            {match.carrierName}
+          </span>
           <span className="mt-0.5 block truncate text-[12px] text-text-muted">{[where, match.mc_number && `MC ${match.mc_number}`, match.dispatcher_phone].filter(Boolean).join(' · ')}</span>
           {match.equipmentMismatch && (
             <span className="mt-1.5 inline-block rounded-full bg-hot/15 px-2 py-px text-[11px] font-medium text-hot">No {EQUIPMENT_LABEL[searchedEquipment] || searchedEquipment || 'matching equipment'} on file</span>
@@ -191,7 +200,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
 
   const shownHistory = shownId ? histories.historyOf(shownId) : null;
   const lanes = useMemo(() => {
-    if (openId || (mode === 'directory' && hoverId)) return lanesForHistory(shownHistory);
+    if (openId || (mode !== 'find' && hoverId)) return lanesForHistory(shownHistory);
     if (mode === 'find') {
       const matchLanes = (results?.laneMatches || [])
         .filter((match) => match.destLat !== null && match.destLng !== null)
@@ -208,7 +217,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
     navigate(`/carriers/${id}`);
   }
   function close() {
-    navigate(mode === 'find' || results ? '/carriers/find' : '/carriers');
+    navigate(results ? '/carriers/find' : '/carriers');
   }
 
   function removeCarrier(carrier) {
@@ -223,7 +232,21 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
       .finally(() => setDeleting(false));
   }
 
-  const rowIds = mode === 'find' ? matches.map((m) => m.carrierId) : carriers.map((c) => c.id);
+  // Starred carriers first everywhere; the Starred tab shows only them.
+  const sorted = useMemo(() => [...carriers].sort((x, y) => Number(Boolean(Number(y.starred))) - Number(Boolean(Number(x.starred)))), [carriers]);
+  const starred = useMemo(() => sorted.filter((carrier) => Number(carrier.starred)), [sorted]);
+  const listed = mode === 'starred' ? starred : sorted;
+
+  function star(carrier, next) {
+    const flip = (value) => (list) => list.map((item) => (item.id === carrier.id ? { ...item, starred: value ? 1 : 0 } : item));
+    setCarriers(flip(next));
+    updateCarrier(carrier.id, { starred: next }).catch((err) => {
+      setCarriers(flip(!next));
+      setError(err.message || 'Could not change the star.');
+    });
+  }
+
+  const rowIds = mode === 'find' ? matches.map((m) => m.carrierId) : listed.map((item) => item.id);
   useHotkeys({
     n: () => setEditing('new'),
     ArrowDown: () => {
@@ -244,9 +267,9 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
       <ScreenPanel
         ref={listRef}
         label="Carriers"
-        count={mode === 'find' ? matches.length : carriers.length}
-        caption={mode === 'find' ? 'Lane search' : 'Directory'}
-        title={mode === 'find' ? (results ? 'carriers for this lane' : 'find carriers for a lane') : 'carriers on file'}
+        count={mode === 'find' ? matches.length : listed.length}
+        caption={mode === 'find' ? 'Lane search' : mode === 'starred' ? 'Your own' : 'Directory'}
+        title={mode === 'find' ? (results ? 'carriers for this lane' : 'find carriers for a lane') : mode === 'starred' ? 'starred carriers' : 'carriers on file'}
         pushedBack={Boolean(openId)}
         onPointerLeave={() => {
           setHoverId(null);
@@ -257,9 +280,10 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
           <PanelTabs
             label="Carriers view"
             value={mode}
-            onChange={(next) => navigate(next === 'find' ? '/carriers/find' : '/carriers')}
+            onChange={(next) => navigate(next === 'find' ? '/carriers/find' : next === 'starred' ? '/carriers/starred' : '/carriers')}
             options={[
               { value: 'directory', label: 'Directory', count: carriers.length },
+              { value: 'starred', label: 'Starred', count: starred.length },
               { value: 'find', label: 'Find for a lane' },
             ]}
           />
@@ -284,7 +308,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
           )
         }
       >
-        {mode === 'directory' && (
+        {mode !== 'find' && (
           <>
             {status === 'loading' && (
               <div className="px-2 pt-2">
@@ -296,13 +320,18 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
                 {error}
               </p>
             )}
-            {status === 'ready' && carriers.length === 0 && (
+            {status === 'ready' && mode === 'starred' && listed.length === 0 && (
+              <EmptyNote title={query ? `No starred carrier matches "${query}".` : 'No starred carriers yet.'}>
+                {query ? null : 'Star your best carriers with the star on their row or profile. Loads they have run light up on the board.'}
+              </EmptyNote>
+            )}
+            {status === 'ready' && mode !== 'starred' && carriers.length === 0 && (
               <EmptyNote title={query ? `No carrier matches "${query}".` : 'No carriers yet.'}>{query ? null : 'Add one with the plus, or book a load and save the carrier from there.'}</EmptyNote>
             )}
-            {carriers.length > 0 && (
-              <ul aria-label="Carriers">
-                {carriers.map((carrier) => (
-                  <CarrierRow key={carrier.id} carrier={carrier} current={hoverId === carrier.id} onOpen={openCarrier} onHover={setHoverId} />
+            {listed.length > 0 && (
+              <ul aria-label={mode === 'starred' ? 'Starred carriers' : 'Carriers'}>
+                {listed.map((carrier) => (
+                  <CarrierRow key={carrier.id} carrier={carrier} current={hoverId === carrier.id} onOpen={openCarrier} onHover={setHoverId} onStar={star} />
                 ))}
               </ul>
             )}
@@ -354,6 +383,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
             onClose={close}
             onEdit={setEditing}
             onDelete={removeCarrier}
+            onStar={star}
             onHoverRun={setHoverRun}
             deleting={deleting}
           />

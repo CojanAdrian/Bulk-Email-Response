@@ -4,6 +4,7 @@ import { formatMoney } from '../../lib/formatMoney';
 import { formatDayAgo } from '../../lib/formatDay';
 import Portal from '../../components/Portal';
 import CopyText from '../../ui/CopyText';
+import { StarIcon } from '../../ui/StarButton';
 
 const CARD_WIDTH = 300;
 const CARD_HEIGHT = 330;
@@ -128,13 +129,17 @@ function Regulars({ load, regulars, onEmail, onOpenCarrier }) {
                 event.stopPropagation();
                 setOpen({ regular, anchor: event.currentTarget.getBoundingClientRect() });
               }}
-              className="inline-flex max-w-full items-center gap-[7px] rounded-full bg-gold/[0.09] py-[5px] pl-1.5 pr-[11px] text-xs text-text-muted shadow-[inset_0_0_0_0.5px_rgb(var(--color-gold)/0.35)] transition-[scale,background-color] duration-300 ease-spring hover:scale-105 hover:bg-gold/[0.18]"
+              className={`inline-flex max-w-full items-center gap-[7px] rounded-full py-[5px] pl-1.5 pr-[11px] text-xs transition-[scale,background-color] duration-300 ease-spring hover:scale-105 ${
+                regular.starred
+                  ? 'bg-gold text-black/70 shadow-[0_0_16px_rgb(var(--color-gold)/0.35)] hover:bg-gold-soft'
+                  : 'bg-gold/[0.09] text-text-muted shadow-[inset_0_0_0_0.5px_rgb(var(--color-gold)/0.35)] hover:bg-gold/[0.18]'
+              }`}
             >
-              <span aria-hidden="true" className="grid h-5 min-w-5 place-items-center rounded-full bg-gold px-1 text-[10px] font-extrabold text-black">
-                {regular.runs}
+              <span aria-hidden="true" className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-extrabold ${regular.starred ? 'bg-black text-gold' : 'bg-gold text-black'}`}>
+                {regular.starred ? <StarIcon filled className="h-3 w-3" /> : regular.runs}
               </span>
-              <b className="truncate font-semibold text-text">{regular.carrierName}</b>
-              <span className="shrink-0">last {formatMoney(regular.lastRate)}</span>
+              <b className={`truncate font-semibold ${regular.starred ? 'text-black' : 'text-text'}`}>{regular.carrierName}</b>
+              <span className="shrink-0">{regular.starred ? `${regular.runs}× · ` : ''}last {formatMoney(regular.lastRate)}</span>
             </button>
           </li>
         ))}

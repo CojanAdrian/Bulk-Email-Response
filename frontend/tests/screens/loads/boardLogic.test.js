@@ -89,7 +89,7 @@ describe('lanesFor', () => {
       { id: 2, origin_city: 'Nowhere', dest_city: 'Chicago', origin_lat: null, origin_lng: null, dest_lat: 41.88, dest_lng: -87.63 },
     ];
     expect(lanesFor(loads, { 1: [{ carrierId: 7 }] })).toEqual([
-      { id: 1, from: [-96.8, 32.78], to: [-87.63, 41.88], fromLabel: 'Dallas', toLabel: 'Chicago', gold: true },
+      { id: 1, from: [-96.8, 32.78], to: [-87.63, 41.88], fromLabel: 'Dallas', toLabel: 'Chicago', gold: true, star: false },
     ]);
   });
 });

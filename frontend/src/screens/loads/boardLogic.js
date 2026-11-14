@@ -16,6 +16,11 @@ export const SORTS = [
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
+// A load at least one of your starred carriers has already run.
+export function hasStarRegular(regulars) {
+  return Array.isArray(regulars) && regulars.some((regular) => regular.starred);
+}
+
 export function hasNoRate(load) {
   return load.target_pay === null || load.target_pay === undefined || load.target_pay === '';
 }
@@ -61,6 +66,7 @@ export function visibleLoads({ loads, status, quick = 'all', query = '', sort = 
     if (load.status !== status) return false;
     if (q && !matchesSearch(load, q)) return false;
     if (quick === 'proven' && !proven[load.id]?.length) return false;
+    if (quick === 'starred' && !hasStarRegular(proven[load.id])) return false;
     if (quick === 'needs_rate' && !hasNoRate(load)) return false;
     return true;
   });
@@ -109,7 +115,7 @@ export function lanesFor(loads, proven = {}) {
     const from = coordinate(load.origin_lng, load.origin_lat);
     const to = coordinate(load.dest_lng, load.dest_lat);
     if (!from || !to) continue;
-    lanes.push({ id: load.id, from, to, fromLabel: load.origin_city, toLabel: load.dest_city, gold: Boolean(proven[load.id]?.length) });
+    lanes.push({ id: load.id, from, to, fromLabel: load.origin_city, toLabel: load.dest_city, gold: Boolean(proven[load.id]?.length), star: hasStarRegular(proven[load.id]) });
   }
   return lanes;
 }
