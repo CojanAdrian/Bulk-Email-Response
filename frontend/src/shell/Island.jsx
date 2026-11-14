@@ -1,14 +1,17 @@
 import { useNavigate } from 'react-router-dom';
 
 const IDLE_SIZE = { width: 204, height: 38 };
+const NOTICE_SIZE = { width: 400, height: 38 };
 const OPEN_SIZE = { width: 440, height: 164 };
 
 // The pill at the top of the window. At rest it shows the inbox state; when
-// an inquiry arrives it springs open with who wrote and what about.
-function Island({ inquiry = null, onDismiss, pendingCount = 0, gmailConnected = null }) {
+// an inquiry arrives it springs open with who wrote and what about. A
+// notice ({ tone, title, detail }) widens it for a short confirmation.
+function Island({ inquiry = null, onDismiss, notice = null, pendingCount = 0, gmailConnected = null }) {
   const navigate = useNavigate();
   const open = inquiry !== null;
-  const size = open ? OPEN_SIZE : IDLE_SIZE;
+  const showNotice = !open && notice !== null;
+  const size = open ? OPEN_SIZE : showNotice ? NOTICE_SIZE : IDLE_SIZE;
   const disconnected = gmailConnected === false;
 
   function view() {
@@ -23,7 +26,17 @@ function Island({ inquiry = null, onDismiss, pendingCount = 0, gmailConnected = 
         open ? 'rounded-[34px]' : 'rounded-[22px]'
       }`}
     >
-      {!open && (
+      {showNotice && (
+        <p role="status" className="absolute inset-0 flex items-center justify-between gap-3 px-[15px] text-xs font-medium">
+          <span className="flex min-w-0 items-center gap-2 text-text">
+            <span aria-hidden="true" className={`h-1.5 w-1.5 shrink-0 rounded-full ${notice.tone === 'error' ? 'bg-hot' : 'bg-success'}`} />
+            <span className="truncate">{notice.title}</span>
+          </span>
+          {notice.detail && <span className="shrink-0 font-semibold text-text-muted">{notice.detail}</span>}
+        </p>
+      )}
+
+      {!open && !showNotice && (
         <button
           type="button"
           onClick={() => navigate('/inquiries')}

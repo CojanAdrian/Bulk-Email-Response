@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import Papa from 'papaparse';
-import { parseMcleodRows, cleanText } from '../lib/mcleodParser';
-import { uploadLoads } from '../api/loads';
+import { importLoads } from '../lib/importLoads';
 import Card from './Card';
 import { UploadIcon } from './icons';
 
@@ -28,58 +26,16 @@ function UploadPanel({ onUploadComplete, headerActions }) {
 
   function handleFile(file) {
     if (!file) return;
-
     setError(null);
     setResult(null);
-    setStatus('parsing');
-
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: 'greedy',
-      transformHeader: (h) => cleanText(h),
-      complete: (results) => {
-        try {
-          const fields = results.meta.fields || [];
-          if (fields.length === 0) {
-            setError('The file appears to be empty or not a valid CSV.');
-            setStatus('idle');
-            return;
-          }
-          const { loads, missing } = parseMcleodRows(fields, results.data);
-          if (missing.length) {
-            setError(`The file is missing required column(s): ${missing.join(', ')}`);
-            setStatus('idle');
-            return;
-          }
-          if (loads.length === 0) {
-            setError('The file contains headers but no usable data rows.');
-            setStatus('idle');
-            return;
-          }
-          submitLoads(loads);
-        } catch (err) {
-          setError('Failed to process the file. Please check its format and try again.');
-          setStatus('idle');
-        }
-      },
-      error: (err) => {
-        setError(`Failed to read file: ${err.message}`);
-        setStatus('idle');
-      },
-    });
-  }
-
-  function submitLoads(loads) {
-    setStatus('uploading');
-    uploadLoads(loads)
+    importLoads(file, { onStage: setStatus })
       .then((data) => {
         setResult(data);
         setStatus('done');
         onUploadComplete();
       })
       .catch((err) => {
-        const detail = err.message || 'Upload failed.';
-        setError(`Upload failed — no loads were saved. ${detail}`);
+        setError(err.message);
         setStatus('idle');
       });
   }

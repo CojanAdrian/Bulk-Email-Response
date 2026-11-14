@@ -116,7 +116,7 @@ function MainToolPage({ username, onLogout }) {
   });
 
   return (
-    <AppShell username={username} onLogout={onLogout}>
+    <AppShell username={username} onLogout={onLogout} onLoadsImported={handleUploadComplete}>
       <div className="relative z-10 min-w-0">
         {!(tab === 'carriers' && carriersView === 'find') && (
           <header className="mx-auto flex w-full max-w-[1400px] items-end justify-between gap-3 px-4 pt-6 sm:px-6 sm:pt-8">

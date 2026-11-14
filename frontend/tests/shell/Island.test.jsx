@@ -4,7 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import Island from '../../src/shell/Island';
 
 function Where() {
-  return <output data-testid="path">{useLocation().pathname}</output>;
+  return <span data-testid="path">{useLocation().pathname}</span>;
 }
 
 function renderIsland(props) {
@@ -50,6 +50,19 @@ describe('Island', () => {
     fireEvent.click(screen.getByRole('button', { name: 'View' }));
     expect(onDismiss).toHaveBeenCalled();
     expect(screen.getByTestId('path')).toHaveTextContent('/inquiries');
+  });
+
+  test('shows a confirmation in place of the inbox state', () => {
+    renderIsland({ notice: { tone: 'success', title: 'board.csv imported', detail: '3 new · 39 updated' }, pendingCount: 6 });
+    expect(screen.getByRole('status')).toHaveTextContent('board.csv imported');
+    expect(screen.getByRole('status')).toHaveTextContent('3 new · 39 updated');
+    expect(screen.queryByText('6 waiting')).not.toBeInTheDocument();
+  });
+
+  test('a new inquiry takes priority over a notice', () => {
+    renderIsland({ notice: { tone: 'success', title: 'board.csv imported' }, inquiry: INQUIRY });
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   test('Later dismisses it and stays on the current screen', () => {
