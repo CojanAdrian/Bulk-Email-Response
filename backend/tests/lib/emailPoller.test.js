@@ -1063,7 +1063,7 @@ describe('emailPoller', () => {
       expect(rows[0].reply_status).toBe('sent');
       expect(rows[1].reply_status).toBe('pending_review');
       expect(rows[1].gmail_checked_at).not.toBeNull();
-      expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith('token', 'answered', 'c@example.com');
+      expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith('token', 'answered', 'c@example.com', expect.any(Date));
     });
   });
 
@@ -1122,5 +1122,25 @@ describe('emailPoller', () => {
     await pollAccount(pool, { ...accountRows[0], auto_send_enabled: 0 });
     const [rows] = await pool.query('SELECT carrier_mcs FROM email_inquiries WHERE email_account_id = ?', [accountId]);
     expect(rows[0].carrier_mcs).toBe('884213');
+  });
+
+  describe('replies to the emails sent from Find trucks on DAT', () => {
+    test('are inquiries about that load, even though you wrote first in the thread', async () => {
+      const [loadRows] = await pool.query("SELECT id FROM loads WHERE load_number = '4521'");
+      await pool.query('INSERT INTO carrier_offers (user_id, load_id, email, gmail_thread_id) VALUES (?, ?, ?, ?)', [userId, loadRows[0].id, 'dispatch@redline.com', 'offer-thread']);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', threadId: 'offer-thread', from: 'Redline <dispatch@redline.com>', to: 'testuser@brokerage.test',
+        subject: 'Re: Load available', body: 'We can do 2400', receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      // Like Gmail: your email to them exists, but nothing sent after theirs.
+      gmailClient.threadHasSentMessage.mockImplementation(async (_token, _thread, _sender, since) => !since);
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, { ...accountRows[0], auto_send_enabled: 0 });
+      const [rows] = await pool.query('SELECT matched_load_id, match_tier, reply_status FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(rows).toEqual([{ matched_load_id: loadRows[0].id, match_tier: 'offer', reply_status: 'pending_review' }]);
+      expect(matchingEngine.matchInquiry).not.toHaveBeenCalled();
+    });
   });
 });

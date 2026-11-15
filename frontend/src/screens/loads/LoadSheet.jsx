@@ -45,7 +45,7 @@ function Window({ label, sched, children }) {
 // on it. It shares the row's layoutId, so it grows out of the row.
 function LoadSheet({
   load, regulars, asking = 0, matchCount = 0, miles = null, busy = false, error = null, pickupValues,
-  onClose, onStatusChange, onIncludeRateChange, onSaveRate, onPickupChange, onBlast, onFindCarriers, onEdit, onDelete, onEmail, onOpenCarrier,
+  onClose, onStatusChange, onIncludeRateChange, onSaveRate, onPickupChange, onBlast, onFindCarriers, onFindDat, onEdit, onDelete, onEmail, onOpenCarrier,
 }) {
   const [rateDraft, setRateDraft] = useState(null); // null = not editing
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -282,6 +282,11 @@ function LoadSheet({
               <button type="button" onClick={() => onBlast(load)} title="Email this load to carriers" className={`${PILL} bg-accent text-accent-ink`}>
                 Blast
               </button>
+              {onFindDat && (
+                <button type="button" onClick={() => onFindDat(load)} title="Search DAT for trucks and email the ones that pass Highway" className={QUIET}>
+                  Trucks on DAT
+                </button>
+              )}
               <button type="button" onClick={() => onFindCarriers(load)} className={QUIET}>
                 Find carriers
               </button>

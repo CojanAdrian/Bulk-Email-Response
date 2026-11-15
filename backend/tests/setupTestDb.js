@@ -6,6 +6,7 @@ function createTestPool() {
 
 async function resetTables(pool) {
   await pool.query('DELETE FROM email_inquiries');
+  await pool.query('DELETE FROM carrier_offers');
   await pool.query('DELETE FROM email_accounts');
   await pool.query('DELETE FROM loads');
   await pool.query('DELETE FROM users');

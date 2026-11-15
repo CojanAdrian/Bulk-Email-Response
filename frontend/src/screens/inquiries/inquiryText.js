@@ -20,6 +20,7 @@ export const TIER_LABELS = {
   city: 'City only',
   state: 'State only',
   manual: 'Matched by you',
+  offer: 'Your DAT email',
   none: 'No match',
 };
 
@@ -73,6 +74,8 @@ export function matchReason(inquiry) {
       return 'They named only a state on this lane. This is a guess, so check it.';
     case 'manual':
       return 'You picked this load.';
+    case 'offer':
+      return 'They replied to the email you sent them about this load from DAT.';
     default:
       return 'Matched to this load.';
   }
@@ -81,7 +84,7 @@ export function matchReason(inquiry) {
 // How sure the match is: 'sure', 'likely' or 'check'.
 export function matchConfidence(inquiry) {
   if (!inquiry.matched_load_id || inquiry.ref_mismatch) return 'check';
-  if (inquiry.match_tier === 'load_number' || inquiry.match_tier === 'manual') return 'sure';
+  if (inquiry.match_tier === 'load_number' || inquiry.match_tier === 'manual' || inquiry.match_tier === 'offer') return 'sure';
   if (inquiry.match_tier === 'city_state') return 'likely';
   return 'check';
 }

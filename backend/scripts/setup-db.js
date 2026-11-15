@@ -226,6 +226,15 @@ async function migrateSchema(databaseName) {
   if (matchTierCol[0] && !matchTierCol[0].COLUMN_TYPE.includes("'manual'")) {
     await conn.query(`ALTER TABLE email_inquiries MODIFY COLUMN match_tier ENUM('load_number','city_state','city','state','manual','none') NOT NULL DEFAULT 'none'`);
   }
+  // 'offer': a carrier replied to the email you sent them about a load from
+  // "Find trucks on DAT" -- the load is known, not guessed.
+  const [offerTierCol] = await conn.query(
+    `SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_inquiries' AND COLUMN_NAME = 'match_tier'`,
+    [databaseName]
+  );
+  if (offerTierCol[0] && !offerTierCol[0].COLUMN_TYPE.includes("'offer'")) {
+    await conn.query(`ALTER TABLE email_inquiries MODIFY COLUMN match_tier ENUM('load_number','city_state','city','state','manual','offer','none') NOT NULL DEFAULT 'none'`);
+  }
 
   await conn.query(`
     CREATE TABLE IF NOT EXISTS carriers (
@@ -366,6 +375,23 @@ async function migrateSchema(databaseName) {
   if (checkedCol[0].count === 0) {
     await conn.query(`ALTER TABLE email_inquiries ADD COLUMN gmail_checked_at DATETIME NULL`);
   }
+
+  // Emails sent to carriers about a load from "Find trucks on DAT".
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS carrier_offers (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      load_id INT NOT NULL,
+      email VARCHAR(255) NOT NULL,
+      carrier_name VARCHAR(255) NULL,
+      carrier_mc VARCHAR(12) NULL,
+      gmail_thread_id VARCHAR(255) NULL,
+      gmail_message_id VARCHAR(255) NULL,
+      sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_offer_load (load_id),
+      KEY idx_offer_thread (gmail_thread_id)
+    )
+  `);
 
   await conn.query(`
     CREATE TABLE IF NOT EXISTS user_settings (

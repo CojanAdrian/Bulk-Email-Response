@@ -13,6 +13,7 @@ import { useShell } from '../../shell/ShellContext';
 import RateModal from '../../components/RateModal';
 import AddLoadModal from '../../components/AddLoadModal';
 import BlastModal from '../../components/BlastModal';
+import DatTrucksSheet from './DatTrucksSheet';
 import BookingCarrierModal from '../../components/BookingCarrierModal';
 import DatExportSection from '../../components/DatExportSection';
 import SelectionBar from './SelectionBar';
@@ -70,6 +71,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   const [editing, setEditing] = useState(null);
   const [adding, setAdding] = useState(false);
   const [blast, setBlast] = useState(null); // { load, emails }
+  const [datFor, setDatFor] = useState(null); // the load being searched for on DAT
   const [booking, setBooking] = useState(null);
   const datExport = useRef(null);
   const fileInput = useRef(null);
@@ -454,6 +456,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             onPickupChange={changePickup}
             onBlast={(load) => setBlast({ load, emails: '' })}
             onFindCarriers={onViewMatches}
+            onFindDat={(load) => setDatFor(load)}
             onEdit={setEditing}
             onDelete={remove}
             onEmail={(load, emails) => setBlast({ load, emails })}
@@ -482,6 +485,16 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             }}
           />
         )}
+        <AnimatePresence>
+          {datFor && (
+            <DatTrucksSheet
+              key={datFor.id}
+              load={datFor}
+              onClose={() => setDatFor(null)}
+              onSent={(count) => count > 0 && shell.notify({ tone: 'success', title: `Emailed ${count} carrier${count === 1 ? '' : 's'}`, detail: datFor.load_number })}
+            />
+          )}
+        </AnimatePresence>
         {blast && <BlastModal load={blast.load} initialShowRate={false} initialEmails={blast.emails} onClose={() => setBlast(null)} />}
         {booking && <BookingCarrierModal load={booking} onClose={() => setBooking(null)} />}
       </AnimatePresence>

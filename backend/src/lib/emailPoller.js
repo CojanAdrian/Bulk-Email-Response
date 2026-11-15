@@ -78,7 +78,7 @@ const CHECK_BATCH = 40;
 // whose thread already has a reply from you to that sender.
 async function closeAnsweredInquiries(pool, account, accessToken, wsHub) {
   const [waiting] = await pool.query(
-    `SELECT id, from_address, gmail_thread_id FROM email_inquiries
+    `SELECT id, from_address, gmail_thread_id, received_at FROM email_inquiries
      WHERE email_account_id = ? AND reply_status = 'pending_review' AND gmail_thread_id IS NOT NULL
      ORDER BY gmail_checked_at IS NOT NULL, gmail_checked_at ASC, received_at DESC
      LIMIT ?`,
@@ -86,7 +86,9 @@ async function closeAnsweredInquiries(pool, account, accessToken, wsHub) {
   );
   for (const inquiry of waiting) {
     const sender = extractEmailAddresses(inquiry.from_address)[0] || '';
-    const answered = sender ? await threadHasSentMessage(accessToken, inquiry.gmail_thread_id, sender) : false;
+    // Only a reply sent after their email arrived answers it (your own
+    // first email about a load, earlier in the thread, does not).
+    const answered = sender ? await threadHasSentMessage(accessToken, inquiry.gmail_thread_id, sender, inquiry.received_at) : false;
     if (answered) {
       await pool.query(
         "UPDATE email_inquiries SET reply_status = 'sent', reply_body = 'Answered in Gmail.', gmail_checked_at = NOW() WHERE id = ?",
@@ -145,10 +147,24 @@ async function pollAccount(pool, account, wsHub) {
     // loads, no network) but its result is only needed early when there's
     // prior same-sender history in this thread to compare against below --
     // memoized so it's computed at most once per message either way.
+    // A reply to an email you sent this carrier about a load (Find trucks on
+    // DAT) is about that load: no guessing, and your own email in the thread
+    // does not count as already having answered them.
+    let offerLoad = null;
+    if (message.threadId) {
+      const [offers] = await pool.query(
+        'SELECT load_id FROM carrier_offers WHERE user_id = ? AND gmail_thread_id = ? ORDER BY sent_at DESC LIMIT 1',
+        [account.user_id, message.threadId]
+      );
+      if (offers.length) offerLoad = loads.find((load) => load.id === offers[0].load_id) || null;
+    }
+
     let cachedMatchResult = null;
     function getMatchResult() {
       if (!cachedMatchResult) {
-        cachedMatchResult = matchInquiry(`${message.subject} ${message.body}`, loads);
+        cachedMatchResult = offerLoad
+          ? { matchedLoad: offerLoad, tier: 'offer', refMismatch: false }
+          : matchInquiry(`${message.subject} ${message.body}`, loads);
       }
       return cachedMatchResult;
     }
@@ -201,7 +217,7 @@ async function pollAccount(pool, account, wsHub) {
       // Any reply you have sent this sender in the thread counts, before or
       // after this message: a conversation you are already in is not a new
       // inquiry.
-      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress);
+      const alreadyAnswered = offerLoad ? false : await threadHasSentMessage(accessToken, message.threadId, senderAddress);
       if (alreadyAnswered) continue;
     }
 

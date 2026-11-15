@@ -11,7 +11,7 @@ export const highwayUrl = (mc) => `https://highway.com/broker/carriers/search-re
 
 const DETECT_MS = 2000;
 
-let state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map() };
+let state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map(), dat: new Map() };
 const listeners = new Set();
 const waiting = []; // lookups asked for before the extension answered
 let started = false;
@@ -38,6 +38,10 @@ function onMessage(event) {
     set({ results: new Map(state.results).set(msg.mc, msg.result) });
   } else if (msg.type === 'login') {
     set({ loginNeeded: Boolean(msg.needed) });
+  } else if (msg.type === 'dat-carriers') {
+    const dat = new Map(state.dat);
+    for (const carrier of msg.carriers || []) if (carrier && carrier.mc) dat.set(carrier.mc, carrier);
+    set({ dat });
   }
 }
 
@@ -116,11 +120,24 @@ export function useCarrierCheck(inquiry) {
   return { ...describeCheck(current, key, mcs), recheck: () => requestCheck(key, mcs, { force: true }) };
 }
 
+// Carriers the extension saw in DAT truck searches since a time (ms).
+export function requestDatCarriers(since) {
+  startCarrierCheck();
+  const msg = { type: 'dat-list', since };
+  if (state.extension === 'present') toExtension(msg);
+  else waiting.push(msg);
+}
+
+// The live carrier-check state, for screens that need all of it.
+export function useCarrierCheckState() {
+  return useSyncExternalStore(subscribe, snapshot, snapshot);
+}
+
 // For tests.
 export function resetCarrierCheck() {
   if (typeof window !== 'undefined') window.removeEventListener('message', onMessage);
   started = false;
   waiting.length = 0;
-  state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map() };
+  state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map(), dat: new Map() };
   listeners.forEach((listener) => listener());
 }
