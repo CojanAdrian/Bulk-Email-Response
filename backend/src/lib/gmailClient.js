@@ -117,8 +117,30 @@ async function threadHasSentMessage(accessToken, threadId, recipientAddress, sin
 // (the HTML part for mail apps that show formatting, such as a Gmail
 // signature with a logo, and the plain part for the rest); without, as
 // plain text. Parts are base64 so any characters survive.
-function buildRawMessage({ to, subject, body, html, inReplyToMessageId }) {
-  const headers = [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0'];
+// A header value with characters outside plain ASCII (→, ·, accents) must be
+// encoded, or mail programs show it garbled ("â†’"). Split into short
+// pieces so no encoded word runs past the line limit.
+function encodeHeader(value) {
+  const text = String(value ?? '');
+  // eslint-disable-next-line no-control-regex
+  if (/^[\x00-\x7F]*$/.test(text)) return text;
+  const pieces = [];
+  let piece = '';
+  for (const char of text) {
+    if (Buffer.byteLength(piece + char, 'utf8') > 42) {
+      pieces.push(piece);
+      piece = '';
+    }
+    piece += char;
+  }
+  if (piece) pieces.push(piece);
+  return pieces.map((p) => `=?UTF-8?B?${Buffer.from(p, 'utf8').toString('base64')}?=`).join('\r\n ');
+}
+
+function buildRawMessage({ to, bcc, subject, body, html, inReplyToMessageId }) {
+  const headers = [`To: ${to}`];
+  if (bcc && bcc.length) headers.push(`Bcc: ${[].concat(bcc).join(', ')}`);
+  headers.push(`Subject: ${encodeHeader(subject)}`, 'MIME-Version: 1.0');
   if (inReplyToMessageId) {
     headers.push(`In-Reply-To: ${inReplyToMessageId}`);
     headers.push(`References: ${inReplyToMessageId}`);
@@ -152,9 +174,9 @@ function buildRawMessage({ to, subject, body, html, inReplyToMessageId }) {
   return Buffer.from(message).toString('base64url');
 }
 
-async function sendReply(accessToken, { to, subject, body, html, threadId, inReplyToMessageId }) {
+async function sendReply(accessToken, { to, bcc, subject, body, html, threadId, inReplyToMessageId }) {
   const gmail = buildGmailClient(accessToken);
-  const requestBody = { raw: buildRawMessage({ to, subject, body, html, inReplyToMessageId }) };
+  const requestBody = { raw: buildRawMessage({ to, bcc, subject, body, html, inReplyToMessageId }) };
   if (threadId) {
     requestBody.threadId = threadId;
   }

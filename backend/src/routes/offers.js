@@ -5,18 +5,15 @@ const { sendReply } = require('../lib/gmailClient');
 const { signedReplyFor } = require('../lib/signature');
 
 // Emailing a load to the carriers found for it on DAT ("Find trucks on
-// DAT"). Each carrier gets their own email from the connected Gmail, signed
-// with the Gmail signature; every one is remembered, so a reply to it
-// becomes an inquiry about this load (see emailPoller) and nobody is
-// emailed twice about the same load.
+// DAT"). One email goes from the connected Gmail to yourself with every
+// carrier in Bcc, signed with the Gmail signature. Each carrier is
+// remembered, so a reply becomes an inquiry about this load (see
+// emailPoller) and nobody is emailed twice about the same load.
 
 const MAX_PER_SEND = 100;
-const PAUSE_MS = 250; // between emails, so Gmail does not see a burst
 const EMAIL_RE = /^[^@\s<>,;]+@[^@\s<>,;]+\.[^@\s<>,;]+$/;
 
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-function createOffersRouter(pool, { pauseMs = PAUSE_MS } = {}) {
+function createOffersRouter(pool) {
   const router = express.Router();
 
   async function ownLoad(req, loadId) {
@@ -58,28 +55,37 @@ function createOffersRouter(pool, { pauseMs = PAUSE_MS } = {}) {
     const accessToken = await getAccessToken(account.refresh_token);
     const signed = await signedReplyFor(account, accessToken, String(body).trim());
     const results = [];
+    const toSend = [];
     for (const recipient of recipients) {
       const email = String(recipient?.email || '').trim().toLowerCase();
       if (!EMAIL_RE.test(email)) {
         results.push({ email, ok: false, error: 'Not a valid email address.' });
-        continue;
-      }
-      if (alreadySent.has(email)) {
+      } else if (alreadySent.has(email)) {
         results.push({ email, ok: false, skipped: true, error: 'Already emailed about this load.' });
-        continue;
+      } else if (!toSend.some((r) => r.email === email)) {
+        toSend.push({ email, name: recipient.name || null, mc: recipient.mc || null });
       }
+    }
+    if (toSend.length) {
+      // One email to yourself with every carrier in Bcc: nobody sees the others.
       try {
-        if (results.some((r) => r.ok)) await sleep(pauseMs);
-        const sent = await sendReply(accessToken, { to: email, subject: String(subject).trim(), body: signed.text, html: signed.html });
-        await pool.query(
-          `INSERT INTO carrier_offers (user_id, load_id, email, carrier_name, carrier_mc, gmail_thread_id, gmail_message_id)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-          [req.session.userId, load.id, email, recipient.name || null, recipient.mc || null, sent?.threadId || null, sent?.id || null]
-        );
-        alreadySent.add(email);
-        results.push({ email, ok: true });
+        const sent = await sendReply(accessToken, {
+          to: account.gmail_address,
+          bcc: toSend.map((r) => r.email),
+          subject: String(subject).trim(),
+          body: signed.text,
+          html: signed.html,
+        });
+        for (const r of toSend) {
+          await pool.query(
+            `INSERT INTO carrier_offers (user_id, load_id, email, carrier_name, carrier_mc, gmail_thread_id, gmail_message_id)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.session.userId, load.id, r.email, r.name, r.mc, sent?.threadId || null, sent?.id || null]
+          );
+          results.push({ email: r.email, ok: true });
+        }
       } catch (err) {
-        results.push({ email, ok: false, error: err.message || 'Could not send.' });
+        for (const r of toSend) results.push({ email: r.email, ok: false, error: err.message || 'Could not send.' });
       }
     }
     return res.json({ results, sent: results.filter((r) => r.ok).length });

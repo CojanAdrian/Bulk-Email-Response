@@ -48,19 +48,25 @@ describe('emailing a load to carriers found on DAT', () => {
   const send = (recipients, extra = {}) =>
     agent.post('/api/offers').send({ load_id: loadId, subject: 'Load available: Chicago, IL → Dallas, TX', body: 'PU: CHICAGO, IL', recipients, ...extra });
 
-  test('sends each carrier their own signed email and remembers it', async () => {
+  test('sends one signed email to yourself with every carrier in Bcc, and remembers each', async () => {
     const res = await send([
       { email: 'Dispatch@Redline.com', name: 'REDLINE HAUL', mc: '884213' },
+      { email: 'ops@northstar.com', name: 'NORTHSTAR', mc: '671905' },
       { email: 'ops@northstar.com', name: 'NORTHSTAR', mc: '671905' },
     ]);
     expect(res.status).toBe(200);
     expect(res.body.sent).toBe(2);
-    expect(gmailClient.sendReply).toHaveBeenCalledTimes(2);
-    expect(gmailClient.sendReply.mock.calls[0][1]).toMatchObject({ to: 'dispatch@redline.com', subject: 'Load available: Chicago, IL → Dallas, TX', body: 'PU: CHICAGO, IL\n\nKenny' });
+    expect(gmailClient.sendReply).toHaveBeenCalledTimes(1);
+    expect(gmailClient.sendReply.mock.calls[0][1]).toMatchObject({
+      to: 'kenny@brokerage.test',
+      bcc: ['dispatch@redline.com', 'ops@northstar.com'],
+      subject: 'Load available: Chicago, IL → Dallas, TX',
+      body: 'PU: CHICAGO, IL\n\nKenny',
+    });
     const [rows] = await pool.query('SELECT email, carrier_mc, gmail_thread_id FROM carrier_offers WHERE load_id = ? ORDER BY id', [loadId]);
     expect(rows).toEqual([
       { email: 'dispatch@redline.com', carrier_mc: '884213', gmail_thread_id: 't1' },
-      { email: 'ops@northstar.com', carrier_mc: '671905', gmail_thread_id: 't2' },
+      { email: 'ops@northstar.com', carrier_mc: '671905', gmail_thread_id: 't1' },
     ]);
     const list = await agent.get(`/api/offers?load_id=${loadId}`);
     expect(list.body.map((row) => row.email).sort()).toEqual(['dispatch@redline.com', 'ops@northstar.com']);
@@ -78,13 +84,16 @@ describe('emailing a load to carriers found on DAT', () => {
     expect(gmailClient.sendReply).not.toHaveBeenCalled();
   });
 
-  test('one failed send does not stop the rest', async () => {
-    gmailClient.sendReply.mockRejectedValueOnce(new Error('Gmail said no')).mockResolvedValueOnce({ id: 'm2', threadId: 't2' });
+  test('a failed send is reported for every carrier and nobody is marked as emailed', async () => {
+    gmailClient.sendReply.mockRejectedValueOnce(new Error('Gmail said no'));
     const res = await send([{ email: 'a@x.com' }, { email: 'b@x.com' }]);
+    expect(res.body.sent).toBe(0);
     expect(res.body.results).toEqual([
       { email: 'a@x.com', ok: false, error: 'Gmail said no' },
-      { email: 'b@x.com', ok: true },
+      { email: 'b@x.com', ok: false, error: 'Gmail said no' },
     ]);
+    const [rows] = await pool.query('SELECT * FROM carrier_offers WHERE load_id = ?', [loadId]);
+    expect(rows).toEqual([]);
   });
 
   test('another user\'s load is not found', async () => {

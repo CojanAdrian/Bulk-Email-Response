@@ -481,3 +481,22 @@ describe('markMessageRead', () => {
     });
   });
 });
+
+describe('building the email', () => {
+  const { buildRawMessage } = require('../../src/lib/gmailClient');
+  const decode = (raw) => Buffer.from(raw, 'base64url').toString('utf8');
+
+  test('a subject with → and · is encoded, so it is not shown garbled', () => {
+    const text = decode(buildRawMessage({ to: 'a@x.com', subject: 'Load available: Van Nuys, CA → Chandler, AZ · PU Nov 15 · VR', body: 'b' }));
+    const header = text.split('\r\n\r\n')[0];
+    expect(header).not.toMatch(/→|·/);
+    const words = [...header.matchAll(/=\?UTF-8\?B\?([^?]+)\?=/g)].map((m) => Buffer.from(m[1], 'base64').toString('utf8'));
+    expect(words.join('')).toBe('Load available: Van Nuys, CA → Chandler, AZ · PU Nov 15 · VR');
+    expect(header.split('\r\n').every((line) => line.length <= 78)).toBe(true);
+  });
+
+  test('a plain subject stays as it is, and Bcc lists every carrier', () => {
+    const text = decode(buildRawMessage({ to: 'me@x.com', bcc: ['a@x.com', 'b@x.com'], subject: 'Hello', body: 'b' }));
+    expect(text).toContain('To: me@x.com\r\nBcc: a@x.com, b@x.com\r\nSubject: Hello\r\n');
+  });
+});
