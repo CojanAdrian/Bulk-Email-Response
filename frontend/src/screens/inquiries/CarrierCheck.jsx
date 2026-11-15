@@ -3,8 +3,8 @@ import { EXTENSION_URL, openOnHighway } from '../../lib/carrierCheck';
 // How each Highway outcome looks: a short label for rows, a headline and a
 // line of advice for the opened inquiry.
 const LOOK = {
-  pass: { short: 'Pass', title: 'Passes your Highway rules', advice: 'Good to work with.', tone: 'text-success', fill: 'bg-success/15', ring: 'ring-success/30', icon: 'check' },
-  partial: { short: 'Partial', title: 'Partially passes', advice: 'Review the carrier on Highway before you book.', tone: 'text-gold', fill: 'bg-gold/15', ring: 'ring-gold/30', icon: 'half' },
+  pass: { short: 'Pass', title: 'Passes your Highway rules', advice: 'Good to work with.', tone: 'text-[rgb(96,165,250)]', fill: 'bg-[rgba(96,165,250,0.15)]', ring: 'ring-[rgba(96,165,250,0.35)]', icon: 'check' },
+  partial: { short: 'Partial', title: 'Partially passes', advice: 'Review the carrier on Highway before you book.', tone: 'text-success', fill: 'bg-success/15', ring: 'ring-success/30', icon: 'half' },
   fail: { short: 'Fail', title: 'Fails your Highway rules', advice: 'Do not book this carrier.', tone: 'text-hot', fill: 'bg-hot/15', ring: 'ring-hot/40', icon: 'cross' },
   not_found: { short: 'Not on Highway', title: 'Not on Highway', advice: 'No carrier with this MC# on Highway. Ask them to set up.', tone: 'text-warning', fill: 'bg-warning/10', ring: 'ring-warning/25', icon: 'question' },
   other: { short: 'Check', title: 'Unusual assessment', advice: 'Open it on Highway to see why.', tone: 'text-warning', fill: 'bg-warning/10', ring: 'ring-warning/25', icon: 'question' },
