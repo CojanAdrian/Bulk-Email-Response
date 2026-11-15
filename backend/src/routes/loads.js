@@ -267,6 +267,11 @@ function createLoadsRouter(pool, wsHub) {
     }
     values.push(req.params.id);
     await pool.query(`UPDATE loads SET ${updates.join(', ')} WHERE id = ?`, values);
+    // Back to active means it was not booked after all: its run comes off
+    // the carrier's history too, so the carrier no longer shows this load.
+    if (body.status === 'active' && existing.status !== 'active') {
+      await pool.query('DELETE FROM carrier_lane_history WHERE load_id = ?', [req.params.id]);
+    }
     const [rows] = await pool.query('SELECT * FROM loads WHERE id = ?', [req.params.id]);
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', { loadId: rows[0].id });
     res.json(presentLoad(rows[0]));
@@ -331,6 +336,16 @@ function createLoadsRouter(pool, wsHub) {
       : `UPDATE loads SET ${setClause} WHERE id IN (${placeholders}) AND user_id = ?`;
     const params = isAdmin ? [status, status, ...ids] : [status, status, ...ids, req.session.userId];
     const [result] = await pool.query(sql, params);
+    // Loads moved back to active come off their carriers' history (only
+    // loads this user may change).
+    if (status === 'active') {
+      await pool.query(
+        isAdmin
+          ? `DELETE FROM carrier_lane_history WHERE load_id IN (${placeholders})`
+          : `DELETE h FROM carrier_lane_history h JOIN loads l ON l.id = h.load_id WHERE h.load_id IN (${placeholders}) AND l.user_id = ?`,
+        isAdmin ? ids : [...ids, req.session.userId]
+      );
+    }
     if (wsHub) wsHub.emitToUser(req.session.userId, 'load:changed', {});
     res.json({ updated: result.affectedRows });
   }));

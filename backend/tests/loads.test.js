@@ -353,6 +353,50 @@ describe('loads routes', () => {
     });
   });
 
+  describe('putting a booked load back to active', () => {
+    async function bookedWithRun(number) {
+      const [load] = await pool.query('INSERT INTO loads (load_number, origin_city, user_id, status) VALUES (?, ?, ?, ?)', [number, 'Dallas', userId, 'booked']);
+      const [carrier] = await pool.query("INSERT INTO carriers (user_id, company_name, mc_number) VALUES (?, 'ABC Trucking', '884213')", [userId]);
+      const [history] = await pool.query(
+        `INSERT INTO carrier_lane_history (carrier_id, user_id, load_id, origin_city, origin_state, dest_city, dest_state)
+         VALUES (?, ?, ?, 'Dallas', 'TX', 'Chicago', 'IL')`,
+        [carrier.insertId, userId, load.insertId]
+      );
+      return { loadId: load.insertId, carrierId: carrier.insertId, historyId: history.insertId };
+    }
+    const historyExists = async (id) => (await pool.query('SELECT id FROM carrier_lane_history WHERE id = ?', [id]))[0].length === 1;
+
+    test('takes the load off the carrier history, and keeps the carrier', async () => {
+      const { loadId, carrierId, historyId } = await bookedWithRun('L1001');
+      const res = await agent.patch(`/api/loads/${loadId}`).send({ status: 'active' });
+      expect(res.status).toBe(200);
+      expect(await historyExists(historyId)).toBe(false);
+      const [carriers] = await pool.query('SELECT id FROM carriers WHERE id = ?', [carrierId]);
+      expect(carriers).toHaveLength(1);
+    });
+
+    test('covered keeps the carrier history', async () => {
+      const { loadId, historyId } = await bookedWithRun('L1002');
+      await agent.patch(`/api/loads/${loadId}`).send({ status: 'covered' });
+      expect(await historyExists(historyId)).toBe(true);
+    });
+
+    test('editing other fields of a booked load keeps its history', async () => {
+      const { loadId, historyId } = await bookedWithRun('L1003');
+      await agent.patch(`/api/loads/${loadId}`).send({ comment: 'note' });
+      expect(await historyExists(historyId)).toBe(true);
+    });
+
+    test('bulk back to active clears the history of those loads only', async () => {
+      const first = await bookedWithRun('L1004');
+      const other = await bookedWithRun('L1005');
+      const res = await agent.post('/api/loads/bulk-status').send({ ids: [first.loadId], status: 'active' });
+      expect(res.status).toBe(200);
+      expect(await historyExists(first.historyId)).toBe(false);
+      expect(await historyExists(other.historyId)).toBe(true);
+    });
+  });
+
   describe('POST /bulk-delete', () => {
     test('rejects unauthenticated requests', async () => {
       const res = await request(app).post('/api/loads/bulk-delete').send({ ids: [1] });

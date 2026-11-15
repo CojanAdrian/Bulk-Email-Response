@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { listCarriers, deleteCarrier, updateCarrier } from '../../api/carriers';
 import { getCarrierMatchesForLoad, searchCarrierMatches } from '../../api/carrierMatches';
 import { useHotkeys } from '../../lib/useHotkeys';
+import { subscribe } from '../../lib/liveSocket';
 import { EQUIPMENT_OPTIONS } from '../../lib/equipmentOptions';
 import { useScreenMap } from '../../map/useScreenMap';
 import CarrierSheet from '../../components/CarrierSheet';
@@ -122,6 +123,8 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
   const [editing, setEditing] = useState(null); // null, 'new' or a carrier
   const [deleting, setDeleting] = useState(false);
   const [savedTick, setSavedTick] = useState(0);
+  // Loads changing (booked, back to active, deleted) change carriers' runs.
+  useEffect(() => subscribe('load:changed', () => setSavedTick((t) => t + 1)), []);
 
   const [lane, setLane] = useState(() => laneFromLoad(focusedLoad));
   const [results, setResults] = useState(null); // { laneMatches, regionalMatches, queryOrigin, queryDest }
@@ -149,7 +152,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
       ignore = true;
       clearTimeout(timer);
     };
-  }, [query]);
+  }, [query, savedTick]);
 
   function runSearch(request) {
     setSearchStatus('loading');
@@ -191,7 +194,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
   const shownId = openId ?? hoverId;
   useEffect(() => {
     if (shownId) histories.ensure(shownId);
-  }, [shownId, histories]);
+  }, [shownId, histories, savedTick]);
 
   const matches = results ? [...(results.laneMatches || []), ...(results.regionalMatches || [])] : [];
   const queryLane = results?.queryOrigin && results?.queryDest

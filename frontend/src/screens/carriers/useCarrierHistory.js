@@ -1,5 +1,6 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { listCarrierHistory } from '../../api/carriers';
+import { subscribe } from '../../lib/liveSocket';
 import { laneFromRow } from '../../map/useScreenMap';
 
 // Carriers' lane histories, fetched once each and remembered, so hovering
@@ -7,6 +8,17 @@ import { laneFromRow } from '../../map/useScreenMap';
 export function useCarrierHistory() {
   const cache = useRef(new Map());
   const [, setVersion] = useState(0);
+
+  // A load booked, deleted or put back to active changes carriers' runs, so
+  // remembered histories are dropped and fetched again when next needed.
+  useEffect(
+    () =>
+      subscribe('load:changed', () => {
+        cache.current.clear();
+        setVersion((v) => v + 1);
+      }),
+    []
+  );
 
   const ensure = useCallback((carrierId) => {
     if (!carrierId || cache.current.has(carrierId)) return;
