@@ -251,7 +251,7 @@ function DatTrucksSheet({ load, onClose, onSent }) {
       <div className="mt-5 rounded-[20px] bg-white/[0.045] px-5 py-4">
         <p className="text-[14px] font-semibold">One-time setup</p>
         <p className="mt-1.5 text-[13px] leading-snug text-text-muted">
-          MC Check needs to see one truck search on DAT to learn how DAT searches. Open DAT, search this exact lane once, and that is it. From then on BulkPosting searches DAT by itself and you never need to open it.
+          MC Check needs to see one truck search on DAT to learn how DAT searches. Open DAT, click Search Trucks, enter this exact lane (origin, destination, equipment, date) and press Search. That is it. From then on BulkPosting searches DAT by itself and you never need to open it.
         </p>
         <p className="mt-3 rounded-[14px] bg-black/30 px-3.5 py-2.5 font-mono text-[12.5px]">{laneText(load)}</p>
         {check.datLearnError && (
