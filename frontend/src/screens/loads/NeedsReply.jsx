@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import RelativeTime from '../../components/RelativeTime';
 
-const SHOWN = 4;
+const SHOWN = 3;
 
 function senderName(fromAddress) {
   const text = String(fromAddress || '');
@@ -9,12 +9,13 @@ function senderName(fromAddress) {
   return (named ? named[1] : text).trim() || 'Unknown sender';
 }
 
-// The inquiries waiting on a reply, oldest first, beside the board.
+// The newest inquiries waiting on a reply, beside the board.
 // Hovering one points the map at the load it is about.
 function NeedsReply({ inquiries, onHoverLoad }) {
   const navigate = useNavigate();
   if (!inquiries.length) return null;
   const extra = inquiries.length - SHOWN;
+  const newest = [...inquiries].sort((a, b) => String(b.received_at).localeCompare(String(a.received_at)));
 
   return (
     <section aria-label="Inquiries waiting for a reply">
@@ -23,11 +24,11 @@ function NeedsReply({ inquiries, onHoverLoad }) {
         <span className="text-hot">{inquiries.length}</span>
       </h2>
       <ul className="space-y-2">
-        {inquiries.slice(0, SHOWN).map((inquiry, index) => (
+        {newest.slice(0, SHOWN).map((inquiry, index) => (
           <li key={inquiry.id} style={{ animationDelay: `${index * 90}ms` }} className="motion-safe:animate-[slide-in_900ms_var(--spring)_both]">
             <button
               type="button"
-              onClick={() => navigate('/inquiries')}
+              onClick={() => navigate(`/inquiries/${inquiry.id}`)}
               onPointerEnter={() => onHoverLoad(inquiry.matched_load_id ?? null)}
               onPointerLeave={() => onHoverLoad(null)}
               className="mat block w-full rounded-[20px] px-4 py-[13px] text-left transition-[scale,translate] duration-300 ease-spring hover:-translate-x-1.5 hover:scale-[1.03]"

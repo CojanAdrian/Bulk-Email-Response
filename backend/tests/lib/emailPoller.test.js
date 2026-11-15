@@ -9,7 +9,7 @@ const { extractEmailAddresses: realExtractEmailAddresses } = jest.requireActual(
 const matchingEngine = require('../../src/lib/matchingEngine');
 const bcrypt = require('bcrypt');
 const { createTestPool, resetTables } = require('../setupTestDb');
-const { pollAccount, pollAllAccounts } = require('../../src/lib/emailPoller');
+const { pollAccount, pollAllAccounts, closeAnsweredInquiries, looksLikeLoadQuestion, isListMail } = require('../../src/lib/emailPoller');
 
 describe('emailPoller', () => {
   let pool;
@@ -725,7 +725,7 @@ describe('emailPoller', () => {
       await pollAccount(pool, accountRows[0]);
 
       expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith(
-        'fresh-access-token', 't1', 'carrierb@example.com', new Date('2026-08-08T08:00:00Z')
+        'fresh-access-token', 't1', 'carrierb@example.com'
       );
     });
 
@@ -1005,5 +1005,65 @@ describe('emailPoller', () => {
     consoleErrorSpy.mockRestore();
 
     expect(googleOAuth.getAccessToken).toHaveBeenCalledTimes(2);
+  });
+
+  describe('only real inquiries', () => {
+    async function pollWith(message, match) {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({ id: 'm1', to: 'testuser@example.com', receivedAt: new Date('2026-08-08T08:00:00Z'), ...message });
+      matchingEngine.matchInquiry.mockReturnValue(match);
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+      const [rows] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      return rows;
+    }
+
+    test('skips your own messages', async () => {
+      const rows = await pollWith({ from: 'Me <testuser@example.com>', subject: 'Load 4521', body: 'rate?' }, { matchedLoad: { id: 1 }, tier: 'load_number' });
+      expect(rows).toHaveLength(0);
+    });
+
+    test('skips unmatched mail that is not about freight', async () => {
+      const rows = await pollWith({ from: 'friend@example.com', subject: 'Dinner Friday', body: 'See you at 7' }, { matchedLoad: null, tier: 'none' });
+      expect(rows).toHaveLength(0);
+    });
+
+    test('keeps unmatched mail that asks about freight, so you can pick the load', async () => {
+      const rows = await pollWith({ from: 'carrier@example.com', subject: 'Truck available', body: 'Empty in Ohio, any loads going west?' }, { matchedLoad: null, tier: 'none' });
+      expect(rows).toHaveLength(1);
+    });
+
+    test('skips list mail unless it names one of your load numbers', async () => {
+      const news = await pollWith({ from: 'news@board.com', listId: '<weekly.board.com>', subject: 'Dallas, TX rates this week', body: 'Rates are up' }, { matchedLoad: { id: 1 }, tier: 'city_state' });
+      expect(news).toHaveLength(0);
+    });
+
+    test('helpers', () => {
+      expect(looksLikeLoadQuestion({ subject: 'Re: 0091335', body: 'what does it pay?' })).toBe(true);
+      expect(looksLikeLoadQuestion({ subject: 'Hello', body: 'happy birthday' })).toBe(false);
+      expect(isListMail({ precedence: 'bulk' })).toBe(true);
+      expect(isListMail({})).toBe(false);
+    });
+  });
+
+  describe('closeAnsweredInquiries', () => {
+    test('closes a waiting inquiry you already answered in Gmail and stamps the rest as checked', async () => {
+      const insert = (msg, thread) =>
+        pool.query(
+          "INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, received_at, gmail_thread_id, reply_status) VALUES (?, ?, ?, ?, NOW(), ?, 'pending_review')",
+          [userId, accountId, msg, 'Carrier <c@example.com>', thread]
+        );
+      await insert('a', 'answered');
+      await insert('b', 'open');
+      gmailClient.threadHasSentMessage.mockImplementation(async (_t, thread) => thread === 'answered');
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await closeAnsweredInquiries(pool, accountRows[0], 'token', null);
+      const [rows] = await pool.query('SELECT gmail_message_id, reply_status, gmail_checked_at FROM email_inquiries ORDER BY gmail_message_id');
+      expect(rows[0].reply_status).toBe('sent');
+      expect(rows[1].reply_status).toBe('pending_review');
+      expect(rows[1].gmail_checked_at).not.toBeNull();
+      expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith('token', 'answered', 'c@example.com');
+    });
   });
 });

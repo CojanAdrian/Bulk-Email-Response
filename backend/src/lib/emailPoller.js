@@ -19,6 +19,53 @@ function isAddressedOnlyToAccount(message, accountEmail) {
   return recipients.length > 0 && recipients.every((address) => address === ownEmail);
 }
 
+function isFromAccount(message, accountEmail) {
+  const sender = extractEmailAddresses(message.from)[0] || '';
+  return sender !== '' && sender === String(accountEmail || '').toLowerCase();
+}
+
+// Newsletters and mailing lists mark themselves with List-Id or a bulk
+// Precedence header.
+function isListMail(message) {
+  return Boolean(message.listId) || /^(bulk|list|junk)$/i.test(String(message.precedence || '').trim());
+}
+
+// Words a carrier uses when asking about freight. Mail that matched no load
+// and has none of these is not an inquiry.
+const LOAD_QUESTION = /\b(loads?|rate|rates|available|avail|truck|trucks|pay|pays|lane|still|book|cover|covered|pick ?up|pu|delivery|del|ref|reference|mc|equipment|reefer|van|flatbed|interested|dispatch|miles?|mi|lbs|weight)\b|\$\s?\d/i;
+
+function looksLikeLoadQuestion(message) {
+  return LOAD_QUESTION.test(`${message.subject || ''} ${message.body || ''}`);
+}
+
+const CHECK_BATCH = 40;
+
+// Inquiries you answered straight from Gmail leave the Waiting list: each
+// poll looks at the waiting inquiries checked longest ago and closes any
+// whose thread already has a reply from you to that sender.
+async function closeAnsweredInquiries(pool, account, accessToken, wsHub) {
+  const [waiting] = await pool.query(
+    `SELECT id, from_address, gmail_thread_id FROM email_inquiries
+     WHERE email_account_id = ? AND reply_status = 'pending_review' AND gmail_thread_id IS NOT NULL
+     ORDER BY gmail_checked_at IS NOT NULL, gmail_checked_at ASC, received_at DESC
+     LIMIT ?`,
+    [account.id, CHECK_BATCH]
+  );
+  for (const inquiry of waiting) {
+    const sender = extractEmailAddresses(inquiry.from_address)[0] || '';
+    const answered = sender ? await threadHasSentMessage(accessToken, inquiry.gmail_thread_id, sender) : false;
+    if (answered) {
+      await pool.query(
+        "UPDATE email_inquiries SET reply_status = 'sent', reply_body = 'Answered in Gmail.', gmail_checked_at = NOW() WHERE id = ?",
+        [inquiry.id]
+      );
+      if (wsHub) wsHub.emitToUser(account.user_id, 'inquiry:updated', { id: inquiry.id, reply_status: 'sent', reply_body: 'Answered in Gmail.' });
+    } else {
+      await pool.query('UPDATE email_inquiries SET gmail_checked_at = NOW() WHERE id = ?', [inquiry.id]);
+    }
+  }
+}
+
 async function pollAccount(pool, account, wsHub) {
   if (!account.last_polled_at) {
     // First-ever poll for this account: listNewMessageIds(token, null) queries
@@ -56,6 +103,9 @@ async function pollAccount(pool, account, wsHub) {
     if (looksLikeAutomatedNotification(message)) {
       continue;
     }
+
+    // Your own messages are never an inquiry.
+    if (isFromAccount(message, account.gmail_address)) continue;
 
     // matchInquiry is cheap (local regex against the already-fetched active
     // loads, no network) but its result is only needed early when there's
@@ -114,11 +164,20 @@ async function pollAccount(pool, account, wsHub) {
       // threadHasSentMessage) -- otherwise the shared-thread blast quirk
       // above would make every carrier's message look pre-answered the
       // moment the account replies to just one of them.
-      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress, message.receivedAt);
+      // Any reply you have sent this sender in the thread counts, before or
+      // after this message: a conversation you are already in is not a new
+      // inquiry.
+      const alreadyAnswered = await threadHasSentMessage(accessToken, message.threadId, senderAddress);
       if (alreadyAnswered) continue;
     }
 
     const { matchedLoad, tier, refMismatch } = getMatchResult();
+
+    // Mail that matched no load is kept only when it reads like a question
+    // about freight; list mail only when it names one of your loads.
+    if (!matchedLoad && !looksLikeLoadQuestion(message)) continue;
+    if (isListMail(message) && tier !== 'load_number') continue;
+
     const status = matchedLoad ? 'matched' : 'needs_review';
 
     // Only an exact load-number match is confident enough to auto-send without a
@@ -209,6 +268,12 @@ async function pollAccount(pool, account, wsHub) {
   }
 
   await pool.query('UPDATE email_accounts SET last_polled_at = NOW() WHERE id = ?', [account.id]);
+
+  try {
+    await closeAnsweredInquiries(pool, account, accessToken, wsHub);
+  } catch (err) {
+    console.error(`Failed to check answered inquiries for account ${account.id}:`, err);
+  }
 }
 
 async function pollAllAccounts(pool, wsHub) {
@@ -222,4 +287,4 @@ async function pollAllAccounts(pool, wsHub) {
   }
 }
 
-module.exports = { pollAccount, pollAllAccounts };
+module.exports = { pollAccount, pollAllAccounts, closeAnsweredInquiries, looksLikeLoadQuestion, isListMail };

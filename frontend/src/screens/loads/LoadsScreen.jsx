@@ -47,7 +47,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
   const location = useLocation();
   const shell = useShell();
   const board = useBoard(refreshKey);
-  const { loads, proven, matches, asking, waiting, reload } = board;
+  const { loads, proven, matches, asking, askingNewest, waiting, reload } = board;
 
   const [tab, setTab] = useState('active');
   const [quick, setQuick] = usePersistentState('loadsTable.quickFilter', 'all');
@@ -411,6 +411,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                     onEmail={(target, emails) => setBlast({ load: target, emails })}
                     onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
                     onToggleRate={changeIncludeRate}
+                    onOpenAsking={(load) => askingNewest[load.id] && navigate(`/inquiries/${askingNewest[load.id].id}`)}
                   />
               ))}
             </ul>

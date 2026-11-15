@@ -61,6 +61,9 @@ async function getMessage(accessToken, messageId) {
     to: getHeader('To'),
     cc: getHeader('Cc'),
     subject: getHeader('Subject'),
+    // Mailing-list markers: newsletters and bulk mail carry these.
+    listId: getHeader('List-Id'),
+    precedence: getHeader('Precedence'),
     body: extractPlainTextBody(res.data.payload),
     receivedAt: new Date(Number(res.data.internalDate)),
   };

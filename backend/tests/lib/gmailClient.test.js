@@ -130,6 +130,8 @@ describe('getMessage', () => {
       id: 'm1',
       threadId: 't1',
       messageIdHeader: '<abc123@mail.gmail.com>',
+      listId: '',
+      precedence: '',
       from: 'carrier@example.com',
       to: 'broker@example.com',
       cc: 'dispatch@carrier.com',

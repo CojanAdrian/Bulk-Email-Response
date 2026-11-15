@@ -35,6 +35,11 @@ describe('RelativeTime', () => {
     expect(el.className).toMatch(/text-warning/);
   });
 
+  test('shows days once a day has passed', () => {
+    render(<RelativeTime value="2026-07-10T12:00:00Z" />);
+    expect(screen.getByText('22d ago')).toBeInTheDocument();
+  });
+
   test('shows red past 60 minutes, with hours and minutes', () => {
     render(<RelativeTime value="2026-08-01T10:15:00Z" />);
     const el = screen.getByText('1h 45m ago');

@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { motion } from 'framer-motion';
 import RelativeTime from '../../components/RelativeTime';
 import SelectionCircle from '../../components/SelectionCircle';
@@ -15,7 +16,8 @@ const STATUS_TONE = {
 
 // One email on the Inquiries list. Waiting ones show how long they have
 // waited; the rest show what happened to them.
-function InquiryRow({ inquiry, showStatus, current, selecting, selected, onOpen, onHover, onToggleSelect }) {
+// Waiting ones can be sent or rejected right here, without opening them.
+function InquiryRow({ inquiry, showStatus, current, selecting, selected, busy = false, canSend = false, onOpen, onHover, onToggleSelect, onSend, onReject }) {
   const lane = inquiry.matched_load_origin_city && inquiry.matched_load_dest_city ? `${inquiry.matched_load_origin_city} → ${inquiry.matched_load_dest_city}` : null;
   const multiStop = detectMultiStop(inquiryLoad(inquiry));
   const stopTone = multiStopTagVariant(inquiryLoad(inquiry)) === 'error' ? 'bg-hot/15 text-hot' : 'bg-white text-black';
@@ -68,10 +70,33 @@ function InquiryRow({ inquiry, showStatus, current, selecting, selected, onOpen,
         <div className="flex flex-col items-end gap-1.5 text-right">
           <RelativeTime value={inquiry.received_at} className="text-[11.5px] font-medium" />
           {showStatus && <span className={`rounded-full px-2 py-px text-[11px] font-semibold ${STATUS_TONE[inquiry.reply_status] || STATUS_TONE.none}`}>{STATUS_LABELS[inquiry.reply_status] || inquiry.reply_status}</span>}
+          {waiting && !selecting && onSend && (
+            <span className="mt-1 flex gap-1.5" onClick={(event) => event.stopPropagation()} onKeyDown={(event) => event.stopPropagation()}>
+              <button
+                type="button"
+                onClick={() => onReject(inquiry)}
+                disabled={busy}
+                aria-label={`Reject the inquiry from ${senderName(inquiry.from_address)}`}
+                className="rounded-full px-2.5 py-1 text-[11.5px] font-semibold text-text-muted transition-colors hover:bg-error-bg hover:text-error disabled:opacity-50"
+              >
+                Reject
+              </button>
+              <button
+                type="button"
+                onClick={() => onSend(inquiry)}
+                disabled={busy || !canSend}
+                title={canSend ? 'Send the reply written from the load' : 'No reply written yet. Open it to write one.'}
+                aria-label={`Send the reply to ${senderName(inquiry.from_address)}`}
+                className="rounded-full bg-white px-3 py-1 text-[11.5px] font-bold text-black transition-[transform,opacity] hover:scale-[1.04] disabled:opacity-40 disabled:hover:scale-100"
+              >
+                {busy ? 'Sending…' : 'Send'}
+              </button>
+            </span>
+          )}
         </div>
       </motion.div>
     </li>
   );
 }
 
-export default InquiryRow;
+export default memo(InquiryRow);

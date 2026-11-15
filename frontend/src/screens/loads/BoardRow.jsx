@@ -66,7 +66,7 @@ function LaneArrow() {
 
 // One load on the board. Clicking it (or Enter) opens the load; the row
 // itself grows into the detail sheet, which shares its layoutId.
-function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecting, selected, onOpen, onHover, onToggleSelect, onEmail, onOpenCarrier, onToggleRate }) {
+function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecting, selected, onOpen, onHover, onToggleSelect, onEmail, onOpenCarrier, onToggleRate, onOpenAsking }) {
   const proven = Boolean(regulars?.length);
   const starRun = hasStarRegular(regulars);
   const pickup = schedule(load.early_pu, load.late_pu);
@@ -166,7 +166,23 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
             <span className={rateHidden ? 'line-through decoration-1' : ''}>{hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}</span>
             {rateHidden && <span className="sr-only">, hidden from replies</span>}
           </p>
-          {asking > 0 && <p className="mt-0.5 text-[11.5px] font-semibold text-hot">{asking} asking</p>}
+          {asking > 0 &&
+            (onOpenAsking ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenAsking(load);
+                }}
+                onKeyDown={(event) => event.stopPropagation()}
+                title={asking === 1 ? 'Open the email' : 'Open the newest email'}
+                className="-mr-1.5 mt-0.5 rounded-full px-1.5 py-px text-[11.5px] font-semibold text-hot underline-offset-2 hover:bg-hot/15 hover:underline focus-visible:bg-hot/15"
+              >
+                {asking} asking
+              </button>
+            ) : (
+              <p className="mt-0.5 text-[11.5px] font-semibold text-hot">{asking} asking</p>
+            ))}
         </div>
       </motion.div>
     </li>

@@ -76,6 +76,34 @@ describe('inquiries routes', () => {
     expect(res.body[1].subject).toBe('Older inquiry');
   });
 
+  test('limit caps how many inquiries come back, newest first', async () => {
+    for (let n = 1; n <= 5; n += 1) {
+      await pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)
+         VALUES (?, ?, ?, 'c@example.com', ?, ?, 'none', 'needs_review')`,
+        [userId, accountId, `m${n}`, `Inquiry ${n}`, `2026-08-0${n} 08:00:00`]
+      );
+    }
+    const res = await agent.get('/api/inquiries?limit=2');
+    expect(res.body.map((row) => row.subject)).toEqual(['Inquiry 5', 'Inquiry 4']);
+  });
+
+  test('waiting leaves out inquiries about loads that are no longer active', async () => {
+    const [active] = await pool.query("INSERT INTO loads (user_id, load_number, status) VALUES (?, 'A1', 'active')", [userId]);
+    const [covered] = await pool.query("INSERT INTO loads (user_id, load_number, status) VALUES (?, 'C1', 'covered')", [userId]);
+    const add = (msg, loadId) =>
+      pool.query(
+        `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, matched_load_id, match_tier, status, reply_status)
+         VALUES (?, ?, ?, 'c@example.com', ?, NOW(), ?, 'load_number', 'matched', 'pending_review')`,
+        [userId, accountId, msg, msg, loadId]
+      );
+    await add('about-active', active.insertId);
+    await add('about-covered', covered.insertId);
+    await add('about-deleted', 999999);
+    const res = await agent.get('/api/inquiries?reply_status=pending_review');
+    expect(res.body.map((row) => row.subject)).toEqual(['about-active']);
+  });
+
   test('supports order=oldest for the review queue, without changing the default newest-first order', async () => {
     await pool.query(
       `INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, match_tier, status)

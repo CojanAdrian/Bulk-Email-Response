@@ -16,6 +16,9 @@ import InboxCard from './InboxCard';
 import { useInquiries } from './useInquiries';
 import { draftFor, matchesSearch } from './inquiryText';
 
+// Rows drawn at a time; more appear as you scroll.
+const PAGE = 50;
+
 const HOW_STEPS = ['Carrier emails', 'Matched to your load', 'You check and send'];
 
 // The three steps every inquiry goes through, in one line.
@@ -58,6 +61,24 @@ function InquiriesScreen({ refreshKey }) {
 
   const source = tab === 'waiting' ? queue : all;
   const rows = useMemo(() => source.filter((inquiry) => matchesSearch(inquiry, query.trim().toLowerCase())), [source, query]);
+  const [shownCount, setShownCount] = useState(PAGE);
+  const shown = useMemo(() => rows.slice(0, shownCount), [rows, shownCount]);
+  const moreRef = useRef(null);
+
+  useEffect(() => {
+    setShownCount(PAGE);
+  }, [tab, query]);
+
+  // Draws the next batch when the end of the list scrolls into view.
+  useEffect(() => {
+    const sentinel = moreRef.current;
+    if (!sentinel || typeof IntersectionObserver === 'undefined') return undefined;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) setShownCount((count) => count + PAGE);
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [shown.length, rows.length]);
   const openId = openIdFrom(location.pathname);
   const open = openId === null ? null : all.find((inquiry) => inquiry.id === openId) || null;
   const current = rows.find((inquiry) => inquiry.id === currentId) || null;
@@ -65,13 +86,13 @@ function InquiriesScreen({ refreshKey }) {
   // One lane per load, however many emails are about it.
   const lanes = useMemo(() => {
     const byLoad = new Map();
-    for (const inquiry of rows) {
+    for (const inquiry of shown) {
       if (!inquiry.matched_load_id || byLoad.has(inquiry.matched_load_id)) continue;
       const lane = laneFromRow(inquiry.matched_load_id, inquiry, { prefix: 'matched_load_' });
       if (lane) byLoad.set(inquiry.matched_load_id, lane);
     }
     return [...byLoad.values()];
-  }, [rows]);
+  }, [shown]);
   const focusInquiry = open || current;
   const { widest } = useScreenMap({ lanes, focusId: focusInquiry?.matched_load_id ?? null, rightColumn: true, sheetOpen: Boolean(open) });
 
@@ -97,29 +118,39 @@ function InquiriesScreen({ refreshKey }) {
     else close();
   }
 
-  function send(inquiry) {
+  function send(inquiry, { stay = false } = {}) {
     setBusyId(inquiry.id);
     setActionError(null);
     sendInquiryReply(inquiry.id, draftOf(inquiry))
       .then((updated) => {
         replace(updated || { id: inquiry.id, reply_status: 'sent' });
-        advance(inquiry.id);
+        if (!stay) advance(inquiry.id);
       })
       .catch((err) => setActionError(err.message || 'Failed to send the reply.'))
       .finally(() => setBusyId(null));
   }
 
-  function reject(inquiry) {
+  function reject(inquiry, { stay = false } = {}) {
     setBusyId(inquiry.id);
     setActionError(null);
     rejectInquiry(inquiry.id)
       .then((updated) => {
         replace(updated || { id: inquiry.id, reply_status: 'rejected' });
-        advance(inquiry.id);
+        if (!stay) advance(inquiry.id);
       })
       .catch((err) => setActionError(err.message || 'Failed to reject the inquiry.'))
       .finally(() => setBusyId(null));
   }
+
+  // Handlers handed to the rows stay the same between renders, so a row
+  // only redraws when its own inquiry changes.
+  const latest = useRef({});
+  latest.current = { send, reject, navigate, toggle: selection.toggle };
+  const rowOpen = useCallback((inquiry) => latest.current.navigate(`/inquiries/${inquiry.id}`), []);
+  const rowHover = useCallback((inquiry) => setCurrentId(inquiry.id), []);
+  const rowToggle = useCallback((id) => latest.current.toggle(id), []);
+  const rowSend = useCallback((inquiry) => latest.current.send(inquiry, { stay: true }), []);
+  const rowReject = useCallback((inquiry) => latest.current.reject(inquiry, { stay: true }), []);
 
   function reassign(inquiry, loadId) {
     setActionError(null);
@@ -197,7 +228,7 @@ function InquiriesScreen({ refreshKey }) {
               }}
               options={[
                 { value: 'waiting', label: 'Waiting', count: queue.length },
-                { value: 'all', label: 'All', count: all.length },
+                { value: 'all', label: 'Recent', count: all.length },
               ]}
             />
             {tab === 'waiting' && queue.length > 0 && (
@@ -265,7 +296,7 @@ function InquiriesScreen({ refreshKey }) {
         {status === 'ready' && source.length > 0 && rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-text-muted">No inquiries match "{query}".</p>}
         {rows.length > 0 && (
           <ul aria-label="Inquiries">
-            {rows.map((inquiry) => (
+            {shown.map((inquiry) => (
               <InquiryRow
                 key={inquiry.id}
                 inquiry={inquiry}
@@ -273,11 +304,20 @@ function InquiriesScreen({ refreshKey }) {
                 current={currentId === inquiry.id}
                 selecting={selection.active}
                 selected={selection.isSelected(inquiry.id)}
-                onOpen={openInquiry}
-                onHover={(item) => setCurrentId(item.id)}
-                onToggleSelect={selection.toggle}
+                busy={busyId === inquiry.id}
+                canSend={Boolean(String(draftOf(inquiry) || '').trim())}
+                onOpen={rowOpen}
+                onHover={rowHover}
+                onToggleSelect={rowToggle}
+                onSend={rowSend}
+                onReject={rowReject}
               />
             ))}
+            {shown.length < rows.length && (
+              <li ref={moreRef} className="px-4 py-4 text-center text-xs text-text-muted">
+                Showing {shown.length} of {rows.length}
+              </li>
+            )}
           </ul>
         )}
       </ScreenPanel>

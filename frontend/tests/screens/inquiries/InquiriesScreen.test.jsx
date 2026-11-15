@@ -78,10 +78,34 @@ describe('InquiriesScreen', () => {
     expect(within(rows[0]).getByText('No load matched')).toBeInTheDocument();
   });
 
+  test('a waiting inquiry can be sent from the list without opening it', async () => {
+    inquiriesApi.sendInquiryReply.mockResolvedValue({ ...OLDER, reply_status: 'sent' });
+    renderScreen();
+    await screen.findByText('Redline Haul');
+    fireEvent.click(screen.getByRole('button', { name: 'Send the reply to Redline Haul' }));
+    await waitFor(() => expect(inquiriesApi.sendInquiryReply).toHaveBeenCalledWith(1, OLDER.live_reply_body));
+    await waitFor(() => expect(screen.getAllByTestId('inquiry-row')).toHaveLength(1));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  test('a waiting inquiry can be rejected from the list', async () => {
+    inquiriesApi.rejectInquiry.mockResolvedValue({ ...OLDER, reply_status: 'rejected' });
+    renderScreen();
+    await screen.findByText('Redline Haul');
+    fireEvent.click(screen.getByRole('button', { name: 'Reject the inquiry from Redline Haul' }));
+    await waitFor(() => expect(inquiriesApi.rejectInquiry).toHaveBeenCalledWith(1));
+  });
+
+  test('Send is off for an inquiry with no reply written', async () => {
+    renderScreen();
+    await screen.findByText('Redline Haul');
+    expect(screen.getByRole('button', { name: 'Send the reply to ops@northstar.com' })).toBeDisabled();
+  });
+
   test('All shows every inquiry with what happened to it', async () => {
     renderScreen();
     await screen.findByText('Redline Haul');
-    fireEvent.click(screen.getByRole('button', { name: /^all 3$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^recent 3$/i }));
     expect(screen.getAllByTestId('inquiry-row')).toHaveLength(3);
     expect(screen.getByText('Sent')).toBeInTheDocument();
   });

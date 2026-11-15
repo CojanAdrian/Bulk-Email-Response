@@ -1,6 +1,6 @@
 import { describe, test, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent, within } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 import LoadsScreen from '../../../src/screens/loads/LoadsScreen';
 import ShellContext from '../../../src/shell/ShellContext';
 import { getState, resetMapStore } from '../../../src/map/mapStore';
@@ -35,12 +35,17 @@ const REGULAR = { carrierId: 7, carrierName: 'Redline Haul', runs: 4, lastRanAt:
 let shell;
 let onViewMatches;
 
+function Where() {
+  return <p data-testid="where">{useLocation().pathname}</p>;
+}
+
 function renderScreen(start = '/loads') {
   return render(
     <MemoryRouter initialEntries={[start]}>
       <ShellContext.Provider value={shell}>
         <LoadsScreen refreshKey={0} onViewMatches={onViewMatches} />
       </ShellContext.Provider>
+      <Where />
     </MemoryRouter>
   );
 }
@@ -138,6 +143,17 @@ describe('LoadsScreen', () => {
       renderScreen();
       expect(await screen.findByText('2 asking')).toBeInTheDocument();
     });
+
+    test('clicking "asking" opens the newest email about the load', async () => {
+      inquiriesApi.listInquiries.mockResolvedValue([
+        { id: 5, matched_load_id: 1, from_address: 'a@x.com', subject: 'Re: L1001', received_at: '2026-11-14T09:00:00Z' },
+        { id: 6, matched_load_id: 1, from_address: 'b@x.com', subject: 'L1001?', received_at: '2026-11-14T10:00:00Z' },
+      ]);
+      renderScreen();
+      fireEvent.click(await screen.findByRole('button', { name: '2 asking' }));
+      expect(screen.getByTestId('where')).toHaveTextContent('/inquiries/6');
+    });
+
 
     test('draws a lane on the map for each listed load that has coordinates', async () => {
       renderScreen();

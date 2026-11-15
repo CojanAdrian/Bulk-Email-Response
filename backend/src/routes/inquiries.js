@@ -15,6 +15,8 @@ function createInquiriesRouter(pool, wsHub) {
 
   router.get('/', asyncHandler(async (req, res) => {
     const { reply_status, order } = req.query;
+    // At most this many rows; the full history can be thousands.
+    const limit = Math.min(Math.max(Number(req.query.limit) || 0, 0), 1000);
     const params = [req.session.userId];
     let sql = `
       SELECT ei.*, ${INQUIRY_JOIN_FIELDS}
@@ -25,11 +27,21 @@ function createInquiriesRouter(pool, wsHub) {
       sql += ' AND ei.reply_status = ?';
       params.push(reply_status);
     }
+    // A waiting inquiry about a load that is covered, booked or deleted
+    // cannot be answered any more, so it leaves the queue (it stays in the
+    // full history).
+    if (reply_status === 'pending_review') {
+      sql += " AND (ei.matched_load_id IS NULL OR l.status = 'active')";
+    }
     // The review queue (a work queue) requests oldest-first so the most
     // overdue inquiry sorts to the top; every other caller (the inquiry
     // log) keeps the default newest-first, since that's a log meant to be
     // read most-recent-first.
-    sql += order === 'oldest' ? ' ORDER BY ei.received_at ASC' : ' ORDER BY ei.received_at DESC';
+    sql += order === 'oldest' ? ' ORDER BY ei.received_at ASC, ei.id ASC' : ' ORDER BY ei.received_at DESC, ei.id DESC';
+    if (limit > 0) {
+      sql += ' LIMIT ?';
+      params.push(limit);
+    }
     const [rows] = await pool.query(sql, params);
     res.json(rows.map(attachLiveReplyBody));
   }));

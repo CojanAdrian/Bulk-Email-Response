@@ -91,13 +91,19 @@ export function useBoard(refreshKey) {
     };
   }, []);
 
-  const asking = useMemo(() => {
+  // How many waiting emails ask about each load, and the newest of them
+  // (what "N asking" opens).
+  const { asking, askingNewest } = useMemo(() => {
     const counts = {};
+    const newest = {};
     for (const inquiry of waiting) {
-      if (inquiry.matched_load_id) counts[inquiry.matched_load_id] = (counts[inquiry.matched_load_id] || 0) + 1;
+      const id = inquiry.matched_load_id;
+      if (!id) continue;
+      counts[id] = (counts[id] || 0) + 1;
+      if (!newest[id] || String(inquiry.received_at) > String(newest[id].received_at)) newest[id] = inquiry;
     }
-    return counts;
+    return { asking: counts, askingNewest: newest };
   }, [waiting]);
 
-  return { loads, status, error, matches, proven, waiting, asking, reload };
+  return { loads, status, error, matches, proven, waiting, asking, askingNewest, reload };
 }

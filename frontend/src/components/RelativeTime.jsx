@@ -32,6 +32,7 @@ function formatRelative(ms) {
   if (minutes < 1) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
+  if (hours >= 24) return `${Math.floor(hours / 24)}d ago`;
   const remainderMinutes = minutes % 60;
   return remainderMinutes === 0 ? `${hours}h ago` : `${hours}h ${remainderMinutes}m ago`;
 }

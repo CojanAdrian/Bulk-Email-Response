@@ -347,6 +347,16 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE carriers ADD COLUMN starred TINYINT(1) NOT NULL DEFAULT 0`);
   }
 
+  // When a waiting inquiry's Gmail thread was last checked for a reply you
+  // sent from Gmail itself (see closeAnsweredInquiries in emailPoller.js).
+  const [checkedCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_inquiries' AND COLUMN_NAME = 'gmail_checked_at'`,
+    [databaseName]
+  );
+  if (checkedCol[0].count === 0) {
+    await conn.query(`ALTER TABLE email_inquiries ADD COLUMN gmail_checked_at DATETIME NULL`);
+  }
+
   await conn.query(`
     CREATE TABLE IF NOT EXISTS user_settings (
       user_id INT PRIMARY KEY,

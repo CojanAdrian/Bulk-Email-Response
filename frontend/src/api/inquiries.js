@@ -1,9 +1,10 @@
 import { get, post, patch } from './client';
 
-export function listInquiries(replyStatus, { order } = {}) {
+export function listInquiries(replyStatus, { order, limit } = {}) {
   const params = new URLSearchParams();
   if (replyStatus) params.set('reply_status', replyStatus);
   if (order) params.set('order', order);
+  if (limit) params.set('limit', String(limit));
   const query = params.toString();
   return get(`/api/inquiries${query ? `?${query}` : ''}`);
 }
