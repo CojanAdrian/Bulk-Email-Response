@@ -1,7 +1,7 @@
 // BulkPosting desktop: the BulkPosting website in its own window, with a
 // desktop shortcut and native notifications. Everything else (loads,
 // inquiries, Gmail) works exactly as on the website, against the same server.
-const { app, BrowserWindow, Menu, shell, ipcMain, nativeTheme, screen } = require('electron');
+const { app, BrowserWindow, WebContentsView, Menu, shell, ipcMain, nativeTheme, screen, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { normalizeAddress, isInsideApp } = require('./address');
@@ -32,7 +32,16 @@ function writeConfig(change) {
 
 const address = () => normalizeAddress(readConfig().address) || BUILT_IN_ADDRESS;
 
-let win = null;
+let win = null; // the window: its own page is the title bar
+let web = null; // BulkPosting, in a view below the title bar
+
+const TITLE_BAR = 36;
+const webPreferences = () => ({
+  preload: path.join(__dirname, 'preload.js'),
+  contextIsolation: true,
+  sandbox: true,
+  spellcheck: true,
+});
 
 const GOOGLE_SIGN_IN = /^(accounts\.google\.com|accounts\.youtube\.com|myaccount\.google\.com|ogs\.google\.com|ssl\.gstatic\.com|www\.gstatic\.com|apis\.google\.com|play\.google\.com)$/i;
 
@@ -65,8 +74,8 @@ function page(name) {
 
 function openApp() {
   const origin = address();
-  if (!origin) return win.loadFile(page('setup.html'));
-  return win.loadURL(origin);
+  if (!origin) return web.loadFile(page('setup.html'));
+  return web.loadURL(origin);
 }
 
 // The window comes back where and how big it was.
@@ -91,20 +100,55 @@ function createWindow() {
     icon: path.join(__dirname, 'build', 'icon.png'),
     autoHideMenuBar: true,
     show: false,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      sandbox: true,
-      spellcheck: true,
-    },
+    // A custom black title bar; Windows still draws the minimize, maximize
+    // and close buttons, in the app's colours.
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#000000', symbolColor: '#a3a39e', height: TITLE_BAR },
+    webPreferences: webPreferences(),
   });
-  if (maximized) win.maximize();
   win.setMenuBarVisibility(false);
+  win.loadFile(page('titlebar.html'));
+
+  const view = new WebContentsView({ webPreferences: webPreferences() });
+  view.setBackgroundColor('#000000');
+  win.contentView.addChildView(view);
+  web = view.webContents;
+
+  // The view fills the window below the title bar (all of it in full screen).
+  const layout = () => {
+    const [width, height] = win.getContentSize();
+    const top = win.isFullScreen() ? 0 : TITLE_BAR;
+    view.setBounds({ x: 0, y: top, width, height: Math.max(0, height - top) });
+  };
+  layout();
+  for (const event of ['resize', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen', 'restore']) win.on(event, layout);
+  if (maximized) win.maximize();
+
+  // The title bar shows the page's title ("(16) BulkPosting": 16 waiting)
+  // and dims when the window is not in front.
+  const tellTitleBar = (channel, value) => {
+    if (!win.isDestroyed()) win.webContents.send(channel, value);
+  };
+  web.on('page-title-updated', (_event, title) => {
+    win.setTitle(title);
+    tellTitleBar('desktop:title', title);
+  });
+  win.on('focus', () => tellTitleBar('desktop:focus', true));
+  win.on('blur', () => tellTitleBar('desktop:focus', false));
+  win.webContents.on('did-finish-load', () => tellTitleBar('desktop:title', web.getTitle() || 'BulkPosting'));
+  win.on('focus', () => web.focus());
+
+  // Save the login to disk right away (not only every so often), so
+  // reopening the app finds you signed in even after a crash.
+  const saveCookies = () => web.session.cookies.flushStore().catch(() => {});
+  web.on('did-finish-load', saveCookies);
+  web.on('did-navigate-in-page', saveCookies);
+  win.on('close', saveCookies);
 
   // BulkPosting can tell it runs in the desktop app.
-  const baseAgent = win.webContents.getUserAgent();
-  win.webContents.setUserAgent(`${plainChrome(baseAgent)} BulkPostingDesktop/${app.getVersion()}`);
-  win.webContents.session.webRequest.onBeforeSendHeaders({ urls: ['https://*.google.com/*', 'https://*.gstatic.com/*', 'https://*.youtube.com/*'] }, (details, callback) => {
+  const baseAgent = web.getUserAgent();
+  web.setUserAgent(`${plainChrome(baseAgent)} BulkPostingDesktop/${app.getVersion()}`);
+  web.session.webRequest.onBeforeSendHeaders({ urls: ['https://*.google.com/*', 'https://*.gstatic.com/*', 'https://*.youtube.com/*'] }, (details, callback) => {
     callback({ requestHeaders: { ...details.requestHeaders, 'User-Agent': plainChrome(baseAgent) } });
   });
 
@@ -118,7 +162,7 @@ function createWindow() {
 
   // Links to other sites (Gmail compose, Highway, Google sign-in) open in
   // your normal browser; BulkPosting's own pages stay in the window.
-  win.webContents.setWindowOpenHandler(({ url }) => {
+  web.setWindowOpenHandler(({ url }) => {
     const origin = address();
     if (origin && isInsideApp(url, origin)) return { action: 'allow' };
     if (/^https?:|^mailto:/i.test(url)) shell.openExternal(url);
@@ -127,7 +171,7 @@ function createWindow() {
   // Sign-in with Google and Connect Gmail go through BulkPosting's server
   // (/api/...) and Google's sign-in pages, then come back: those stay in the
   // window. Any other site opens in the browser.
-  win.webContents.on('will-navigate', (event, url) => {
+  web.on('will-navigate', (event, url) => {
     if (url.startsWith('file:')) return;
     const origin = address();
     if (origin && isInsideApp(url, origin)) return;
@@ -137,21 +181,21 @@ function createWindow() {
   });
 
   // No server: a quiet screen with Try again and Change address.
-  win.webContents.on('did-fail-load', (_event, code, _description, url, isMainFrame) => {
+  web.on('did-fail-load', (_event, code, _description, url, isMainFrame) => {
     if (!isMainFrame || code === -3 || url.startsWith('file:')) return; // -3: navigation replaced
-    win.loadFile(page('offline.html'));
+    web.loadFile(page('offline.html'));
   });
 
   // Right-click: copy, paste and spelling, like a browser.
-  win.webContents.on('context-menu', (_event, params) => {
+  web.on('context-menu', (_event, params) => {
     const items = [];
     for (const suggestion of params.dictionarySuggestions || []) {
-      items.push({ label: suggestion, click: () => win.webContents.replaceMisspelling(suggestion) });
+      items.push({ label: suggestion, click: () => web.replaceMisspelling(suggestion) });
     }
     if (items.length) items.push({ type: 'separator' });
     if (params.isEditable) items.push({ role: 'cut' }, { role: 'copy' }, { role: 'paste' }, { role: 'selectAll' });
     else if (params.selectionText) items.push({ role: 'copy' });
-    if (params.linkURL) items.push({ label: 'Copy link', click: () => require('electron').clipboard.writeText(params.linkURL) });
+    if (params.linkURL) items.push({ label: 'Copy link', click: () => clipboard.writeText(params.linkURL) });
     if (items.length) Menu.buildFromTemplate(items).popup({ window: win });
   });
 
@@ -165,15 +209,15 @@ function setMenu() {
       {
         label: 'BulkPosting',
         submenu: [
-          { label: 'Change BulkPosting address…', accelerator: 'CmdOrCtrl+Shift+A', click: () => win && win.loadFile(page('setup.html')) },
+          { label: 'Change BulkPosting address…', accelerator: 'CmdOrCtrl+Shift+A', click: () => web && web.loadFile(page('setup.html')) },
           { type: 'separator' },
-          { role: 'reload' },
-          { role: 'forceReload' },
-          { role: 'toggleDevTools' },
+          { label: 'Reload', accelerator: 'CmdOrCtrl+R', click: () => web && web.reload() },
+          { label: 'Reload ignoring cache', accelerator: 'CmdOrCtrl+Shift+R', click: () => web && web.reloadIgnoringCache() },
+          { label: 'Developer tools', accelerator: 'CmdOrCtrl+Shift+I', click: () => web && web.toggleDevTools() },
           { type: 'separator' },
-          { role: 'resetZoom' },
-          { role: 'zoomIn' },
-          { role: 'zoomOut' },
+          { label: 'Actual size', accelerator: 'CmdOrCtrl+0', click: () => web && web.setZoomLevel(0) },
+          { label: 'Zoom in', accelerator: 'CmdOrCtrl+=', click: () => web && web.setZoomLevel(web.getZoomLevel() + 0.5) },
+          { label: 'Zoom out', accelerator: 'CmdOrCtrl+-', click: () => web && web.setZoomLevel(web.getZoomLevel() - 0.5) },
           { role: 'togglefullscreen' },
           { type: 'separator' },
           { role: 'quit' },
@@ -196,7 +240,7 @@ ipcMain.handle('desktop:set-address', (_event, input) => {
   return { ok: true, address: origin };
 });
 ipcMain.handle('desktop:retry', () => openApp());
-ipcMain.handle('desktop:change-address', () => win.loadFile(page('setup.html')));
+ipcMain.handle('desktop:change-address', () => web.loadFile(page('setup.html')));
 
 // One window: opening the app again brings it to the front.
 if (!app.requestSingleInstanceLock()) {
@@ -206,6 +250,7 @@ if (!app.requestSingleInstanceLock()) {
     if (!win) return;
     if (win.isMinimized()) win.restore();
     win.focus();
+    web.focus();
   });
   app.setAppUserModelId('com.bulkposting.desktop'); // Windows notifications show "BulkPosting"
   nativeTheme.themeSource = 'dark';

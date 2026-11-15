@@ -95,13 +95,40 @@ function UsMap() {
       pointer[1] = event.clientY / height - 0.5;
     }
 
-    function drawLand(k, now, ripples) {
+    // The land (dots, borders, state codes) only changes when the camera
+    // moves, so it is drawn into its own canvas and reused frame after
+    // frame; the lanes and their animations are drawn fresh on top.
+    function drawStaticLand(c, k) {
       const size = 1.5 / Math.sqrt(k);
-      ctx.fillStyle = `rgba(${WHITE},.11)`;
-      ctx.beginPath();
-      for (const [x, y] of shapes.dots) ctx.rect(x, y, size, size);
-      ctx.fill();
+      c.fillStyle = `rgba(${WHITE},.11)`;
+      c.beginPath();
+      for (const [x, y] of shapes.dots) c.rect(x, y, size, size);
+      c.fill();
 
+      c.lineWidth = 0.7 / k;
+      c.strokeStyle = `rgba(${WHITE},.09)`;
+      c.stroke(shapes.borders);
+      c.lineWidth = 1 / k;
+      c.strokeStyle = `rgba(${WHITE},.2)`;
+      c.stroke(shapes.nation);
+
+      // Codes stay about the same size on screen as the camera zooms.
+      const shrink = Math.pow(k, -0.75);
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      c.fillStyle = `rgba(${WHITE},.46)`;
+      if ('letterSpacing' in c) c.letterSpacing = `${LABEL_TRACKING * shrink}px`;
+      let font = '';
+      for (const label of shapes.labels) {
+        const next = `700 ${(label.size * shrink).toFixed(2)}px ${LABEL_FAMILY}`;
+        if (next !== font) c.font = font = next;
+        c.fillText(label.text, label.x, label.y);
+      }
+      if ('letterSpacing' in c) c.letterSpacing = '0px';
+    }
+
+    function drawRipples(k, now, ripples) {
+      const size = 1.5 / Math.sqrt(k);
       for (const wave of ripples) {
         const age = (now - wave.startedAt) / RIPPLE_MS;
         if (age < 0 || age > 1) continue;
@@ -115,27 +142,26 @@ function UsMap() {
         }
         ctx.fill();
       }
+    }
 
-      ctx.lineWidth = 0.7 / k;
-      ctx.strokeStyle = `rgba(${WHITE},.09)`;
-      ctx.stroke(shapes.borders);
-      ctx.lineWidth = 1 / k;
-      ctx.strokeStyle = `rgba(${WHITE},.2)`;
-      ctx.stroke(shapes.nation);
+    // The stored land picture and what it was drawn for.
+    const land = { canvas: document.createElement('canvas'), key: '' };
 
-      // Codes stay about the same size on screen as the camera zooms.
-      const shrink = Math.pow(k, -0.75);
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.fillStyle = `rgba(${WHITE},.46)`;
-      if ('letterSpacing' in ctx) ctx.letterSpacing = `${LABEL_TRACKING * shrink}px`;
-      let font = '';
-      for (const label of shapes.labels) {
-        const next = `700 ${(label.size * shrink).toFixed(2)}px ${LABEL_FAMILY}`;
-        if (next !== font) ctx.font = font = next;
-        ctx.fillText(label.text, label.x, label.y);
+    function landFor(k, baseX, baseY) {
+      const key = [k.toFixed(5), baseX.toFixed(2), baseY.toFixed(2), camera.x.toFixed(3), camera.y.toFixed(3), canvas.width, canvas.height].join('|');
+      if (land.key === key) return land.canvas;
+      const c = land.canvas.getContext('2d');
+      if (land.canvas.width !== canvas.width || land.canvas.height !== canvas.height) {
+        land.canvas.width = canvas.width;
+        land.canvas.height = canvas.height;
+      } else {
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.clearRect(0, 0, land.canvas.width, land.canvas.height);
       }
-      if ('letterSpacing' in ctx) ctx.letterSpacing = '0px';
+      c.setTransform(dpr * k, 0, 0, dpr * k, dpr * (baseX - camera.x * k), dpr * (baseY - camera.y * k));
+      drawStaticLand(c, k);
+      land.key = key;
+      return land.canvas;
     }
 
     // rest: how visible a lane is when nothing is focused. A full board
@@ -218,14 +244,24 @@ function UsMap() {
       camera.x += (target.x - camera.x) * ease;
       camera.y += (target.y - camera.y) * ease;
       camera.k += (target.k - camera.k) * ease;
+      // Close enough: settle exactly, so a still map is not redrawn.
+      if (Math.abs(target.x - camera.x) < 0.02 && Math.abs(target.y - camera.y) < 0.02 && Math.abs(target.k - camera.k) < 0.0002) {
+        camera.x = target.x;
+        camera.y = target.y;
+        camera.k = target.k;
+      }
 
       const { left, right } = insets;
       const freeLeft = left;
       const freeRight = Math.max(freeLeft + 320, width - right);
       const fit = Math.min((freeRight - freeLeft) / MAP_WIDTH, (height - 210) / MAP_HEIGHT);
       const k = Math.max(fit, 0.2) * camera.k;
-      const anchorX = (freeLeft + freeRight) / 2 - (still ? 0 : pointer[0] * 14);
-      const anchorY = height * 0.48 - (still ? 0 : pointer[1] * 10);
+      const baseX = (freeLeft + freeRight) / 2;
+      const baseY = height * 0.48;
+      const driftX = still ? 0 : -pointer[0] * 14;
+      const driftY = still ? 0 : -pointer[1] * 10;
+      const anchorX = baseX + driftX;
+      const anchorY = baseY + driftY;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       ctx.clearRect(0, 0, width, height);
@@ -236,7 +272,12 @@ function UsMap() {
       ctx.fillRect(0, 0, width, height);
 
       ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (anchorX - camera.x * k), dpr * (anchorY - camera.y * k));
-      if (shapes) drawLand(k, now, ripples);
+      if (shapes) {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.drawImage(landFor(k, baseX, baseY), Math.round(driftX * dpr), Math.round(driftY * dpr));
+        ctx.setTransform(dpr * k, 0, 0, dpr * k, dpr * (anchorX - camera.x * k), dpr * (anchorY - camera.y * k));
+        if (ripples.length) drawRipples(k, now, ripples);
+      }
       const rest = Math.max(0.08, Math.min(0.3, 14 / Math.max(lanes.length, 1)));
       lanes.forEach((lane, index) => drawLane(lane, index, k, now, focusId, rest));
     }

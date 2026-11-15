@@ -2,7 +2,7 @@ import CopyText from '../ui/CopyText';
 
 // Where the Windows installer is published (GitHub Releases of this repo).
 export const DESKTOP_DOWNLOAD_URL = 'https://github.com/CojanAdrian/Bulk-Email-Response/releases/latest/download/BulkPosting-Setup.exe';
-const SIZE = '83 MB';
+const SIZE = '116 MB';
 
 // "BulkPostingDesktop/1.0.0" in the user agent: this page is open inside the
 // desktop app.

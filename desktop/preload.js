@@ -9,4 +9,7 @@ contextBridge.exposeInMainWorld('bulkpostingDesktop', {
   setAddress: (address) => ipcRenderer.invoke('desktop:set-address', address),
   retry: () => ipcRenderer.invoke('desktop:retry'),
   changeAddress: () => ipcRenderer.invoke('desktop:change-address'),
+  // For the title bar.
+  onTitle: (fn) => ipcRenderer.on('desktop:title', (_event, title) => fn(title)),
+  onFocus: (fn) => ipcRenderer.on('desktop:focus', (_event, focused) => fn(focused)),
 });

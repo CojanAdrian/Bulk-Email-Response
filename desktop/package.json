@@ -1,7 +1,7 @@
 {
   "name": "bulkposting-desktop",
   "productName": "BulkPosting",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "BulkPosting as a desktop app.",
   "main": "main.js",
   "private": true,
@@ -12,7 +12,7 @@
     "dist": "electron-builder --win nsis --publish never"
   },
   "devDependencies": {
-    "electron": "33.2.1",
+    "electron": "44.11.3",
     "electron-builder": "25.1.8"
   },
   "build": {
@@ -43,6 +43,6 @@
     }
   },
   "allowScripts": {
-    "electron@33.2.1": true
+    "electron@44.11.3": true
   }
 }

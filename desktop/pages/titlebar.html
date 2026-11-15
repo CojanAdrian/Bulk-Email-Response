@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'" />
+  <title>BulkPosting</title>
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+    body {
+      font: 12.5px/1 "Inter Variable", Inter, "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+      color: #f5f5f2;
+      -webkit-font-smoothing: antialiased;
+      user-select: none;
+    }
+    /* The whole bar drags the window and double-click maximizes; it stops
+       where Windows draws its buttons. */
+    .bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: env(titlebar-area-width, calc(100% - 138px));
+      height: env(titlebar-area-height, 36px);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding-left: 22px;
+      box-sizing: border-box;
+      -webkit-app-region: drag;
+      transition: opacity 0.25s ease;
+    }
+    body.away .bar { opacity: 0.45; }
+    .mark { width: 16px; height: 16px; border-radius: 4px; }
+    .name { font-weight: 700; letter-spacing: -0.02em; font-size: 13px; }
+    .page { color: rgba(245, 245, 242, 0.45); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chip {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      margin-left: 4px;
+      padding: 4px 9px 4px 8px;
+      border-radius: 999px;
+      background: rgba(255, 128, 72, 0.14);
+      color: #ff9a6a;
+      font-weight: 700;
+      font-size: 11.5px;
+    }
+    .chip::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+    .chip.on { display: inline-flex; }
+    /* A hairline under the bar, fading out at both ends. */
+    .rule {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08) 20%, rgba(255, 255, 255, 0.08) 80%, transparent);
+    }
+  </style>
+</head>
+<body>
+  <div class="bar">
+    <span id="waiting" class="chip"></span>
+    <span id="page" class="page"></span>
+  </div>
+  <div class="rule"></div>
+  <script src="titlebar.js"></script>
+</body>
+</html>
