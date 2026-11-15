@@ -14,9 +14,10 @@ function Island({ inquiry = null, onDismiss, notice = null, pendingCount = 0, gm
   const size = open ? OPEN_SIZE : showNotice ? NOTICE_SIZE : IDLE_SIZE;
   const disconnected = gmailConnected === false;
 
+  // Opens this exact inquiry, not just the list.
   function view() {
     onDismiss?.();
-    navigate('/inquiries');
+    navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries');
   }
 
   return (

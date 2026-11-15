@@ -74,6 +74,9 @@ function createStatsRouter(pool) {
       bookedToday: todayEntry.count,
       avgGpToday: average(todayEntry.gps),
       series,
+      // Every booked load with a logged GP in the 7 days counts once, so a
+      // busy day weighs more than a quiet one.
+      weekAvgGp: average(booked.filter((row) => row.gp !== null && row.gp !== undefined).map((row) => Number(row.gp))),
       repliedToday: replies.length,
       medianReplyMinutes: minutes.length ? Math.round(median(minutes)) : null,
       repliesByHour: hourly.map((row) => ({ hour: Number(row.hour), replies: Number(row.replies) })),

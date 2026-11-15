@@ -56,10 +56,18 @@ function beep() {
   }
 }
 
-function notifyDesktop(title, body) {
+// onClick runs when the notification is clicked: the window comes forward.
+function notifyDesktop(title, body, onClick) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || !document.hidden) return;
   try {
-    new Notification(title, { body });
+    const notification = new Notification(title, { body });
+    if (onClick) {
+      notification.onclick = () => {
+        window.focus();
+        onClick();
+        notification.close();
+      };
+    }
   } catch {
     // Some browsers only allow notifications from a service worker.
   }
@@ -67,11 +75,13 @@ function notifyDesktop(title, body) {
 
 // The newest inquiry to arrive over the live socket, for a few seconds,
 // with the user's chosen sound and desktop notification.
-function useIncomingInquiry(notifications) {
+function useIncomingInquiry(notifications, openInquiry) {
   const [inquiry, setInquiry] = useState(null);
   const timer = useRef(null);
   const prefs = useRef(notifications);
   prefs.current = notifications;
+  const open = useRef(openInquiry);
+  open.current = openInquiry;
 
   useEffect(() => {
     const unsubscribe = subscribe('inquiry:new', (incoming) => {
@@ -80,7 +90,11 @@ function useIncomingInquiry(notifications) {
       timer.current = setTimeout(() => setInquiry(null), ALERT_FOR_MS);
       if (!prefs.current.newInquiry) return;
       if (prefs.current.sound) beep();
-      notifyDesktop(`New inquiry from ${incoming?.from_address || 'a carrier'}`, incoming?.subject || '');
+      notifyDesktop(`New inquiry from ${incoming?.from_address || 'a carrier'}`, incoming?.subject || '', () => {
+        clearTimeout(timer.current);
+        setInquiry(null);
+        open.current(incoming);
+      });
     });
     return () => {
       unsubscribe();
@@ -125,7 +139,7 @@ function Shell({ username, onLogout, mapDimmed, onLoadsImported, children }) {
   const { settings } = useSettings();
   const gmailConnected = useGmailConnected();
   const pendingCount = usePendingReviewCount();
-  const [incoming, dismissIncoming] = useIncomingInquiry(settings.notifications);
+  const [incoming, dismissIncoming] = useIncomingInquiry(settings.notifications, (inquiry) => navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries'));
   const [notice, showNotice] = useNotice();
   const [searching, setSearching] = useState(false);
   const reduced = settings.appearance.motion === 'reduced';
@@ -151,12 +165,12 @@ function Shell({ username, onLogout, mapDimmed, onLoadsImported, children }) {
   );
 
   const tooLong = useCallback(
-    (waited) => {
+    (waited, oldest) => {
       showNotice({ tone: 'error', title: `An inquiry has waited ${waited} min`, detail: 'Inquiries' });
       if (settings.notifications.sound) beep();
-      notifyDesktop('An inquiry is waiting', `It has waited ${waited} minutes.`);
+      notifyDesktop('An inquiry is waiting', `It has waited ${waited} minutes.`, () => navigate(oldest?.id ? `/inquiries/${oldest.id}` : '/inquiries'));
     },
-    [showNotice, settings.notifications.sound]
+    [showNotice, settings.notifications.sound, navigate]
   );
   useWaitingTooLong({ enabled: settings.notifications.waitingTooLong, minutes: settings.targets.replyMinutes, notify: tooLong });
 

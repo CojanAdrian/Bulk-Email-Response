@@ -49,7 +49,8 @@ function TodayCard() {
   const { loadsPerDay, marginPerLoad, replyMinutes } = settings.targets;
   const recentGp = today.series.map((day) => day.avgGp);
   const weekAverage = recentGp.filter((v) => v !== null);
-  const avg = weekAverage.length ? Math.round(weekAverage.reduce((a, b) => a + b, 0) / weekAverage.length) : null;
+  // Average gross profit per booked load over the last 7 days.
+  const avg = today.weekAvgGp !== undefined ? today.weekAvgGp : weekAverage.length ? Math.round(weekAverage.reduce((a, b) => a + b, 0) / weekAverage.length) : null;
   const hours = new Array(HOURS_SHOWN).fill(0);
   const nowHour = new Date().getHours();
   for (const { hour, replies } of today.repliesByHour || []) {

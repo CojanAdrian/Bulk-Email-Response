@@ -98,6 +98,8 @@ describe('settings, today and password routes', () => {
       expect(res.body.series).toHaveLength(7);
       expect(res.body.series[6]).toEqual({ day: res.body.today, booked: 3, avgGp: 1500 });
       expect(res.body.series[3]).toMatchObject({ booked: 1, avgGp: 500 });
+      // Per load across the week: (1200 + 1800 + 500) / 3, not the average of the two days.
+      expect(res.body.weekAvgGp).toBe(1167);
     });
 
     test('gives the median minutes between an inquiry arriving and its reply today', async () => {
