@@ -113,28 +113,67 @@ async function threadHasSentMessage(accessToken, threadId, recipientAddress, sin
   });
 }
 
-function buildRawMessage({ to, subject, body, inReplyToMessageId }) {
-  const headers = [
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-  ];
+// A reply as a raw email. With html it goes out as multipart/alternative
+// (the HTML part for mail apps that show formatting, such as a Gmail
+// signature with a logo, and the plain part for the rest); without, as
+// plain text. Parts are base64 so any characters survive.
+function buildRawMessage({ to, subject, body, html, inReplyToMessageId }) {
+  const headers = [`To: ${to}`, `Subject: ${subject}`, 'MIME-Version: 1.0'];
   if (inReplyToMessageId) {
     headers.push(`In-Reply-To: ${inReplyToMessageId}`);
     headers.push(`References: ${inReplyToMessageId}`);
   }
-  const message = `${headers.join('\r\n')}\r\n\r\n${body}`;
+  const CRLF = String.fromCharCode(13, 10);
+  const base64Lines = (text) => Buffer.from(text, 'utf8').toString('base64').replace(/.{76}(?=.)/g, (chunk) => chunk + CRLF);
+  let message;
+  if (html) {
+    const boundary = `bp_${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`;
+    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+    message = [
+      headers.join(CRLF),
+      '',
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(body),
+      `--${boundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      'Content-Transfer-Encoding: base64',
+      '',
+      base64Lines(html),
+      `--${boundary}--`,
+      '',
+    ].join(CRLF);
+  } else {
+    headers.push('Content-Type: text/plain; charset="UTF-8"');
+    message = headers.join(CRLF) + CRLF + CRLF + body;
+  }
   return Buffer.from(message).toString('base64url');
 }
 
-async function sendReply(accessToken, { to, subject, body, threadId, inReplyToMessageId }) {
+async function sendReply(accessToken, { to, subject, body, html, threadId, inReplyToMessageId }) {
   const gmail = buildGmailClient(accessToken);
-  const requestBody = { raw: buildRawMessage({ to, subject, body, inReplyToMessageId }) };
+  const requestBody = { raw: buildRawMessage({ to, subject, body, html, inReplyToMessageId }) };
   if (threadId) {
     requestBody.threadId = threadId;
   }
   const res = await gmail.users.messages.send({ userId: 'me', requestBody });
   return res.data;
+}
+
+// The signature set in Gmail's settings for this address (HTML), or '' when
+// there is none.
+async function getGmailSignature(accessToken, address) {
+  const gmail = buildGmailClient(accessToken);
+  const res = await gmail.users.settings.sendAs.list({ userId: 'me' });
+  const identities = res.data.sendAs || [];
+  const wanted = String(address || '').toLowerCase();
+  const identity =
+    identities.find((item) => String(item.sendAsEmail || '').toLowerCase() === wanted) ||
+    identities.find((item) => item.isDefault) ||
+    identities.find((item) => item.isPrimary);
+  return (identity && identity.signature) || '';
 }
 
 // Clears the UNREAD label on the original inquiry message once a reply has
@@ -158,4 +197,6 @@ module.exports = {
   threadHasSentMessage,
   sendReply,
   markMessageRead,
+  getGmailSignature,
+  buildRawMessage,
 };

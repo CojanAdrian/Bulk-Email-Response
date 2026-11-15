@@ -1,7 +1,8 @@
 const { getAccessToken } = require('./googleOAuth');
 const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadHasSentMessage, markMessageRead } = require('./gmailClient');
 const { matchInquiry } = require('./matchingEngine');
-const { composeReply, appendSignature } = require('./replyComposer');
+const { composeReply } = require('./replyComposer');
+const { signedReplyFor } = require('./signature');
 const { looksLikeAutomatedNotification } = require('./notificationFilter');
 const { fetchInquiryWithLoad } = require('./inquiryQueries');
 
@@ -243,12 +244,14 @@ async function pollAccount(pool, account, wsHub) {
         // reply_body used for a pending-review draft -- but once this
         // actually goes out, reply_body is updated to the signed version so
         // it reflects exactly what the carrier received.
-        const sentBody = appendSignature(replyBody, account.signature);
+        const signed = await signedReplyFor(account, accessToken, replyBody);
+        const sentBody = signed.text;
         try {
           await sendReply(accessToken, {
             to: message.from,
             subject: replySubject(message.subject),
             body: sentBody,
+            html: signed.html,
             threadId: message.threadId,
             inReplyToMessageId: message.messageIdHeader,
           });

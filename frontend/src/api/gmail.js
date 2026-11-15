@@ -19,3 +19,8 @@ export function setAutoSendEnabled(enabled) {
 export function setSignature(signature) {
   return patch('/api/gmail/signature', { signature });
 }
+
+// The signature set in Gmail itself, read fresh: { html, text }.
+export function getGoogleSignature() {
+  return get('/api/gmail/google-signature');
+}

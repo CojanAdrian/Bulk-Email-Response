@@ -1,6 +1,7 @@
 const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
-const { getAuthUrl, exchangeCodeForTokens, getUserEmailAddress } = require('../lib/googleOAuth');
+const { getAuthUrl, exchangeCodeForTokens, getUserEmailAddress, getAccessToken } = require('../lib/googleOAuth');
+const { gmailSignatureFor, htmlToText } = require('../lib/signature');
 
 function createGmailRouter(pool, wsHub) {
   const router = express.Router();
@@ -22,6 +23,15 @@ function createGmailRouter(pool, wsHub) {
 
   router.get('/status', asyncHandler(async (req, res) => {
     res.json(await fetchStatus(req.session.userId));
+  }));
+
+  // The signature set in Gmail, read fresh, for the settings preview.
+  router.get('/google-signature', asyncHandler(async (req, res) => {
+    const [rows] = await pool.query('SELECT * FROM email_accounts WHERE user_id = ?', [req.session.userId]);
+    if (rows.length === 0) return res.json({ html: '', text: '' });
+    const accessToken = await getAccessToken(rows[0].refresh_token);
+    const html = await gmailSignatureFor(rows[0], accessToken, { fresh: true });
+    return res.json({ html, text: htmlToText(html) });
   }));
 
   router.get('/connect', (req, res) => {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { changePassword } from '../api/auth';
-import { getGmailStatus, setSignature } from '../api/gmail';
+import { getGmailStatus, setSignature, getGoogleSignature } from '../api/gmail';
 import { formatMoney } from '../lib/formatMoney';
 import { Toggle, Stepper, Segmented } from '../ui/controls';
 import { CloseButton } from '../ui/Sheet';
@@ -125,8 +125,28 @@ function Profile({ username }) {
   );
 }
 
+// Your Gmail signature exactly as carriers see it, on white like an email.
+// No scripts run inside; the frame only grows to fit.
+function SignaturePreview({ html }) {
+  const [height, setHeight] = useState(80);
+  return (
+    <iframe
+      title="Your Gmail signature"
+      sandbox="allow-same-origin"
+      srcDoc={`<!doctype html><html><body style="margin:0;padding:14px 16px;background:#fff;color:#222;font:13px Arial,sans-serif">${html}</body></html>`}
+      onLoad={(event) => {
+        const doc = event.currentTarget.contentDocument;
+        if (doc?.body) setHeight(Math.min(Math.max(doc.body.scrollHeight, 40), 360));
+      }}
+      style={{ height }}
+      className="w-full rounded-[14px] border-0 bg-white"
+    />
+  );
+}
+
 function SignatureEditor() {
   const [status, setStatus] = useState(null);
+  const [google, setGoogle] = useState({ state: 'loading', html: '' });
   const [draft, setDraft] = useState('');
   const [state, setState] = useState({ busy: false, saved: false, error: null });
   useEffect(() => {
@@ -136,6 +156,14 @@ function SignatureEditor() {
         if (ignore || !data) return;
         setStatus(data);
         setDraft(data.signature || '');
+        if (!data.connected) return;
+        Promise.resolve(getGoogleSignature())
+          .then((sig) => {
+            if (!ignore) setGoogle({ state: 'ready', html: sig?.html || '' });
+          })
+          .catch(() => {
+            if (!ignore) setGoogle({ state: 'error', html: '' });
+          });
       })
       .catch(() => {});
     return () => {
@@ -143,8 +171,25 @@ function SignatureEditor() {
     };
   }, []);
   if (!status?.connected) return <p className="text-[12.5px] text-text-muted">Connect Gmail to set a signature.</p>;
+  const usingGoogle = google.state === 'ready' && google.html;
   return (
     <div className="w-full">
+      {google.state === 'loading' && <p className="mb-3 text-[12.5px] text-text-muted">Reading your Gmail signature…</p>}
+      {usingGoogle && (
+        <div className="mb-4">
+          <p className="mb-2 flex items-center gap-2 text-[12.5px] text-text">
+            <span className="rounded-full bg-success/15 px-2 py-px text-[11px] font-semibold text-success">In use</span>
+            Your Gmail signature ends every reply.
+          </p>
+          <SignaturePreview html={google.html} />
+          <p className="mt-2 text-[11.5px] text-text-muted">To change it, edit your signature in Gmail settings. Replies pick it up within 10 minutes.</p>
+        </div>
+      )}
+      {google.state === 'ready' && !google.html && (
+        <p className="mb-3 text-[12.5px] text-text-muted">No signature is set in Gmail, so replies use the one below. Set one in Gmail and it will be used instead.</p>
+      )}
+      {google.state === 'error' && <p className="mb-3 text-[12.5px] text-text-muted">Could not read your Gmail signature right now; replies use the one below until it can.</p>}
+      {usingGoogle && <p className="mb-1.5 text-[12px] text-text-muted">Backup, used only if Gmail cannot be reached:</p>}
       <textarea aria-label="Signature" rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} className="w-full rounded-[14px] border px-3 py-2 text-[13px] text-text" placeholder={'Your name\nCompany\nPhone'} />
       <div className="mt-2 flex items-center gap-3">
         <button

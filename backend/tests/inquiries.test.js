@@ -325,6 +325,19 @@ describe('inquiries routes', () => {
       expect(sendArgs.inReplyToMessageId).toBe('<abc@mail.gmail.com>');
     });
 
+    test('ends the reply with the Gmail signature, formatted', async () => {
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
+      gmailClient.getGmailSignature.mockResolvedValueOnce('<div><b>Kenny Cojan</b><br>IGT Freight</div>');
+
+      const res = await agent.post(`/api/inquiries/${inquiryId}/send`);
+      expect(res.status).toBe(200);
+      const sendArgs = gmailClient.sendReply.mock.calls[0][1];
+      expect(sendArgs.body).toBe('Yes, load #4521 is still available.\n\nKenny Cojan\nIGT Freight');
+      expect(sendArgs.html).toContain('<b>Kenny Cojan</b>');
+      expect(res.body.reply_body).toBe('Yes, load #4521 is still available.\n\nKenny Cojan\nIGT Freight');
+    });
+
     test('sends a caller-edited body instead of the stored draft when provided', async () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });

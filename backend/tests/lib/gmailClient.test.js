@@ -13,6 +13,9 @@ jest.mock('googleapis', () => {
       threads: {
         get: jest.fn(),
       },
+      settings: {
+        sendAs: { list: jest.fn() },
+      },
     },
   };
   return {
@@ -26,7 +29,7 @@ jest.mock('googleapis', () => {
 });
 
 const googleapis = require('googleapis');
-const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply, markMessageRead } = require('../../src/lib/gmailClient');
+const { listNewMessageIds, getMessage, extractPlainTextBody, extractEmailAddresses, threadHasSentMessage, sendReply, markMessageRead, getGmailSignature } = require('../../src/lib/gmailClient');
 
 describe('listNewMessageIds', () => {
   beforeEach(() => {
@@ -360,9 +363,39 @@ describe('threadHasSentMessage', () => {
   });
 });
 
+describe('getGmailSignature', () => {
+  test('returns the signature of the matching address, else the default one', async () => {
+    googleapis.__mockGmailClient.users.settings.sendAs.list.mockResolvedValue({
+      data: { sendAs: [
+        { sendAsEmail: 'other@igt.com', isDefault: true, signature: '<b>Other</b>' },
+        { sendAsEmail: 'Kenny@IGT.com', isPrimary: true, signature: '<b>Kenny</b>' },
+      ] },
+    });
+    expect(await getGmailSignature('token', 'kenny@igt.com')).toBe('<b>Kenny</b>');
+    expect(await getGmailSignature('token', 'nobody@igt.com')).toBe('<b>Other</b>');
+  });
+
+  test('returns an empty string when Gmail has no signature', async () => {
+    googleapis.__mockGmailClient.users.settings.sendAs.list.mockResolvedValue({ data: { sendAs: [{ sendAsEmail: 'k@igt.com', isPrimary: true }] } });
+    expect(await getGmailSignature('token', 'k@igt.com')).toBe('');
+  });
+});
+
 describe('sendReply', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  test('with html, sends a plain and a formatted copy', async () => {
+    googleapis.__mockGmailClient.users.messages.send.mockResolvedValue({ data: { id: 'sent1' } });
+    await sendReply('token', { to: 'c@example.com', subject: 'Re: 4521', body: 'Yes\n\nKenny', html: '<div>Yes</div><div class="gmail_signature"><b>Kenny</b></div>' });
+    const raw = googleapis.__mockGmailClient.users.messages.send.mock.calls[0][0].requestBody.raw;
+    const decoded = Buffer.from(raw, 'base64url').toString('utf8');
+    expect(decoded).toContain('Content-Type: multipart/alternative');
+    const parts = decoded.split(/\r\n\r\n/).map((part) => part.split(/\r\n--/)[0]);
+    const bodies = parts.slice(1).map((part) => Buffer.from(part.replace(/\r\n/g, ''), 'base64').toString('utf8'));
+    expect(bodies).toContain('Yes\n\nKenny');
+    expect(bodies).toContain('<div>Yes</div><div class="gmail_signature"><b>Kenny</b></div>');
   });
 
   test('sends a base64url-encoded RFC 2822 message with To/Subject/body', async () => {

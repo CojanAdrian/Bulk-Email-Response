@@ -2,7 +2,7 @@ const express = require('express');
 const asyncHandler = require('../lib/asyncHandler');
 const { getAccessToken } = require('../lib/googleOAuth');
 const { sendReply, markMessageRead } = require('../lib/gmailClient');
-const { appendSignature } = require('../lib/replyComposer');
+const { signedReplyFor } = require('../lib/signature');
 const { INQUIRY_JOIN_FIELDS, attachLiveReplyBody, fetchInquiryWithLoad } = require('../lib/inquiryQueries');
 
 function replySubject(originalSubject) {
@@ -69,12 +69,14 @@ function createInquiriesRouter(pool, wsHub) {
     if (!draftBody || !draftBody.trim()) {
       throw Object.assign(new Error('Reply body cannot be empty.'), { status: 400 });
     }
-    const body = appendSignature(draftBody, accountRows[0].signature);
     const accessToken = await getAccessToken(accountRows[0].refresh_token);
+    const signed = await signedReplyFor(accountRows[0], accessToken, draftBody);
+    const body = signed.text;
     await sendReply(accessToken, {
       to: inquiry.from_address,
       subject: replySubject(inquiry.subject),
       body,
+      html: signed.html,
       threadId: inquiry.gmail_thread_id,
       inReplyToMessageId: inquiry.gmail_in_reply_to,
     });

@@ -95,6 +95,20 @@ describe('SettingsSheet', () => {
     await waitFor(() => expect(gmailApi.setSignature).toHaveBeenCalledWith('Adrian Cojan'));
   });
 
+  test('shows the Gmail signature that replies use', async () => {
+    gmailApi.getGoogleSignature.mockResolvedValue({ html: '<b>Kenny Cojan</b><br>IGT Freight', text: 'Kenny Cojan\nIGT Freight' });
+    renderSheet('gmail');
+    expect(await screen.findByText('Your Gmail signature ends every reply.')).toBeInTheDocument();
+    expect(screen.getByTitle('Your Gmail signature')).toHaveAttribute('srcdoc', expect.stringContaining('<b>Kenny Cojan</b>'));
+    expect(screen.getByText('Backup, used only if Gmail cannot be reached:')).toBeInTheDocument();
+  });
+
+  test('says when Gmail has no signature, so the typed one is used', async () => {
+    gmailApi.getGoogleSignature.mockResolvedValue({ html: '', text: '' });
+    renderSheet('gmail');
+    expect(await screen.findByText(/No signature is set in Gmail/)).toBeInTheDocument();
+  });
+
   test('Escape and the close button close it; Sign out signs out', () => {
     const { onClose, onLogout } = renderSheet('targets');
     fireEvent.keyDown(document, { key: 'Escape' });
