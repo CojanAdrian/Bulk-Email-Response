@@ -61,6 +61,7 @@ const ERRORS = {
   'dat-open': 'Could not open DAT. Search again in a moment.',
   'form-not-found': 'MC Check could not find the truck search form on DAT. Run Diagnostics in the MC Check settings and send the report.',
   'no-place': "DAT did not offer the origin or destination city. Check the load's cities, or run Diagnostics in the MC Check settings and send the report.",
+  'no-date': "MC Check could not set DAT's date range to the pickup day, so it did not search. Run Diagnostics in the MC Check settings and send the report.",
   'no-search-button': "MC Check filled the search but could not find DAT's Search button. Run Diagnostics in the MC Check settings and send the report.",
   timeout: 'DAT took too long to answer. Search again in a moment.',
 };
