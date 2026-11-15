@@ -5,6 +5,8 @@ import SelectionCircle from '../../components/SelectionCircle';
 import { SHEET_SPRING } from '../../ui/Sheet';
 import { detectMultiStop, multiStopTagVariant } from '../../lib/lookupMessage';
 import { STATUS_LABELS, senderName, inquiryLoad } from './inquiryText';
+import { useCarrierCheck } from '../../lib/carrierCheck';
+import { CarrierBadge } from './CarrierCheck';
 
 const STATUS_TONE = {
   pending_review: 'bg-hot/15 text-hot',
@@ -22,6 +24,7 @@ function InquiryRow({ inquiry, showStatus, current, selecting, selected, busy = 
   const multiStop = detectMultiStop(inquiryLoad(inquiry));
   const stopTone = multiStopTagVariant(inquiryLoad(inquiry)) === 'error' ? 'bg-hot/15 text-hot' : 'bg-white text-black';
   const waiting = inquiry.reply_status === 'pending_review';
+  const check = useCarrierCheck(inquiry);
 
   function activate() {
     if (selecting) onToggleSelect(inquiry.id);
@@ -52,7 +55,10 @@ function InquiryRow({ inquiry, showStatus, current, selecting, selected, busy = 
           {selecting && <SelectionCircle selected={selected} onToggle={() => onToggleSelect(inquiry.id)} ariaLabel={`Select inquiry from ${inquiry.from_address}`} />}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[15px] font-semibold tracking-[-0.02em] text-text">{senderName(inquiry.from_address)}</p>
+          <p className="flex min-w-0 items-center gap-2">
+            <span className="truncate text-[15px] font-semibold tracking-[-0.02em] text-text">{senderName(inquiry.from_address)}</span>
+            <CarrierBadge check={check} />
+          </p>
           <p className="mt-0.5 truncate text-[13px] text-text-muted">{inquiry.subject || 'No subject'}</p>
           <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-1.5 text-[11.5px] text-text-muted">
             {inquiry.matched_load_id ? (

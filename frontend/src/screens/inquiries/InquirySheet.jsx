@@ -6,6 +6,8 @@ import LoadPicker from '../../components/LoadPicker';
 import { buildPUSched } from '../../lib/datExport';
 import { formatMoney } from '../../lib/formatMoney';
 import { multiStopTagVariant, detectMultiStop } from '../../lib/lookupMessage';
+import { useCarrierCheck } from '../../lib/carrierCheck';
+import { CarrierCheckCard } from './CarrierCheck';
 import { STATUS_LABELS, senderEmail, senderName, withRateLine, inquiryLoad, matchReason, matchConfidence } from './inquiryText';
 
 function received(value) {
@@ -53,6 +55,7 @@ function InquirySheet({ inquiry, draft, onDraftChange, busy, error, onClose, onS
   const stopTag = multiStopTagVariant(load);
   const stopLabel = detectMultiStop(load);
   const confidence = CONFIDENCE[matchConfidence(inquiry)];
+  const check = useCarrierCheck(inquiry);
 
   function toggleRate(include) {
     setRateOverride(include);
@@ -70,6 +73,7 @@ function InquirySheet({ inquiry, draft, onDraftChange, busy, error, onClose, onS
       <p className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-text-muted">
         <CopyText value={senderEmail(inquiry.from_address)} label="Copy email address" className="mx-0" />
       </p>
+      <CarrierCheckCard check={check} />
 
       <div className="mt-6">
         <Step n={1} title="They wrote">

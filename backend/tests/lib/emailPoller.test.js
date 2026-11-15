@@ -1108,4 +1108,19 @@ describe('emailPoller', () => {
       ]);
     });
   });
+
+  test('saves the carrier MC numbers found in the email, best first', async () => {
+    googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+    gmailClient.getMessage.mockResolvedValue({
+      id: 'm1', from: 'dispatch@redline.com', to: 'testuser@brokerage.test',
+      subject: 'Load 4521', body: 'Still available? Redline Haul MC# 884213',
+      receivedAt: new Date('2026-08-08T08:00:00Z'),
+    });
+    matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
+    const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+    await pollAccount(pool, { ...accountRows[0], auto_send_enabled: 0 });
+    const [rows] = await pool.query('SELECT carrier_mcs FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(rows[0].carrier_mcs).toBe('884213');
+  });
 });

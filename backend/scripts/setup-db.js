@@ -347,6 +347,16 @@ async function migrateSchema(databaseName) {
     await conn.query(`ALTER TABLE carriers ADD COLUMN starred TINYINT(1) NOT NULL DEFAULT 0`);
   }
 
+  // The carrier's MC numbers found in the full email, best first, comma
+  // separated, for the Highway check (MC Check extension).
+  const [mcCol] = await conn.query(
+    `SELECT COUNT(*) AS count FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'email_inquiries' AND COLUMN_NAME = 'carrier_mcs'`,
+    [databaseName]
+  );
+  if (mcCol[0].count === 0) {
+    await conn.query(`ALTER TABLE email_inquiries ADD COLUMN carrier_mcs VARCHAR(64) NULL`);
+  }
+
   // When a waiting inquiry's Gmail thread was last checked for a reply you
   // sent from Gmail itself (see closeAnsweredInquiries in emailPoller.js).
   const [checkedCol] = await conn.query(
