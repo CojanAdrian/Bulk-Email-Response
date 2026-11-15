@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CloseButton, PILL_PRIMARY, PILL_QUIET } from '../../ui/Sheet';
-import { useCarrierCheckState, startCarrierCheck, describeCheck, requestCheck, openOnHighway, findTrucksOnDat, teachDat, forgetDat, EXTENSION_URL } from '../../lib/carrierCheck';
+import { useCarrierCheckState, startCarrierCheck, describeCheck, requestCheck, openOnHighway, findTrucksOnDat, EXTENSION_URL } from '../../lib/carrierCheck';
 import { buildLookupMessage, rateIsShown } from '../../lib/lookupMessage';
 import { CarrierBadge } from '../inquiries/CarrierCheck';
 import { listOffers, sendOffers } from '../../api/offers';
@@ -10,7 +10,7 @@ import { place, schedule } from './boardLogic';
 export const DAT_URL = 'https://one.dat.com/';
 const GOOD = new Set(['pass', 'partial']);
 const HIGHWAY_WAIT_MS = 90 * 1000; // carriers still unchecked after this are left out
-const MIN_VERSION = [0, 5];
+const MIN_VERSION = [0, 6];
 
 // What to search on DAT, and the email subject.
 export function laneText(load) {
@@ -59,22 +59,16 @@ const ERRORS = {
   'dat-login': 'DAT asked for a login. Log in to DAT One in Brave, then search again.',
   'dat-not-ready': 'DAT did not start in time. Search again in a moment.',
   'dat-open': 'Could not open DAT. Search again in a moment.',
-  'not-learned': 'MC Check has not learned the DAT search yet.',
-  'no-coords': 'This load has no map position for its cities, which DAT needs. Edit the load so its cities are found on the map.',
-  changed: 'DAT answered differently than when MC Check learned its search. Redo the DAT setup.',
-  http: 'DAT turned the search down. If this keeps happening, redo the DAT setup.',
+  'form-not-found': 'MC Check could not find the truck search form on DAT. Run Diagnostics in the MC Check settings and send the report.',
+  'no-place': "DAT did not offer the origin or destination city. Check the load's cities, or run Diagnostics in the MC Check settings and send the report.",
+  'no-search-button': "MC Check filled the search but could not find DAT's Search button. Run Diagnostics in the MC Check settings and send the report.",
   timeout: 'DAT took too long to answer. Search again in a moment.',
-};
-
-const LEARN_ERRORS = {
-  'lane-not-found': 'That search was not this lane. Search exactly the lane below, so MC Check knows which parts to change.',
-  'no-carriers-after-search': 'MC Check saw the search but no carriers in the answer. Try the search once more.',
-  'too-many-requests': 'DAT sent more than MC Check can follow for one search. Send the extension diagnostics to whoever maintains it.',
 };
 
 // Finds trucks on DAT for a load and emails the load, by itself, to every
 // carrier there that passes (or partly passes) Highway and has an email.
-// The MC Check extension runs the DAT search in a minimized DAT window and
+// The MC Check extension opens DAT's truck search in a minimized window,
+// fills in the lane and presses Search like a person would, and
 // checks each carrier on Highway; the server sends the emails.
 function DatTrucksSheet({ load, onClose, onSent }) {
   const check = useCarrierCheckState();
@@ -84,7 +78,6 @@ function DatTrucksSheet({ load, onClose, onSent }) {
   const [emailed, setEmailed] = useState(null); // Set of emails already sent this load, once known
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
-  const [copied, setCopied] = useState(false);
   const deadline = useRef(0);
   const stopRun = useRef(null);
   const lane = useMemo(() => datLane(load), [load]);
@@ -114,7 +107,7 @@ function DatTrucksSheet({ load, onClose, onSent }) {
     loadEmailed();
   }, [loadEmailed]);
 
-  const ready = check.extension === 'present' && newEnough(check.version) && check.datReady;
+  const ready = check.extension === 'present' && newEnough(check.version);
 
   const search = useCallback(() => {
     stopRun.current?.();
@@ -189,21 +182,6 @@ function DatTrucksSheet({ load, onClose, onSent }) {
     return () => clearTimeout(timer);
   }, [phase, pending, rows, emailed, load, onSent, loadEmailed]);
 
-  function setup() {
-    navigator.clipboard?.writeText?.(laneText(load)).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    });
-    teachDat(lane);
-  }
-
-  function redoSetup() {
-    stopRun.current?.();
-    forgetDat();
-    setPhase('idle');
-    setError(null);
-  }
-
   const sentTo = new Set((result?.results || []).filter((r) => r.ok).map((r) => String(r.email).toLowerCase()));
   const outcome = (row) => {
     if (row.email && sentTo.has(row.email.toLowerCase())) return { text: 'Emailed', strong: true };
@@ -242,35 +220,9 @@ function DatTrucksSheet({ load, onClose, onSent }) {
   } else if (!newEnough(check.version)) {
     body = (
       <Note>
-        <span className="font-semibold text-text">Update MC Check to version 0.5 or newer</span> (you have {check.version || 'an older one'}). Pull the latest from its bulkposting-bridge branch and reload it in
+        <span className="font-semibold text-text">Update MC Check to version 0.6 or newer</span> (you have {check.version || 'an older one'}). Pull the latest from its bulkposting-bridge branch and reload it in
         brave://extensions.
       </Note>
-    );
-  } else if (!check.datReady) {
-    body = (
-      <div className="mt-5 rounded-[20px] bg-white/[0.045] px-5 py-4">
-        <p className="text-[14px] font-semibold">One-time setup</p>
-        <p className="mt-1.5 text-[13px] leading-snug text-text-muted">
-          MC Check needs to see one truck search on DAT to learn how DAT searches. Open DAT, click Search Trucks, enter this exact lane (origin, destination, equipment, date) and press Search. That is it. From then on BulkPosting searches DAT by itself and you never need to open it.
-        </p>
-        <p className="mt-3 rounded-[14px] bg-black/30 px-3.5 py-2.5 font-mono text-[12.5px]">{laneText(load)}</p>
-        {check.datLearnError && (
-          <p role="alert" className="mt-3 rounded-xl bg-error-bg px-3 py-2 text-[12.5px] text-error">
-            {LEARN_ERRORS[check.datLearnError] || 'MC Check could not learn from that search. Try once more.'}
-          </p>
-        )}
-        <div className="mt-3.5 flex flex-wrap items-center gap-2">
-          <button type="button" onClick={setup} className={PILL_PRIMARY}>
-            {check.datLearning ? 'Open DAT again' : 'Open DAT for the setup'}
-          </button>
-          {copied && <span className="text-[12px] text-text-muted">Lane copied</span>}
-        </div>
-        {check.datLearning && (
-          <p role="status" className="mt-3 text-[12.5px] text-text-muted">
-            Waiting for your search on DAT… This window carries on by itself once it has seen it.
-          </p>
-        )}
-      </div>
     );
   } else {
     body = (
@@ -389,11 +341,6 @@ function DatTrucksSheet({ load, onClose, onSent }) {
             <button type="button" onClick={onClose} className={PILL_QUIET}>
               {phase === 'searching' || phase === 'checking' ? 'Stop' : 'Done'}
             </button>
-            {check.datReady && (
-              <button type="button" onClick={redoSetup} className="ml-auto text-[11.5px] text-text-muted underline-offset-2 hover:text-text hover:underline">
-                Redo DAT setup
-              </button>
-            )}
           </div>
         </div>
       </motion.div>

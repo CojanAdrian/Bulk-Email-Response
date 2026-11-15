@@ -21,14 +21,14 @@ const DAT = [
 const HIGHWAY = { 1: 'pass', 2: 'partial', 3: 'fail', 4: 'pass' };
 
 // Answers like the MC Check extension (0.5) bridge.
-function fakeExtension({ datReady = true, findResult = { stage: 'done', carriers: DAT } } = {}) {
+function fakeExtension({ version = '0.6.0', datReady = true, findResult = { stage: 'done', carriers: DAT } } = {}) {
   const seen = [];
   const reply = (msg) => window.dispatchEvent(new MessageEvent('message', { data: { source: 'mc-check', ...msg }, source: window }));
   function onMessage(event) {
     const msg = event.data;
     if (!msg || msg.source !== 'bulkposting') return;
     seen.push(msg);
-    if (msg.type === 'hello') setTimeout(() => reply({ type: 'ready', version: '0.5.0', datReady }));
+    if (msg.type === 'hello') setTimeout(() => reply({ type: 'ready', version, datReady }));
     if (msg.type === 'dat-find') {
       setTimeout(() => {
         reply({ type: 'dat-find-status', id: msg.id, stage: 'searching' });
@@ -98,19 +98,18 @@ describe('Trucks on DAT', () => {
     expect(offersApi.sendOffers.mock.calls[0][0].recipients.map((r) => r.email)).toEqual(['partial@x.com']);
   });
 
-  test('before the one-time setup it asks for one search on DAT, then carries on', async () => {
-    ext = fakeExtension({ datReady: false });
+  test('an older MC Check is asked to update, and nothing is searched', async () => {
+    ext = fakeExtension({ version: '0.5.0' });
     render(<DatTrucksSheet load={LOAD} onClose={vi.fn()} />);
     await settle();
-    expect(screen.getByText('One-time setup')).toBeInTheDocument();
+    expect(screen.getByText(/Update MC Check to version 0.6 or newer/)).toBeInTheDocument();
     expect(ext.seen.some((m) => m.type === 'dat-find')).toBe(false);
-    fireEvent.click(screen.getByRole('button', { name: 'Open DAT for the setup' }));
-    await settle(2);
-    const learn = ext.seen.find((m) => m.type === 'dat-learn');
-    expect(learn.lane.originCity).toBe('Chicago');
-    expect(screen.getByText(/Waiting for your search on DAT/)).toBeInTheDocument();
-    await act(async () => ext.reply({ type: 'dat-learned', ok: true }));
-    await waitFor(() => expect(offersApi.sendOffers).toHaveBeenCalled());
+  });
+
+  test('a DAT page the extension could not fill is explained', async () => {
+    ext = fakeExtension({ findResult: { stage: 'error', code: 'form-not-found' } });
+    render(<DatTrucksSheet load={LOAD} onClose={vi.fn()} />);
+    expect(await screen.findByText(/could not find the truck search form on DAT/)).toBeInTheDocument();
   });
 
   test('a DAT login problem is explained', async () => {
