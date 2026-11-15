@@ -82,8 +82,11 @@ function UsMap() {
     let frameId = 0;
     let cancelled = false;
 
+    // Drawn at no less than twice the screen's resolution (capped at 3x),
+    // then scaled down by the browser: thin lanes and the dotted land come
+    // out smooth instead of jagged, even on a standard 1080p screen.
     function resize() {
-      dpr = window.devicePixelRatio || 1;
+      dpr = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
       width = window.innerWidth;
       height = window.innerHeight;
       canvas.width = width * dpr;
@@ -96,8 +99,11 @@ function UsMap() {
     }
 
     function drawLand(k, now, ripples) {
-      const size = 1.5 / Math.sqrt(k);
-      ctx.fillStyle = `rgba(${WHITE},.11)`;
+      // At least one screen pixel, so the dots do not shimmer zoomed out.
+      const size = Math.max(1.5 / Math.sqrt(k), 1.05 / k);
+      // Zoomed out the dots sit a few pixels apart and read as grain, so
+      // they fade back; zoomed in they come up to full strength.
+      ctx.fillStyle = `rgba(${WHITE},${(0.055 + 0.055 * Math.min(1, Math.max(0, (k - 1) / 1.5))).toFixed(3)})`;
       ctx.beginPath();
       for (const [x, y] of shapes.dots) ctx.rect(x, y, size, size);
       ctx.fill();
@@ -116,8 +122,8 @@ function UsMap() {
         ctx.fill();
       }
 
-      ctx.lineWidth = 0.7 / k;
-      ctx.strokeStyle = `rgba(${WHITE},.09)`;
+      ctx.lineWidth = 0.8 / k;
+      ctx.strokeStyle = `rgba(${WHITE},.1)`;
       ctx.stroke(shapes.borders);
       ctx.lineWidth = 1 / k;
       ctx.strokeStyle = `rgba(${WHITE},.2)`;
@@ -147,7 +153,7 @@ function UsMap() {
       const colour = lane.gold || lane.star ? GOLD : WHITE;
 
       ctx.lineCap = 'round';
-      ctx.lineWidth = (focused ? 1.6 : lane.star ? 1.4 : 1) / k;
+      ctx.lineWidth = (focused ? 1.6 : lane.star ? 1.4 : 1.1) / k;
       ctx.strokeStyle = `rgba(${colour},${faded ? Math.min(0.06, rest) : focused ? 0.4 : lane.star ? 0.55 : rest})`;
       ctx.beginPath();
       ctx.moveTo(A[0], A[1]);
@@ -179,7 +185,7 @@ function UsMap() {
       for (const [point, label, isOrigin] of [[A, lane.fromLabel, true], [B, lane.toLabel, false]]) {
         ctx.fillStyle = `rgba(${colour},${faded ? 0.15 : focused ? 1 : Math.min(1, rest * 3.2)})`;
         ctx.beginPath();
-        ctx.arc(point[0], point[1], (focused ? 3.4 : 2.2) / k, 0, Math.PI * 2);
+        ctx.arc(point[0], point[1], (focused ? 3.4 : 2.6) / k, 0, Math.PI * 2);
         ctx.fill();
         if (!focused) continue;
         if (!still) {
