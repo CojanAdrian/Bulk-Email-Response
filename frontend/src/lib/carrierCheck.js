@@ -11,7 +11,9 @@ export const highwayUrl = (mc) => `https://highway.com/broker/carriers/search-re
 
 const DETECT_MS = 2000;
 
-let state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map(), dat: new Map() };
+const EMPTY = () => ({ extension: 'unknown', version: null, loginNeeded: false, datReady: false, datLearning: false, datLearnError: null, picked: new Map(), results: new Map(), dat: new Map() });
+let state = EMPTY();
+const datRuns = new Map(); // search id -> status callback
 const listeners = new Set();
 const waiting = []; // lookups asked for before the extension answered
 let started = false;
@@ -30,7 +32,7 @@ function onMessage(event) {
   const msg = event.data;
   if (msg.type === 'ready') {
     const first = state.extension !== 'present';
-    set({ extension: 'present', version: msg.version || null, loginNeeded: Boolean(msg.loginNeeded) });
+    set({ extension: 'present', version: msg.version || null, loginNeeded: Boolean(msg.loginNeeded), datReady: Boolean(msg.datReady), datLearning: Boolean(msg.datLearning) });
     if (first) waiting.splice(0).forEach(toExtension);
   } else if (msg.type === 'picked') {
     set({ picked: new Map(state.picked).set(msg.key, msg.mc ?? null) });
@@ -42,6 +44,14 @@ function onMessage(event) {
     const dat = new Map(state.dat);
     for (const carrier of msg.carriers || []) if (carrier && carrier.mc) dat.set(carrier.mc, carrier);
     set({ dat });
+  } else if (msg.type === 'dat-learned') {
+    set(msg.ok ? { datReady: true, datLearning: false, datLearnError: null } : { datLearnError: msg.error || 'error' });
+  } else if (msg.type === 'dat-find-status') {
+    const callback = datRuns.get(msg.id);
+    if (callback) {
+      if (msg.stage === 'done' || msg.stage === 'error') datRuns.delete(msg.id);
+      callback(msg);
+    }
   }
 }
 
@@ -128,6 +138,35 @@ export function requestDatCarriers(since) {
   else waiting.push(msg);
 }
 
+function sendWhenReady(msg) {
+  startCarrierCheck();
+  if (state.extension === 'present') toExtension(msg);
+  else waiting.push(msg);
+}
+
+// Opens DAT so the extension can learn its truck search from your next
+// search of this lane (needed once).
+export function teachDat(lane) {
+  set({ datLearning: true, datLearnError: null });
+  sendWhenReady({ type: 'dat-learn', lane });
+}
+
+export function forgetDat() {
+  set({ datReady: false, datLearning: false });
+  sendWhenReady({ type: 'dat-forget' });
+}
+
+let runCount = 0;
+// Searches DAT for a lane by itself; onStatus gets
+// { stage: waiting|opening|searching|done|error, carriers, code }.
+// Returns a function that stops listening.
+export function findTrucksOnDat(lane, onStatus) {
+  const id = `find-${Date.now()}-${++runCount}`;
+  datRuns.set(id, onStatus);
+  sendWhenReady({ type: 'dat-find', id, lane });
+  return () => datRuns.delete(id);
+}
+
 // The live carrier-check state, for screens that need all of it.
 export function useCarrierCheckState() {
   return useSyncExternalStore(subscribe, snapshot, snapshot);
@@ -138,6 +177,7 @@ export function resetCarrierCheck() {
   if (typeof window !== 'undefined') window.removeEventListener('message', onMessage);
   started = false;
   waiting.length = 0;
-  state = { extension: 'unknown', version: null, loginNeeded: false, picked: new Map(), results: new Map(), dat: new Map() };
+  datRuns.clear();
+  state = EMPTY();
   listeners.forEach((listener) => listener());
 }
