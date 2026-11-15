@@ -4,3 +4,7 @@
 client_secret_*.json
 
 .superpowers/
+
+# Desktop app build output
+desktop/node_modules/
+desktop/dist/

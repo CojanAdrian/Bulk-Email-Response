@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'" />
+  <title>BulkPosting</title>
+  <link rel="stylesheet" href="screen.css" />
+</head>
+<body>
+  <main class="card">
+    <img class="mark" src="../build/icon.png" alt="" />
+    <p class="caps">Welcome to BulkPosting</p>
+    <h1>Where do you open BulkPosting?</h1>
+    <p class="lead">Type the address you use in your browser. The app remembers it; you can change it later with Ctrl+Shift+A.</p>
+    <form id="form">
+      <label for="address" class="sr">BulkPosting address</label>
+      <input id="address" type="text" inputmode="url" autocomplete="url" placeholder="bulkposting.yourcompany.com" autofocus required />
+      <button type="submit">Open BulkPosting</button>
+    </form>
+    <p id="error" class="error" role="alert"></p>
+  </main>
+  <script src="setup.js"></script>
+</body>
+</html>

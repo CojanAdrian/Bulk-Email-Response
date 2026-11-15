@@ -6,6 +6,7 @@ import { formatMoney } from '../lib/formatMoney';
 import { Toggle, Stepper, Segmented } from '../ui/controls';
 import { CloseButton } from '../ui/Sheet';
 import InboxCard from '../screens/inquiries/InboxCard';
+import { DesktopDownload } from './DesktopDownload';
 import { useSettings } from './SettingsContext';
 
 export const SECTIONS = [
@@ -15,6 +16,7 @@ export const SECTIONS = [
   { key: 'board', label: 'Board', blurb: 'How your load board behaves.' },
   { key: 'notifications', label: 'Notifications', blurb: 'When the app should get your attention.' },
   { key: 'appearance', label: 'Appearance', blurb: 'How it looks and moves.' },
+  { key: 'download', label: 'Download app', blurb: 'BulkPosting in its own window on your computer.' },
 ];
 
 const TABS = [
@@ -287,7 +289,7 @@ function Appearance() {
   );
 }
 
-const BODIES = { targets: Targets, profile: Profile, gmail: Gmail, board: Board, notifications: Notifications, appearance: Appearance };
+const BODIES = { targets: Targets, profile: Profile, gmail: Gmail, board: Board, notifications: Notifications, appearance: Appearance, download: DesktopDownload };
 
 // Every user's own settings. Each change is saved as soon as it is made.
 function SettingsSheet({ section, username, onSection, onClose, onLogout }) {
