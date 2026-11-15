@@ -45,4 +45,21 @@ describe('looksLikeAutomatedNotification', () => {
     const message = { subject: 'Is this load still available?' };
     expect(looksLikeAutomatedNotification(message)).toBe(false);
   });
+
+  test('flags a Google Chat "messaged you" email', () => {
+    const message = { from: 'Liam Akopean <Liam@igtfreight.com>', subject: 'Liam Akopean <Liam@igtfreight.com> messaged you on Google Chat while you were away' };
+    expect(looksLikeAutomatedNotification(message)).toBe(true);
+  });
+
+  test('flags a sender shown as "via Google Chat"', () => {
+    expect(looksLikeAutomatedNotification({ from: 'Liam (via Google Chat) <chat-noreply@google.com>', subject: '0092461' })).toBe(true);
+  });
+
+  test('flags calendar invitations', () => {
+    expect(looksLikeAutomatedNotification({ from: 'boss@company.com', subject: 'Invitation: Weekly sync @ Mon' })).toBe(true);
+  });
+
+  test('leaves a carrier asking about a load alone', () => {
+    expect(looksLikeAutomatedNotification({ from: 'dispatch@redline.com', subject: 'Re: 0094249 Saint Louis to Kansas City' })).toBe(false);
+  });
 });

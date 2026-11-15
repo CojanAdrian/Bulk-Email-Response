@@ -19,6 +19,37 @@ function isAddressedOnlyToAccount(message, accountEmail) {
   return recipients.length > 0 && recipients.every((address) => address === ownEmail);
 }
 
+// Free mail providers: many carriers use them, so sharing one with the
+// account says nothing about being a coworker.
+const PUBLIC_MAIL_DOMAINS = new Set(['gmail.com', 'googlemail.com', 'yahoo.com', 'ymail.com', 'outlook.com', 'hotmail.com', 'live.com', 'msn.com', 'icloud.com', 'me.com', 'aol.com', 'protonmail.com', 'proton.me', 'gmx.com', 'mail.com', 'comcast.net', 'att.net', 'verizon.net']);
+
+const domainOf = (address) => String(address || '').toLowerCase().split('@')[1] || '';
+
+// Mail from your own company's domain is a coworker, not a carrier.
+function isFromColleague(fromHeader, accountEmail) {
+  const accountDomain = domainOf(accountEmail);
+  if (!accountDomain || PUBLIC_MAIL_DOMAINS.has(accountDomain)) return false;
+  return domainOf(extractEmailAddresses(fromHeader)[0]) === accountDomain;
+}
+
+// Waiting inquiries that are not inquiries after all (coworkers, chat and
+// other notifications, logged before these rules existed) are set aside as
+// rejected, so the queue only holds carriers.
+async function setAsideNonInquiries(pool, account, wsHub) {
+  const [waiting] = await pool.query(
+    "SELECT id, from_address, subject FROM email_inquiries WHERE email_account_id = ? AND reply_status = 'pending_review'",
+    [account.id]
+  );
+  const notInquiries = waiting.filter(
+    (row) => isFromColleague(row.from_address, account.gmail_address) || looksLikeAutomatedNotification({ from: row.from_address, subject: row.subject })
+  );
+  if (notInquiries.length === 0) return 0;
+  const ids = notInquiries.map((row) => row.id);
+  await pool.query(`UPDATE email_inquiries SET reply_status = 'rejected' WHERE id IN (${ids.map(() => '?').join(',')})`, ids);
+  if (wsHub) for (const id of ids) wsHub.emitToUser(account.user_id, 'inquiry:updated', { id, reply_status: 'rejected' });
+  return ids.length;
+}
+
 function isFromAccount(message, accountEmail) {
   const sender = extractEmailAddresses(message.from)[0] || '';
   return sender !== '' && sender === String(accountEmail || '').toLowerCase();
@@ -104,8 +135,9 @@ async function pollAccount(pool, account, wsHub) {
       continue;
     }
 
-    // Your own messages are never an inquiry.
+    // Your own messages are never an inquiry, and neither are a coworker's.
     if (isFromAccount(message, account.gmail_address)) continue;
+    if (isFromColleague(message.from, account.gmail_address)) continue;
 
     // matchInquiry is cheap (local regex against the already-fetched active
     // loads, no network) but its result is only needed early when there's
@@ -270,6 +302,7 @@ async function pollAccount(pool, account, wsHub) {
   await pool.query('UPDATE email_accounts SET last_polled_at = NOW() WHERE id = ?', [account.id]);
 
   try {
+    await setAsideNonInquiries(pool, account, wsHub);
     await closeAnsweredInquiries(pool, account, accessToken, wsHub);
   } catch (err) {
     console.error(`Failed to check answered inquiries for account ${account.id}:`, err);
@@ -287,4 +320,4 @@ async function pollAllAccounts(pool, wsHub) {
   }
 }
 
-module.exports = { pollAccount, pollAllAccounts, closeAnsweredInquiries, looksLikeLoadQuestion, isListMail };
+module.exports = { pollAccount, pollAllAccounts, closeAnsweredInquiries, setAsideNonInquiries, isFromColleague, looksLikeLoadQuestion, isListMail };

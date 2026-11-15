@@ -9,7 +9,7 @@ const { extractEmailAddresses: realExtractEmailAddresses } = jest.requireActual(
 const matchingEngine = require('../../src/lib/matchingEngine');
 const bcrypt = require('bcrypt');
 const { createTestPool, resetTables } = require('../setupTestDb');
-const { pollAccount, pollAllAccounts, closeAnsweredInquiries, looksLikeLoadQuestion, isListMail } = require('../../src/lib/emailPoller');
+const { pollAccount, pollAllAccounts, closeAnsweredInquiries, setAsideNonInquiries, isFromColleague, looksLikeLoadQuestion, isListMail } = require('../../src/lib/emailPoller');
 
 describe('emailPoller', () => {
   let pool;
@@ -39,7 +39,7 @@ describe('emailPoller', () => {
     // the matching/sending pipeline itself, not these two gates.
     const [accountResult] = await pool.query(
       "INSERT INTO email_accounts (user_id, gmail_address, refresh_token, last_polled_at, auto_send_enabled) VALUES (?, ?, ?, '2020-01-01 00:00:00', 1)",
-      [userId, 'testuser@example.com', 'refresh-token-abc']
+      [userId, 'testuser@brokerage.test', 'refresh-token-abc']
     );
     accountId = accountResult.insertId;
     await pool.query(
@@ -53,7 +53,7 @@ describe('emailPoller', () => {
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
       id: 'm1',
-      from: 'carrier@example.com', to: 'testuser@example.com',
+      from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Load 4521',
       body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
@@ -74,7 +74,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Goodyear, AZ Los Angeles, CA REF 0084341', body: 'Is this still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
@@ -91,7 +91,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
@@ -108,7 +108,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
@@ -129,7 +129,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Dallas load?', body: 'Anything from Dallas?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
@@ -150,7 +150,7 @@ describe('emailPoller', () => {
       id: 'm1',
       threadId: 't1',
       messageIdHeader: '<abc123@mail.gmail.com>',
-      from: 'carrier@example.com', to: 'testuser@example.com',
+      from: 'carrier@example.com', to: 'testuser@brokerage.test',
       subject: 'Load 4521',
       body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
@@ -185,7 +185,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
@@ -206,7 +206,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO' }, tier: 'load_number' });
@@ -222,7 +222,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
@@ -240,7 +240,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Re: Load 4521', body: 'Still available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Re: Load 4521', body: 'Still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({
@@ -259,7 +259,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Dallas load?', body: 'Anything from Dallas, TX?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Dallas load?', body: 'Anything from Dallas, TX?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     const matchedLoad = { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', early_pu: null, target_pay: null };
@@ -285,7 +285,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Anything out of Dallas?', body: 'Anything out of Dallas?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Anything out of Dallas?', body: 'Anything out of Dallas?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     const matchedLoad = { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', target_pay: '1500.00' };
@@ -306,7 +306,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Anything in Texas?', body: 'Anything in Texas?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Anything in Texas?', body: 'Anything in Texas?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     const matchedLoad = { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Chicago', dest_state: 'IL', target_pay: '1500.00' };
@@ -324,7 +324,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
@@ -340,7 +340,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', cc: 'team@igtfreight.com',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', cc: 'team@igtfreight.com',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -359,7 +359,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com, dispatch@carrier.com',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test, dispatch@carrier.com',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -378,13 +378,13 @@ describe('emailPoller', () => {
       gmailClient.getMessage.mockImplementation(async (token, messageId) => {
         if (messageId === 'm1') {
           return {
-            id: 'm1', from: 'carrier1@example.com', to: 'testuser@example.com', cc: 'team@igtfreight.com',
+            id: 'm1', from: 'carrier1@example.com', to: 'testuser@brokerage.test', cc: 'team@igtfreight.com',
             subject: 'Group reply', body: 'Is load 4521 still available?',
             receivedAt: new Date('2026-08-08T08:00:00Z'),
           };
         }
         return {
-          id: 'm2', from: 'carrier2@example.com', to: 'testuser@example.com',
+          id: 'm2', from: 'carrier2@example.com', to: 'testuser@brokerage.test',
           subject: 'Direct reply', body: 'Is load 4521 still available?',
           receivedAt: new Date('2026-08-08T08:05:00Z'),
         };
@@ -408,7 +408,7 @@ describe('emailPoller', () => {
       // First poll: the original inquiry in the thread.
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -420,7 +420,7 @@ describe('emailPoller', () => {
       // each leg of the back-and-forth) -- same threadId, different message id.
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
@@ -438,13 +438,13 @@ describe('emailPoller', () => {
       gmailClient.getMessage.mockImplementation(async (token, messageId) => {
         if (messageId === 'm1') {
           return {
-            id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+            id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
             subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
             receivedAt: new Date('2026-08-08T08:00:00Z'),
           };
         }
         return {
-          id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+          id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
           subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
           receivedAt: new Date('2026-08-08T08:05:00Z'),
         };
@@ -472,7 +472,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrierA@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrierA@example.com', to: 'testuser@brokerage.test',
         subject: 'Load Available | Dallas TX -> Chicago IL | Reefer', body: 'Is this still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -481,7 +481,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: 't1', from: 'carrierB@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: 't1', from: 'carrierB@example.com', to: 'testuser@brokerage.test',
         subject: 'Re: Load Available | Dallas TX -> Chicago IL | Reefer', body: 'Is this still available?',
         receivedAt: new Date('2026-08-08T08:00:05Z'),
       });
@@ -499,7 +499,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier1@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier1@example.com', to: 'testuser@brokerage.test',
         subject: 'Lewistown, PA - Orlando, FL', body: 'Is this still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -508,7 +508,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: 't2', from: 'carrier2@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: 't2', from: 'carrier2@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
@@ -535,7 +535,7 @@ describe('emailPoller', () => {
       matchingEngine.matchInquiry.mockReturnValueOnce({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Old Blast Email', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -547,7 +547,7 @@ describe('emailPoller', () => {
       matchingEngine.matchInquiry.mockReturnValueOnce({ matchedLoad: { id: 2, load_number: '9911' }, tier: 'load_number' });
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Re: Old Blast Email', body: 'Actually, is load 9911 available?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
@@ -572,7 +572,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Question', body: 'Do you have parking available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -581,7 +581,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Re: Question', body: 'Thanks!',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
@@ -599,7 +599,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -608,7 +608,7 @@ describe('emailPoller', () => {
 
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm2', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm2', threadId: undefined, from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521 again', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
@@ -625,7 +625,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'noreply@truckertools.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'noreply@truckertools.com', to: 'testuser@brokerage.test',
         subject: 'Load# 0807261 -  view the real-time location of this load using Load Track', body: 'Track your shipment.',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -642,7 +642,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'Daisy Carchilan <daisy@igtfreight.com>', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'Daisy Carchilan <daisy@igtfreight.com>', to: 'testuser@brokerage.test',
         subject: 'Re: Shipment 60115349232 Tendered for IGT Logistics Inc', body: 'FYI.',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -658,7 +658,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'dispatch@carrierco.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'dispatch@carrierco.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -677,7 +677,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -696,7 +696,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -714,7 +714,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: 't1', from: 'Carrier B <carrierB@example.com>', to: 'testuser@example.com',
+        id: 'm1', threadId: 't1', from: 'Carrier B <carrierB@example.com>', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -733,7 +733,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@example.com',
+        id: 'm1', threadId: undefined, from: 'carrier@example.com', to: 'testuser@brokerage.test',
         subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
@@ -750,7 +750,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({
@@ -791,7 +791,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Random question', body: 'Do you have parking available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Random question', body: 'Do you have parking available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
@@ -811,7 +811,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Random question', body: 'Do you have parking available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Random question', body: 'Do you have parking available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
@@ -831,7 +831,7 @@ describe('emailPoller', () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
     gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
     gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Random question', body: 'Do you have parking available?',
+      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Random question', body: 'Do you have parking available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
     });
     matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: null, tier: 'none' });
@@ -846,7 +846,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({
@@ -868,7 +868,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({
@@ -889,7 +889,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'testuser@example.com', subject: 'Dallas load?', body: 'Anything from Dallas, TX?',
+        id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Dallas load?', body: 'Anything from Dallas, TX?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({
@@ -921,7 +921,7 @@ describe('emailPoller', () => {
       // and has never been polled.
       const [freshAccountResult] = await pool.query(
         'INSERT INTO email_accounts (user_id, gmail_address, refresh_token) VALUES (?, ?, ?)',
-        [freshUserResult.insertId, 'freshuser@example.com', 'fresh-refresh-token']
+        [freshUserResult.insertId, 'freshuser@brokerage.test', 'fresh-refresh-token']
       );
       freshAccountId = freshAccountResult.insertId;
     });
@@ -971,7 +971,7 @@ describe('emailPoller', () => {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
-        id: 'm1', from: 'carrier@example.com', to: 'freshuser@example.com', subject: 'Load 4521', body: 'Is load 4521 still available?',
+        id: 'm1', from: 'carrier@example.com', to: 'freshuser@brokerage.test', subject: 'Load 4521', body: 'Is load 4521 still available?',
         receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '4521' }, tier: 'load_number' });
@@ -1011,7 +1011,7 @@ describe('emailPoller', () => {
     async function pollWith(message, match) {
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
-      gmailClient.getMessage.mockResolvedValue({ id: 'm1', to: 'testuser@example.com', receivedAt: new Date('2026-08-08T08:00:00Z'), ...message });
+      gmailClient.getMessage.mockResolvedValue({ id: 'm1', to: 'testuser@brokerage.test', receivedAt: new Date('2026-08-08T08:00:00Z'), ...message });
       matchingEngine.matchInquiry.mockReturnValue(match);
       const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
       await pollAccount(pool, accountRows[0]);
@@ -1020,7 +1020,7 @@ describe('emailPoller', () => {
     }
 
     test('skips your own messages', async () => {
-      const rows = await pollWith({ from: 'Me <testuser@example.com>', subject: 'Load 4521', body: 'rate?' }, { matchedLoad: { id: 1 }, tier: 'load_number' });
+      const rows = await pollWith({ from: 'Me <testuser@brokerage.test>', subject: 'Load 4521', body: 'rate?' }, { matchedLoad: { id: 1 }, tier: 'load_number' });
       expect(rows).toHaveLength(0);
     });
 
@@ -1064,6 +1064,48 @@ describe('emailPoller', () => {
       expect(rows[1].reply_status).toBe('pending_review');
       expect(rows[1].gmail_checked_at).not.toBeNull();
       expect(gmailClient.threadHasSentMessage).toHaveBeenCalledWith('token', 'answered', 'c@example.com');
+    });
+  });
+
+  describe('coworkers and notifications', () => {
+    test('a coworker at your own company is not a carrier; a free-mail sender can be', () => {
+      expect(isFromColleague('Liam <Liam@igtfreight.com>', 'kenny@igtfreight.com')).toBe(true);
+      expect(isFromColleague('dispatch@redline.com', 'kenny@igtfreight.com')).toBe(false);
+      expect(isFromColleague('trucker@gmail.com', 'me@gmail.com')).toBe(false);
+    });
+
+    test('skips a coworker email even when it names a load', async () => {
+      await pool.query('UPDATE email_accounts SET gmail_address = ? WHERE id = ?', ['kenny@igtfreight.com', accountId]);
+      googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
+      gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
+      gmailClient.getMessage.mockResolvedValue({
+        id: 'm1', from: 'Liam Akopean <Liam@igtfreight.com>', to: 'kenny@igtfreight.com',
+        subject: 'Liam Akopean messaged you on Google Chat while you were away', body: '0094249 arrived at the truck stop',
+        receivedAt: new Date('2026-08-08T08:00:00Z'),
+      });
+      matchingEngine.matchInquiry.mockReturnValue({ matchedLoad: { id: 1, load_number: '0094249' }, tier: 'load_number' });
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      await pollAccount(pool, accountRows[0]);
+      const [rows] = await pool.query('SELECT * FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+      expect(rows).toHaveLength(0);
+    });
+
+    test('sets aside waiting coworker and chat emails logged before, and keeps carriers', async () => {
+      await pool.query('UPDATE email_accounts SET gmail_address = ? WHERE id = ?', ['kenny@igtfreight.com', accountId]);
+      const add = (msg, from, subject) =>
+        pool.query(
+          "INSERT INTO email_inquiries (user_id, email_account_id, gmail_message_id, from_address, subject, received_at, reply_status) VALUES (?, ?, ?, ?, ?, NOW(), 'pending_review')",
+          [userId, accountId, msg, from, subject]
+        );
+      await add('chat', 'Liam Akopean <Liam@igtfreight.com>', 'Liam Akopean messaged you on Google Chat while you were away');
+      await add('carrier', 'Redline <dispatch@redline.com>', 'Re: 0094249');
+      const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
+      expect(await setAsideNonInquiries(pool, accountRows[0], null)).toBe(1);
+      const [rows] = await pool.query('SELECT gmail_message_id, reply_status FROM email_inquiries ORDER BY gmail_message_id');
+      expect(rows).toEqual([
+        { gmail_message_id: 'carrier', reply_status: 'pending_review' },
+        { gmail_message_id: 'chat', reply_status: 'rejected' },
+      ]);
     });
   });
 });

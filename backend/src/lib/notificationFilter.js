@@ -7,7 +7,7 @@
 
 // Matches senders whose LOCAL PART (before the @) is itself a generic
 // automated-mail name, e.g. noreply@truckertools.com, Loadlock@igtfreight.com.
-const AUTOMATED_SENDER_PATTERN = /^(no-?reply|do-?not-?reply|notifications?|alerts?|tracking|loadlock|automated|system)@/i;
+const AUTOMATED_SENDER_PATTERN = /^(no-?reply|do-?not-?reply|notifications?|alerts?|tracking|loadlock|automated|system|chat-noreply|calendar-notification|mailer-daemon|postmaster)@/i;
 
 // Matches subject-line phrasing characteristic of an automated status
 // update rather than a carrier's own question about availability.
@@ -16,6 +16,13 @@ const NOTIFICATION_SUBJECT_PATTERNS = [
   /load\s*lock\s*alert/i,
   /\btendered\b/i,
   /\bload\s*track\b/i,
+  // Google Chat / Calendar notices ("X messaged you on Google Chat").
+  /messaged you on google chat/i,
+  /\bvia google chat\b/i,
+  /\bmentioned you\b/i,
+  /^(updated )?invitation:/i,
+  /^(accepted|declined|tentatively accepted):/i,
+  /\b(delivery status notification|undeliverable|mail delivery (failed|subsystem))\b/i,
 ];
 
 function extractBareAddress(fromHeader) {
@@ -26,6 +33,9 @@ function extractBareAddress(fromHeader) {
 function looksLikeAutomatedNotification(message) {
   const fromAddress = extractBareAddress(message.from);
   if (AUTOMATED_SENDER_PATTERN.test(fromAddress)) return true;
+
+  // Google Chat puts "(via Google Chat)" in the sender's display name.
+  if (/via google chat/i.test(String(message.from || ''))) return true;
 
   const subject = message.subject || '';
   return NOTIFICATION_SUBJECT_PATTERNS.some((pattern) => pattern.test(subject));
