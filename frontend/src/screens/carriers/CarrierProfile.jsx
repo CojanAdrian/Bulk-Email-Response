@@ -6,6 +6,8 @@ import StarButton from '../../ui/StarButton';
 import { formatMoney } from '../../lib/formatMoney';
 import { formatDayAgo } from '../../lib/formatDay';
 import { EQUIPMENT_OPTIONS } from '../../lib/equipmentOptions';
+import { useDirectoryCheck } from '../../lib/carrierCheck';
+import { CarrierCheckCard } from '../inquiries/CarrierCheck';
 
 const EQUIPMENT_LABEL = Object.fromEntries(EQUIPMENT_OPTIONS.map((option) => [option.code, option.label]));
 
@@ -49,6 +51,8 @@ function CarrierProfile({ carrierId, history, refreshKey = 0, onClose, onEdit, o
   const summary = totals(runs);
   const equipment = Array.isArray(carrier?.equipment_types) ? carrier.equipment_types : [];
   const states = Array.isArray(carrier?.operating_states) ? carrier.operating_states : [];
+  // Saved carriers can fail Highway too (insurance lapsed, authority revoked).
+  const highway = useDirectoryCheck(carrier?.mc_number);
 
   return (
     <Sheet layoutId={`carrier-${carrierId}`} label={carrier ? carrier.company_name : 'Carrier'} onClose={onClose} width="lg">
@@ -84,6 +88,8 @@ function CarrierProfile({ carrierId, history, refreshKey = 0, onClose, onEdit, o
               <p className="mt-1.5 text-[13px] text-text-muted">{carrier.mc_number ? <CopyText value={carrier.mc_number} label="Copy MC number">MC {carrier.mc_number}</CopyText> : 'No MC on file'}</p>
             </div>
           </div>
+
+          {carrier.mc_number && <CarrierCheckCard check={highway} />}
 
           <dl className="mt-5 grid grid-cols-3 gap-x-6 border-y border-white/[0.07] py-[18px]">
             <div>

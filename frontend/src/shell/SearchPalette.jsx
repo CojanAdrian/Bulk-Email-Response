@@ -4,6 +4,8 @@ import { listLoads } from '../api/loads';
 import { listCarriers } from '../api/carriers';
 import { listCustomers } from '../api/customers';
 import { formatMoney } from '../lib/formatMoney';
+import { useDirectoryCheck } from '../lib/carrierCheck';
+import { CarrierBadge } from '../screens/inquiries/CarrierCheck';
 
 const LIMIT = 6;
 
@@ -39,6 +41,7 @@ function search(data, query) {
     title: c.company_name,
     meta: c.mc_number ? `MC ${c.mc_number}` : c.dispatcher_name || '',
     side: c.dispatcher_phone || '',
+    mc: c.mc_number || null,
   }));
   const customers = pick(data.customers, (c) => c.name).map((c) => ({
     kind: 'Customer',
@@ -49,6 +52,12 @@ function search(data, query) {
     side: '',
   }));
   return [...loads, ...carriers, ...customers];
+}
+
+// Pass / Partial / Fail next to a saved carrier, from Highway.
+function HighwayBadge({ mc }) {
+  const check = useDirectoryCheck(mc);
+  return <CarrierBadge check={check} />;
 }
 
 // Ctrl K: one field over every load, carrier and customer. Arrows move,
@@ -134,6 +143,7 @@ function SearchPalette({ onClose, onGo }) {
             >
               <span className={`w-[64px] shrink-0 text-[11px] font-semibold uppercase tracking-[0.1em] ${index === selected ? 'text-black/50' : 'text-text-muted'}`}>{result.kind}</span>
               <span className="min-w-0 flex-1 truncate">{result.title}</span>
+              {result.mc && <HighwayBadge mc={result.mc} />}
               <span className={`shrink-0 text-[12px] tabular-nums ${index === selected ? 'text-black/60' : 'text-text-muted'}`}>{[result.meta, result.side].filter(Boolean).join(' · ')}</span>
             </li>
           ))}

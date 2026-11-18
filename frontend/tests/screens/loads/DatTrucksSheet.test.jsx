@@ -21,7 +21,7 @@ const DAT = [
 const HIGHWAY = { 1: 'pass', 2: 'partial', 3: 'fail', 4: 'pass' };
 
 // Answers like the MC Check extension (0.5) bridge.
-function fakeExtension({ version = '0.6.0', datReady = true, findResult = { stage: 'done', carriers: DAT } } = {}) {
+function fakeExtension({ version = '0.7.0', datReady = true, findResult = { stage: 'done', carriers: DAT } } = {}) {
   const seen = [];
   const reply = (msg) => window.dispatchEvent(new MessageEvent('message', { data: { source: 'mc-check', ...msg }, source: window }));
   function onMessage(event) {
@@ -98,11 +98,19 @@ describe('Trucks on DAT', () => {
     expect(offersApi.sendOffers.mock.calls[0][0].recipients.map((r) => r.email)).toEqual(['partial@x.com']);
   });
 
-  test('an older MC Check is asked to update, and nothing is searched', async () => {
-    ext = fakeExtension({ version: '0.5.0' });
+  test('when DAT could not take the equipment, it says so and sends nothing', async () => {
+    ext = fakeExtension({ findResult: { stage: 'error', code: 'no-equipment' } });
     render(<DatTrucksSheet load={LOAD} onClose={vi.fn()} />);
     await settle();
-    expect(screen.getByText(/Update MC Check to version 0.6 or newer/)).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(/could not set the load's equipment on DAT/);
+    expect(offersApi.sendOffers).not.toHaveBeenCalled();
+  });
+
+  test('an older MC Check is asked to update, and nothing is searched', async () => {
+    ext = fakeExtension({ version: '0.6.3' });
+    render(<DatTrucksSheet load={LOAD} onClose={vi.fn()} />);
+    await settle();
+    expect(screen.getByText(/Update MC Check to version 0.7 or newer/)).toBeInTheDocument();
     expect(ext.seen.some((m) => m.type === 'dat-find')).toBe(false);
   });
 

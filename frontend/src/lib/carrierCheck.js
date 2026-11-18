@@ -6,7 +6,8 @@ import { candidateMcs, normalizeMc } from './mcNumbers';
 // with your Highway login, the same as its Gmail and DAT tags; this file
 // talks to it with window.postMessage (see its src/app-bridge.js).
 
-export const EXTENSION_URL = 'https://github.com/CojanAdrian/Gmail-Highway-Extension';
+// The bulkposting-bridge branch is the version that works with BulkPosting (main is older).
+export const EXTENSION_URL = 'https://github.com/CojanAdrian/Gmail-Highway-Extension/tree/bulkposting-bridge';
 export const highwayUrl = (mc) => `https://highway.com/broker/carriers/search-results?q=${encodeURIComponent(mc)}`;
 
 const DETECT_MS = 2000;
@@ -117,17 +118,28 @@ export function describeCheck(current, key, mcs) {
   return { view: known.includes(result.status) ? result.status : 'other', mc, result };
 }
 
-export function useCarrierCheck(inquiry) {
+// The Highway check for any carrier, asked for when it is first shown.
+export function useMcCheck(key, mcs) {
   const current = useSyncExternalStore(subscribe, snapshot, snapshot);
-  const key = `inquiry-${inquiry.id}`;
-  const mcs = useMemo(() => inquiryMcs(inquiry), [inquiry]);
   const mcsKey = mcs.join(',');
   useEffect(() => {
-    requestCheck(key, mcs);
+    if (mcs.length) requestCheck(key, mcs);
     // mcsKey stands for mcs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, mcsKey]);
   return { ...describeCheck(current, key, mcs), recheck: () => requestCheck(key, mcs, { force: true }) };
+}
+
+export function useCarrierCheck(inquiry) {
+  const mcs = useMemo(() => inquiryMcs(inquiry), [inquiry]);
+  return useMcCheck(`inquiry-${inquiry.id}`, mcs);
+}
+
+// A carrier in your directory, by its MC# on file (none: nothing to check).
+export function useDirectoryCheck(mcNumber) {
+  const mc = normalizeMc(mcNumber);
+  const mcs = useMemo(() => (mc ? [mc] : []), [mc]);
+  return useMcCheck(`mc-${mc || 'none'}`, mcs);
 }
 
 // Carriers the extension saw in DAT truck searches since a time (ms).

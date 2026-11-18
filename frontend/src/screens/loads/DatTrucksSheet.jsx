@@ -10,7 +10,7 @@ import { place, schedule } from './boardLogic';
 export const DAT_URL = 'https://one.dat.com/';
 const GOOD = new Set(['pass', 'partial']);
 const HIGHWAY_WAIT_MS = 90 * 1000; // carriers still unchecked after this are left out
-const MIN_VERSION = [0, 6];
+const MIN_VERSION = [0, 7]; // 0.7: always sets the equipment, reads emails in comments
 
 // What to search on DAT, and the email subject.
 export function laneText(load) {
@@ -56,11 +56,12 @@ function newEnough(version) {
 }
 
 const ERRORS = {
-  'dat-login': 'DAT asked for a login. Log in to DAT One in Brave, then search again.',
+  'dat-login': 'DAT asked for a login. Log in to DAT One in this browser, then search again.',
   'dat-not-ready': 'DAT did not start in time. Search again in a moment.',
   'dat-open': 'Could not open DAT. Search again in a moment.',
   'form-not-found': 'MC Check could not find the truck search form on DAT. Run Diagnostics in the MC Check settings and send the report.',
   'no-place': "DAT did not offer the origin or destination city. Check the load's cities, or run Diagnostics in the MC Check settings and send the report.",
+  'no-equipment': "MC Check could not set the load's equipment on DAT, so it did not search (DAT would have used the last search's equipment). Check the load's equipment, or run Diagnostics in the MC Check settings and send the report.",
   'no-date': "MC Check could not set DAT's date range to the pickup day, so it did not search. Run Diagnostics in the MC Check settings and send the report.",
   'no-search-button': "MC Check filled the search but could not find DAT's Search button. Run Diagnostics in the MC Check settings and send the report.",
   timeout: 'DAT took too long to answer. Search again in a moment.',
@@ -210,10 +211,14 @@ function DatTrucksSheet({ load, onClose, onSent }) {
   if (check.extension === 'absent') {
     body = (
       <Note>
-        <span className="font-semibold text-text">This needs the MC Check extension in Brave.</span> It searches DAT and checks each carrier on Highway with your logins.{' '}
-        <a href={EXTENSION_URL} target="_blank" rel="noreferrer" className="font-semibold text-text underline-offset-2 hover:underline">
-          Get MC Check
-        </a>
+        <span className="font-semibold text-text">This needs the MC Check extension in this browser</span> (Chrome, Brave or Edge). It searches DAT and checks each carrier on Highway with this browser's logins.
+        <span className="mt-2 block">
+          Each browser needs it once: open <b className="text-text">chrome://extensions</b> (or brave://extensions), turn on Developer mode, click Load unpacked and pick MC Check's extension folder. Then log into
+          Highway and DAT One in this browser and reload BulkPosting.{' '}
+          <a href={EXTENSION_URL} target="_blank" rel="noreferrer" className="font-semibold text-text underline-offset-2 hover:underline">
+            Get MC Check
+          </a>
+        </span>
       </Note>
     );
   } else if (check.extension === 'unknown') {
@@ -221,8 +226,8 @@ function DatTrucksSheet({ load, onClose, onSent }) {
   } else if (!newEnough(check.version)) {
     body = (
       <Note>
-        <span className="font-semibold text-text">Update MC Check to version 0.6 or newer</span> (you have {check.version || 'an older one'}). Pull the latest from its bulkposting-bridge branch and reload it in
-        brave://extensions.
+        <span className="font-semibold text-text">Update MC Check to version 0.7 or newer</span> (you have {check.version || 'an older one'}). Pull the latest from its bulkposting-bridge branch and press reload on it
+        in chrome://extensions (or brave://extensions), then reload this page.
       </Note>
     );
   } else {
