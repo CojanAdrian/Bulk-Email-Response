@@ -110,39 +110,69 @@ function RegularCard({ regular, lane, anchor, onClose, onEmail, onOpenCarrier })
   );
 }
 
-// The carriers who already ran a load's lane, as chips: run count, name,
-// last rate paid. Clicking one opens its card.
+const SHOWN = 2;
+
+// The carriers who already ran a load's lane, under a plain caption, as
+// chips: name and last rate paid (and how many runs, when more than one).
+// The first two show; the rest open with "+ more". Clicking one opens its card.
 function Regulars({ load, regulars, onEmail, onOpenCarrier }) {
   const [open, setOpen] = useState(null); // { regular, anchor }
+  const [all, setAll] = useState(false);
   if (!regulars?.length) return null;
   const lane = `${load.origin_city} to ${load.dest_city}`;
+  const shown = all ? regulars : regulars.slice(0, SHOWN);
+  const hidden = regulars.length - shown.length;
 
   return (
     <>
+      {regulars.some((regular) => regular.starred) ? (
+        <p className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold text-gold">
+          <StarIcon filled className="h-3 w-3" />
+          Your star carrier ran this lane
+        </p>
+      ) : (
+        <p className="mb-1.5 text-[11px] font-medium text-gold/80">Ran this lane before</p>
+      )}
       <ul aria-label={`Carriers who ran ${load.load_number}'s lane`} className="flex flex-wrap gap-1.5">
-        {regulars.map((regular) => (
+        {shown.map((regular) => (
           <li key={regular.carrierId}>
             <button
               type="button"
               aria-label={`${regular.carrierName}, ran this lane ${regular.runs} time${regular.runs === 1 ? '' : 's'}, last paid ${formatMoney(regular.lastRate)}`}
+              title="See their contact and email them this load"
               onClick={(event) => {
                 event.stopPropagation();
                 setOpen({ regular, anchor: event.currentTarget.getBoundingClientRect() });
               }}
-              className={`inline-flex max-w-full items-center gap-[7px] rounded-full py-[5px] pl-1.5 pr-[11px] text-xs transition-[scale,background-color] duration-300 ease-spring hover:scale-105 ${
+              className={`inline-flex max-w-full items-center gap-[7px] rounded-full px-[11px] py-[5px] text-xs transition-[scale,background-color] duration-300 ease-spring hover:scale-105 ${
                 regular.starred
                   ? 'bg-gold text-black/70 shadow-[0_0_16px_rgb(var(--color-gold)/0.35)] hover:bg-gold-soft'
                   : 'bg-gold/[0.09] text-text-muted shadow-[inset_0_0_0_0.5px_rgb(var(--color-gold)/0.35)] hover:bg-gold/[0.18]'
               }`}
             >
-              <span aria-hidden="true" className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[10px] font-extrabold ${regular.starred ? 'bg-black text-gold' : 'bg-gold text-black'}`}>
-                {regular.starred ? <StarIcon filled className="h-3 w-3" /> : regular.runs}
-              </span>
+              {regular.starred && <StarIcon filled className="-ml-0.5 h-3 w-3 shrink-0 text-black" />}
               <b className={`truncate font-semibold ${regular.starred ? 'text-black' : 'text-text'}`}>{regular.carrierName}</b>
-              <span className="shrink-0">{regular.starred ? `${regular.runs}× · ` : ''}last {formatMoney(regular.lastRate)}</span>
+              <span className="shrink-0 tabular-nums">
+                {formatMoney(regular.lastRate)}
+                {regular.runs > 1 ? ` · ${regular.runs} runs` : ''}
+              </span>
             </button>
           </li>
         ))}
+        {hidden > 0 && (
+          <li>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                setAll(true);
+              }}
+              className="rounded-full px-2.5 py-[5px] text-xs font-semibold text-text-muted hover:bg-white/10 hover:text-text"
+            >
+              + {hidden} more
+            </button>
+          </li>
+        )}
       </ul>
       {open && (
         <RegularCard

@@ -22,6 +22,7 @@ import Skeleton from '../../components/Skeleton';
 import { SearchIcon } from '../../components/icons';
 import BoardRow from './BoardRow';
 import LoadSheet from './LoadSheet';
+import { FROM_ELSEWHERE } from '../../ui/Sheet';
 import NeedsReply from './NeedsReply';
 import TodayCard from '../../shell/TodayCard';
 import { useSettings } from '../../shell/SettingsContext';
@@ -30,6 +31,50 @@ import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, hasStarRegula
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
 const HEADLINES = { active: 'loads to cover', booked: 'loads booked', covered: 'loads covered' };
+// Less-used board tools, out of the way behind one button.
+function MoreMenu({ items }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!open) return undefined;
+    const onDown = (event) => ref.current && !ref.current.contains(event.target) && setOpen(false);
+    const onKey = (event) => event.key === 'Escape' && setOpen(false);
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} className={TOOL}>
+        More
+        <span aria-hidden="true" className="ml-1 inline-block text-[9px] opacity-60">▼</span>
+      </button>
+      {open && (
+        <div role="menu" className="mat absolute right-0 top-full z-30 mt-1.5 w-[230px] rounded-[18px] p-1.5 motion-safe:animate-[pop-in_400ms_var(--spring)]">
+          {items.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOpen(false);
+                item.onSelect();
+              }}
+              className="block w-full rounded-[12px] px-3 py-2 text-left text-[13px] font-semibold text-text hover:bg-white/10"
+            >
+              {item.label}
+              {item.hint && <span className="block text-[11px] font-normal text-text-muted">{item.hint}</span>}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TOOL = 'rounded-full px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-text';
 const CHIP = 'rounded-full px-2.5 py-1 text-xs font-medium transition-colors';
 // Panel widths plus their margins: the map fits itself between these.
@@ -290,17 +335,17 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             ))}
           </div>
           <div className="-mx-3 flex items-center pb-2 sm:mx-0 sm:ml-auto">
-            <button type="button" onClick={() => fileInput.current?.click()} className={TOOL}>
-              Import
-            </button>
-            <button type="button" onClick={() => datExport.current?.openExportFlow()} className={TOOL}>
-              DAT export
-            </button>
             {rows.length > 0 && !selection.active && (
               <button type="button" onClick={selection.enter} className={TOOL}>
                 Select
               </button>
             )}
+            <MoreMenu
+              items={[
+                { label: 'Import CSV', hint: 'or drop / paste it anywhere', onSelect: () => fileInput.current?.click() },
+                { label: 'DAT export', hint: 'bulk-post file for DAT', onSelect: () => datExport.current?.openExportFlow() },
+              ]}
+            />
             <input
               ref={fileInput}
               type="file"
@@ -352,7 +397,9 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
               { value: 'starred', label: '★ Starred', count: starCount },
               { value: 'proven', label: 'Proven', count: provenCount },
               { value: 'needs_rate', label: 'Needs rate', count: needsRateCount },
-            ].map((option) => (
+            ]
+              .filter((option) => option.value === 'all' || option.value === quick || option.count > 0)
+              .map((option) => (
               <button
                 key={option.value}
                 type="button"
@@ -396,7 +443,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           )}
           {board.status === 'ready' && inTab.length > 0 && rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-text-muted">{emptyMessage}</p>}
           {rows.length > 0 && (
-            <ul aria-label="Loads">
+            <ul aria-label="Loads" className="space-y-1">
               {rows.map((load) => (
                 <BoardRow
                   key={load.id}
@@ -411,9 +458,9 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                     onHover={setCurrentId}
                     onToggleSelect={toggleSelect}
                     onEmail={(target, emails) => setBlast({ load: target, emails })}
-                    onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
+                    onOpenCarrier={(id) => navigate(`/carriers/${id}`, { state: FROM_ELSEWHERE })}
                     onToggleRate={changeIncludeRate}
-                    onOpenAsking={(load) => askingNewest[load.id] && navigate(`/inquiries/${askingNewest[load.id].id}`)}
+                    onOpenAsking={(load) => askingNewest[load.id] && navigate(`/inquiries/${askingNewest[load.id].id}`, { state: FROM_ELSEWHERE })}
                   />
               ))}
             </ul>
@@ -460,7 +507,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
             onEdit={setEditing}
             onDelete={remove}
             onEmail={(load, emails) => setBlast({ load, emails })}
-            onOpenCarrier={(id) => navigate(`/carriers/${id}`)}
+            onOpenCarrier={(id) => navigate(`/carriers/${id}`, { state: FROM_ELSEWHERE })}
           />
         )}
       </AnimatePresence>

@@ -10,7 +10,7 @@ import { useScreenMap } from '../../map/useScreenMap';
 import CarrierSheet from '../../components/CarrierSheet';
 import Skeleton from '../../components/Skeleton';
 import ScreenPanel, { PanelTabs, PanelSearch, PlusButton, EmptyNote } from '../../ui/ScreenPanel';
-import { SheetBackdrop, SHEET_SPRING } from '../../ui/Sheet';
+import { SheetBackdrop, SHEET_SPRING, CloseButton, FROM_ELSEWHERE } from '../../ui/Sheet';
 import StarButton, { StarIcon } from '../../ui/StarButton';
 import CarrierProfile from './CarrierProfile';
 import LaneSearch, { blankLane, laneFromLoad, laneIsComplete } from './LaneSearch';
@@ -30,11 +30,12 @@ function initials(name) {
   return (words.length > 1 ? words[0][0] + words[1][0] : words[0].slice(0, 2)).toUpperCase();
 }
 
+// /carriers/find opens the lane finder over the directory.
 function routeFrom(pathname) {
-  if (pathname.startsWith('/carriers/find')) return { mode: 'find', openId: null };
-  if (pathname.startsWith('/carriers/starred')) return { mode: 'starred', openId: null };
+  if (pathname.startsWith('/carriers/find')) return { mode: 'directory', finding: true, openId: null };
+  if (pathname.startsWith('/carriers/starred')) return { mode: 'starred', finding: false, openId: null };
   const match = pathname.match(/^\/carriers\/(\d+)/);
-  return { mode: 'directory', openId: match ? Number(match[1]) : null };
+  return { mode: 'directory', finding: false, openId: match ? Number(match[1]) : null };
 }
 
 function CarrierRow({ carrier, current, onOpen, onHover, onStar }) {
@@ -79,13 +80,11 @@ function MatchRow({ match, searchedEquipment, current, onOpen, onHover }) {
   const where = match.taggedStates ? match.taggedStates.join(', ') : `${Math.round(match.originDistanceMiles)} mi from the pickup`;
   return (
     <li onPointerEnter={() => onHover(match)} data-row-id={match.carrierId}>
-      <motion.button
+      <button
         type="button"
-        layoutId={`carrier-${match.carrierId}`}
-        transition={SHEET_SPRING}
         onClick={() => onOpen(match.carrierId)}
         aria-label={`Open ${match.carrierName}`}
-        className={`grid w-full grid-cols-[1fr_auto] gap-x-3 rounded-[18px] px-[18px] py-[12px] text-left transition-colors hover:bg-white/[0.065] ${current ? 'bg-white/[0.065]' : ''}`}
+        className={`grid w-full grid-cols-[1fr_auto] gap-x-3 rounded-[16px] px-3.5 py-[10px] text-left transition-colors hover:bg-white/[0.065] ${current ? 'bg-white/[0.065]' : ''}`}
       >
         <span className="min-w-0">
           <span className={`flex items-center gap-1.5 truncate text-[15px] font-semibold tracking-[-0.02em] ${Number(match.starred) ? 'text-gold' : ''}`}>
@@ -101,8 +100,51 @@ function MatchRow({ match, searchedEquipment, current, onOpen, onHover }) {
           <span className={`whitespace-nowrap rounded-full px-2 py-px text-[11px] font-semibold ${tier.tone}`}>{tier.label}</span>
           {match.laneCount > 1 && <span className="text-[11px] text-text-muted">{match.laneCount} lanes on file</span>}
         </span>
-      </motion.button>
+      </button>
     </li>
+  );
+}
+
+// Find carriers for a lane: a card of its own in the bottom right corner,
+// like the Today card on the board. Closed, it is one button.
+function LaneFinder({ open, onOpen, onClose, count, form, onPointerLeave, children }) {
+  const place = 'relative mx-3 mb-28 md:fixed md:bottom-[96px] md:right-5 md:z-[9] md:m-0 md:w-[346px]';
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={onOpen}
+        className={`mat ${place} flex items-center gap-3.5 rounded-[24px] px-5 py-4 text-left transition-[scale] duration-500 ease-spring hover:scale-[1.03] motion-safe:animate-[slide-in_1.1s_var(--spring)_0.4s_both]`}
+      >
+        <span aria-hidden="true" className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-accent text-accent-ink">
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+            <circle cx="7" cy="7" r="4.5" />
+            <path d="M10.5 10.5L14 14" />
+          </svg>
+        </span>
+        <span className="min-w-0">
+          <span className="caps block">Lane search</span>
+          <span className="mt-0.5 block text-[15px] font-semibold tracking-[-0.02em]">Find carriers for a lane</span>
+        </span>
+      </button>
+    );
+  }
+  return (
+    <section
+      aria-label="Find carriers for a lane"
+      onPointerLeave={onPointerLeave}
+      className={`mat ${place} flex max-h-[calc(100dvh-200px)] flex-col overflow-hidden rounded-[28px] motion-safe:animate-[pop-in_500ms_var(--spring)]`}
+    >
+      <CloseButton onClose={onClose} />
+      <div className="px-5 pb-3 pt-5">
+        <p className="caps">Lane search</p>
+        <h2 className="mt-0.5 pr-10 text-[17px] font-semibold tracking-[-0.02em]">
+          {count === null ? 'Find carriers for a lane' : `${count} carrier${count === 1 ? '' : 's'} for this lane`}
+        </h2>
+        <div className="mt-3">{form}</div>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-white/[0.07] px-1.5 pb-2 pt-1.5 [scrollbar-width:none]">{children}</div>
+    </section>
   );
 }
 
@@ -111,7 +153,12 @@ function MatchRow({ match, searchedEquipment, current, onOpen, onHover }) {
 function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
   const navigate = useNavigate();
   const location = useLocation();
-  const { mode, openId } = routeFrom(location.pathname);
+  const { mode, finding, openId } = routeFrom(location.pathname);
+  // The lane finder card (bottom right) stays open while you open carriers from it.
+  const [finderOpen, setFinderOpen] = useState(finding);
+  useEffect(() => {
+    if (finding) setFinderOpen(true);
+  }, [finding]);
   const histories = useCarrierHistory();
 
   const [carriers, setCarriers] = useState([]);
@@ -202,25 +249,30 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
     : null;
 
   const shownHistory = shownId ? histories.historyOf(shownId) : null;
+  const showMatches = finderOpen && !openId && !hoverId;
   const lanes = useMemo(() => {
-    if (openId || (mode !== 'find' && hoverId)) return lanesForHistory(shownHistory);
-    if (mode === 'find') {
+    if (openId || hoverId) return lanesForHistory(shownHistory);
+    if (showMatches) {
       const matchLanes = (results?.laneMatches || [])
         .filter((match) => match.destLat !== null && match.destLng !== null)
         .map((match) => ({ id: `match-${match.carrierId}`, from: [match.originLng, match.originLat], to: [match.destLng, match.destLat], fromLabel: '', toLabel: '', gold: match.tier === 'perfect' }));
       return queryLane ? [queryLane, ...matchLanes] : matchLanes;
     }
     return [];
-  }, [openId, mode, hoverId, shownHistory, results]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [openId, showMatches, hoverId, shownHistory, results]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const focusId = openId ? hoverRun : mode === 'find' ? (hoverMatch ? `match-${hoverMatch.carrierId}` : queryLane ? 'query' : null) : null;
-  useScreenMap({ lanes, focusId, sheetOpen: Boolean(openId) });
+  const focusId = openId ? hoverRun : showMatches ? (hoverMatch ? `match-${hoverMatch.carrierId}` : queryLane ? 'query' : null) : null;
+  // The lane finder sits in the right column, so the map keeps clear of it.
+  useScreenMap({ lanes, focusId, rightColumn: true, sheetOpen: Boolean(openId) });
 
   function openCarrier(id) {
     navigate(`/carriers/${id}`);
   }
+  function openMatch(id) {
+    navigate(`/carriers/${id}`, { state: FROM_ELSEWHERE });
+  }
   function close() {
-    navigate(results ? '/carriers/find' : '/carriers');
+    navigate(mode === 'starred' ? '/carriers/starred' : '/carriers');
   }
 
   function removeCarrier(carrier) {
@@ -249,7 +301,7 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
     });
   }
 
-  const rowIds = mode === 'find' ? matches.map((m) => m.carrierId) : listed.map((item) => item.id);
+  const rowIds = listed.map((item) => item.id);
   useHotkeys({
     n: () => setEditing('new'),
     ArrowDown: () => {
@@ -270,9 +322,9 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
       <ScreenPanel
         ref={listRef}
         label="Carriers"
-        count={mode === 'find' ? matches.length : listed.length}
-        caption={mode === 'find' ? 'Lane search' : mode === 'starred' ? 'Your own' : 'Directory'}
-        title={mode === 'find' ? (results ? 'carriers for this lane' : 'find carriers for a lane') : mode === 'starred' ? 'starred carriers' : 'carriers on file'}
+        count={listed.length}
+        caption={mode === 'starred' ? 'Your own' : 'Directory'}
+        title={mode === 'starred' ? 'starred carriers' : 'carriers on file'}
         pushedBack={Boolean(openId)}
         onPointerLeave={() => {
           setHoverId(null);
@@ -283,97 +335,100 @@ function CarriersScreen({ focusedLoad, onClearFocusedLoad }) {
           <PanelTabs
             label="Carriers view"
             value={mode}
-            onChange={(next) => navigate(next === 'find' ? '/carriers/find' : next === 'starred' ? '/carriers/starred' : '/carriers')}
+            onChange={(next) => navigate(next === 'starred' ? '/carriers/starred' : '/carriers')}
             options={[
               { value: 'directory', label: 'Directory', count: carriers.length },
               { value: 'starred', label: 'Starred', count: starred.length },
-              { value: 'find', label: 'Find for a lane' },
             ]}
           />
         }
-        toolbar={
-          mode === 'find' ? (
-            <LaneSearch
-              lane={lane}
-              onChange={setLane}
-              onSearch={searchLane}
-              searching={searchStatus === 'loading'}
-              loadNumber={focusedLoad?.load_number}
-              onClearLoad={() => {
-                setLane(blankLane());
-                setResults(null);
-                setSearchStatus('idle');
-                onClearFocusedLoad?.();
-              }}
-            />
-          ) : (
-            <PanelSearch label="Search carriers" placeholder="Search company, MC, dispatcher" value={query} onChange={setQuery} />
-          )
+        toolbar={<PanelSearch label="Search carriers" placeholder="Search company, MC, dispatcher" value={query} onChange={setQuery} />}
+      >
+        <>
+          {status === 'loading' && (
+            <div className="px-2 pt-2">
+              <Skeleton count={6} height="3.6rem" className="rounded-[18px]" />
+            </div>
+          )}
+          {status === 'error' && (
+            <p role="alert" className="px-4 py-6 text-sm text-error">
+              {error}
+            </p>
+          )}
+          {status === 'ready' && mode === 'starred' && listed.length === 0 && (
+            <EmptyNote title={query ? `No starred carrier matches "${query}".` : 'No starred carriers yet.'}>
+              {query ? null : 'Star your best carriers with the star on their row or profile. Loads they have run light up on the board.'}
+            </EmptyNote>
+          )}
+          {status === 'ready' && mode !== 'starred' && carriers.length === 0 && (
+            <EmptyNote title={query ? `No carrier matches "${query}".` : 'No carriers yet.'}>{query ? null : 'Add one with the plus, or book a load and save the carrier from there.'}</EmptyNote>
+          )}
+          {listed.length > 0 && (
+            <ul aria-label={mode === 'starred' ? 'Starred carriers' : 'Carriers'}>
+              {listed.map((carrier) => (
+                <CarrierRow key={carrier.id} carrier={carrier} current={hoverId === carrier.id} onOpen={openCarrier} onHover={setHoverId} onStar={star} />
+              ))}
+            </ul>
+          )}
+        </>
+      </ScreenPanel>
+
+      <LaneFinder
+        open={finderOpen}
+        onOpen={() => setFinderOpen(true)}
+        onClose={() => {
+          setFinderOpen(false);
+          setHoverMatch(null);
+          if (finding) navigate('/carriers');
+        }}
+        count={results ? matches.length : null}
+        onPointerLeave={() => setHoverMatch(null)}
+        form={
+          <LaneSearch
+            lane={lane}
+            onChange={setLane}
+            onSearch={searchLane}
+            searching={searchStatus === 'loading'}
+            loadNumber={focusedLoad?.load_number}
+            onClearLoad={() => {
+              setLane(blankLane());
+              setResults(null);
+              setSearchStatus('idle');
+              onClearFocusedLoad?.();
+            }}
+          />
         }
       >
-        {mode !== 'find' && (
+        {searchError && (
+          <p role="alert" className="mx-2 mb-2 rounded-xl bg-error-bg px-3 py-2 text-sm text-error">
+            {searchError}
+          </p>
+        )}
+        {searchStatus === 'loading' && (
+          <div className="px-2 pt-2">
+            <Skeleton count={4} height="3.8rem" className="rounded-[18px]" />
+          </div>
+        )}
+        {searchStatus === 'idle' && <EmptyNote title="Where is the load going?">Type a lane above, or open a load and choose Find carriers.</EmptyNote>}
+        {searchStatus === 'ready' && matches.length === 0 && <EmptyNote title="No carriers for this lane yet.">Carriers show up here once they have run nearby, or are tagged for these states.</EmptyNote>}
+        {searchStatus === 'ready' && results?.laneMatches?.length > 0 && (
+          <ul aria-label="Lane matches">
+            {results.laneMatches.map((match) => (
+              <MatchRow key={match.carrierId} match={match} searchedEquipment={lane.equipment} current={hoverMatch?.carrierId === match.carrierId} onOpen={openMatch} onHover={setHoverMatch} />
+            ))}
+          </ul>
+        )}
+        {searchStatus === 'ready' && results?.regionalMatches?.length > 0 && (
           <>
-            {status === 'loading' && (
-              <div className="px-2 pt-2">
-                <Skeleton count={6} height="3.6rem" className="rounded-[18px]" />
-              </div>
-            )}
-            {status === 'error' && (
-              <p role="alert" className="px-4 py-6 text-sm text-error">
-                {error}
-              </p>
-            )}
-            {status === 'ready' && mode === 'starred' && listed.length === 0 && (
-              <EmptyNote title={query ? `No starred carrier matches "${query}".` : 'No starred carriers yet.'}>
-                {query ? null : 'Star your best carriers with the star on their row or profile. Loads they have run light up on the board.'}
-              </EmptyNote>
-            )}
-            {status === 'ready' && mode !== 'starred' && carriers.length === 0 && (
-              <EmptyNote title={query ? `No carrier matches "${query}".` : 'No carriers yet.'}>{query ? null : 'Add one with the plus, or book a load and save the carrier from there.'}</EmptyNote>
-            )}
-            {listed.length > 0 && (
-              <ul aria-label={mode === 'starred' ? 'Starred carriers' : 'Carriers'}>
-                {listed.map((carrier) => (
-                  <CarrierRow key={carrier.id} carrier={carrier} current={hoverId === carrier.id} onOpen={openCarrier} onHover={setHoverId} onStar={star} />
-                ))}
-              </ul>
-            )}
+            <p className="caps px-4 pb-1 pt-3">No runs yet, tagged for the region</p>
+            <ul aria-label="Regional matches">
+              {results.regionalMatches.map((match) => (
+                <MatchRow key={match.carrierId} match={match} searchedEquipment={lane.equipment} current={hoverMatch?.carrierId === match.carrierId} onOpen={openMatch} onHover={setHoverMatch} />
+              ))}
+            </ul>
           </>
         )}
-        {mode === 'find' && (
-          <>
-            {searchError && (
-              <p role="alert" className="mx-2 mb-2 rounded-xl bg-error-bg px-3 py-2 text-sm text-error">
-                {searchError}
-              </p>
-            )}
-            {searchStatus === 'loading' && (
-              <div className="px-2 pt-2">
-                <Skeleton count={4} height="3.8rem" className="rounded-[18px]" />
-              </div>
-            )}
-            {searchStatus === 'idle' && <EmptyNote title="Where is the load going?">Type a lane above, or open a load and choose Find carriers.</EmptyNote>}
-            {searchStatus === 'ready' && matches.length === 0 && <EmptyNote title="No carriers for this lane yet.">Carriers show up here once they have run nearby, or are tagged for these states.</EmptyNote>}
-            {searchStatus === 'ready' && results?.laneMatches?.length > 0 && (
-              <ul aria-label="Lane matches">
-                {results.laneMatches.map((match) => (
-                  <MatchRow key={match.carrierId} match={match} searchedEquipment={lane.equipment} current={hoverMatch?.carrierId === match.carrierId} onOpen={openCarrier} onHover={setHoverMatch} />
-                ))}
-              </ul>
-            )}
-            {searchStatus === 'ready' && results?.regionalMatches?.length > 0 && (
-              <>
-                <p className="caps px-4 pb-1 pt-3">No runs yet, tagged for the region</p>
-                <ul aria-label="Regional matches">
-                  {results.regionalMatches.map((match) => (
-                    <MatchRow key={match.carrierId} match={match} searchedEquipment={lane.equipment} current={hoverMatch?.carrierId === match.carrierId} onOpen={openCarrier} onHover={setHoverMatch} />
-                  ))}
-                </ul>
-              </>
-            )}
-          </>
-        )}
-      </ScreenPanel>
+      </LaneFinder>
 
       {openId && <SheetBackdrop onClose={close} />}
       <AnimatePresence>

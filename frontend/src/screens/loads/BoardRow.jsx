@@ -5,7 +5,9 @@ import SelectionCircle from '../../components/SelectionCircle';
 import CopyText from '../../ui/CopyText';
 import Regulars from './Regulars';
 import { hasNoRate, hasStarRegular, place, schedule } from './boardLogic';
-import { StarIcon } from '../../ui/StarButton';
+import { EQUIPMENT_OPTIONS } from '../../lib/equipmentOptions';
+
+const EQUIPMENT_LABEL = Object.fromEntries(EQUIPMENT_OPTIONS.map((option) => [option.code, option.label]));
 
 // An eye with a line through it: the rate is left out of replies.
 export function RateHiddenIcon({ className = '' }) {
@@ -96,7 +98,7 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
             activate(event);
           }
         }}
-        className={`group relative grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-[18px] px-[18px] py-[13px] outline-none transition-colors duration-200 hover:bg-white/[0.065] focus-visible:bg-white/[0.065] ${
+        className={`group relative grid cursor-pointer grid-cols-[auto_1fr_auto] items-center gap-x-3 rounded-[18px] px-[18px] py-[16px] outline-none transition-colors duration-200 hover:bg-white/[0.065] focus-visible:bg-white/[0.065] ${
           starRun ? 'star-row my-1.5' : ''
         } ${current || selected ? 'bg-white/[0.065]' : ''} [&:hover_.lane-arrow]:w-[30px] [&:hover_.lane-arrow]:text-text`}
       >
@@ -112,23 +114,21 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
             <LaneArrow />
             <span className="md:truncate">{dest}</span>
           </p>
-          <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-text-muted">
-            <CopyText value={load.load_number} label={`Copy load number ${load.load_number}`} />
+          <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-text-muted">
             {pickup && (
-              <>
-                <span aria-hidden="true" className="text-text/30">·</span>
-                <span className="tabular-nums">
-                  {pickup.day}, {pickup.hours}
-                  {pickup.kind === 'APPT' ? ' appt' : ''}
-                </span>
-              </>
+              <span className="tabular-nums">
+                {pickup.day}, {pickup.hours}
+                {pickup.kind === 'APPT' ? ' appt' : ''}
+              </span>
             )}
             {load.equipment && (
               <>
-                <span aria-hidden="true" className="text-text/30">·</span>
-                <span>{load.equipment}</span>
+                {pickup && <span aria-hidden="true" className="text-text/30">·</span>}
+                <span title={load.equipment}>{EQUIPMENT_LABEL[load.equipment] || load.equipment}</span>
               </>
             )}
+            <span aria-hidden="true" className="text-text/30">·</span>
+            <CopyText value={load.load_number} label={`Copy load number ${load.load_number}`} className="text-text/45" />
             {matchCount > 0 && !proven && (
               <span className="rounded-full bg-white/[0.08] px-2 py-px text-[11px] text-text-muted">
                 {matchCount} match{matchCount === 1 ? '' : 'es'}
@@ -144,14 +144,8 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
               </span>
             )}
           </div>
-          {starRun && (
-            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gold px-2.5 py-[3px] text-[11px] font-bold text-black shadow-[0_0_16px_rgb(var(--color-gold)/0.45)]">
-              <StarIcon filled className="h-3 w-3" />
-              Your star carrier ran this lane
-            </p>
-          )}
           {proven && (
-            <div className="mt-2.5">
+            <div className="mt-3">
               <Regulars load={load} regulars={regulars} onEmail={onEmail} onOpenCarrier={onOpenCarrier} />
             </div>
           )}
@@ -159,11 +153,11 @@ function BoardRow({ load, regulars, asking = 0, matchCount = 0, current, selecti
 
         <div className="self-start text-right">
           <p
-            className={`flex items-center justify-end gap-1.5 text-[17px] font-semibold tabular-nums tracking-[-0.03em] ${hasNoRate(load) ? 'text-hot' : rateHidden ? 'text-text/35' : 'text-text'}`}
+            className={`flex items-center justify-end gap-1.5 text-[17px] font-semibold tabular-nums tracking-[-0.03em] ${hasNoRate(load) ? 'text-hot' : rateHidden ? 'text-text/45' : 'text-text'}`}
             title={rateHidden ? 'Rate hidden: replies and blasts leave it out' : undefined}
           >
             {onToggleRate ? <RateEye load={load} onToggle={onToggleRate} className="-my-1" /> : rateHidden && <RateHiddenIcon className="h-4 w-4 shrink-0" />}
-            <span className={rateHidden ? 'line-through decoration-1' : ''}>{hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}</span>
+            <span>{hasNoRate(load) ? 'No rate' : formatMoney(load.target_pay)}</span>
             {rateHidden && <span className="sr-only">, hidden from replies</span>}
           </p>
           {asking > 0 &&

@@ -151,6 +151,14 @@ describe('CarriersScreen', () => {
       queryDest: { lat: 32.78, lng: -96.8 },
     };
 
+    test('is a card of its own, not a tab of the directory', async () => {
+      renderScreen('/carriers');
+      expect(screen.queryByRole('button', { name: /find for a lane/i })).not.toBeInTheDocument();
+      fireEvent.click(await screen.findByRole('button', { name: /find carriers for a lane/i }));
+      expect(screen.getByRole('region', { name: 'Find carriers for a lane' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Search' })).toBeInTheDocument();
+    });
+
     test('needs both ends of the lane', async () => {
       renderScreen('/carriers/find');
       fireEvent.click(await screen.findByRole('button', { name: 'Search' }));
@@ -173,7 +181,8 @@ describe('CarriersScreen', () => {
       await screen.findByText('Ran this lane');
       await waitFor(() => expect(getState().lanes.map((lane) => lane.id)).toEqual(['query', 'match-7']));
       expect(getState().focusId).toBe('query');
-      fireEvent.pointerEnter(screen.getAllByRole('button', { name: 'Open Redline Haul' })[0].closest('li'));
+      const finder = screen.getByRole('region', { name: 'Find carriers for a lane' });
+      fireEvent.pointerEnter(within(finder).getByRole('button', { name: 'Open Redline Haul' }).closest('li'));
       await waitFor(() => expect(getState().focusId).toBe('match-7'));
     });
 
@@ -181,7 +190,7 @@ describe('CarriersScreen', () => {
       carrierMatchesApi.getCarrierMatchesForLoad.mockResolvedValue(RESULTS);
       renderScreen('/carriers/find', { focusedLoad: { id: 1, load_number: 'L1001', origin_city: 'Chicago', origin_state: 'IL', dest_city: 'Dallas', dest_state: 'TX' } });
       await screen.findByText('Ran this lane');
-      fireEvent.click(screen.getAllByRole('button', { name: 'Open Redline Haul' })[0]);
+      fireEvent.click(within(screen.getByRole('region', { name: 'Find carriers for a lane' })).getByRole('button', { name: 'Open Redline Haul' }));
       expect(await screen.findByRole('dialog', { name: 'Redline Haul' })).toBeInTheDocument();
     });
   });
