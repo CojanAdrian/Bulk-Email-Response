@@ -1,4 +1,4 @@
-const { looksLikeAutomatedNotification } = require('../../src/lib/notificationFilter');
+const { looksLikeAutomatedNotification, isReplySubject } = require('../../src/lib/notificationFilter');
 
 describe('looksLikeAutomatedNotification', () => {
   test('flags a bare noreply@ sender', () => {
@@ -61,5 +61,19 @@ describe('looksLikeAutomatedNotification', () => {
 
   test('leaves a carrier asking about a load alone', () => {
     expect(looksLikeAutomatedNotification({ from: 'dispatch@redline.com', subject: 'Re: 0094249 Saint Louis to Kansas City' })).toBe(false);
+  });
+});
+
+describe('isReplySubject', () => {
+  test('a reply in any of the usual spellings', () => {
+    for (const subject of ['Re: Load 4521', 'RE: 0094249', 're:x', '  Re : Load', 'Re[2]: Load', 'RE: RE: Load available']) {
+      expect(isReplySubject(subject)).toBe(true);
+    }
+  });
+
+  test('not a reply', () => {
+    for (const subject of ['Load 4521', 'Regarding load 4521', 'Reefer available Dallas', 'Fwd: Load', '', null, undefined]) {
+      expect(isReplySubject(subject)).toBe(false);
+    }
   });
 });

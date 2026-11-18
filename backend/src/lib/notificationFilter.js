@@ -41,4 +41,12 @@ function looksLikeAutomatedNotification(message) {
   return NOTIFICATION_SUBJECT_PATTERNS.some((pattern) => pattern.test(subject));
 }
 
-module.exports = { looksLikeAutomatedNotification };
+// A reply in an existing conversation ("Re: ...", also "RE:", "Re[2]:",
+// "Re: RE:") is never a new inquiry; you answer those in Gmail.
+const REPLY_SUBJECT = /^\s*re\s*(\[\d+\])?\s*:/i;
+
+function isReplySubject(subject) {
+  return REPLY_SUBJECT.test(String(subject || ''));
+}
+
+module.exports = { looksLikeAutomatedNotification, isReplySubject };

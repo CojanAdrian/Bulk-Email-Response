@@ -3,7 +3,7 @@ const { listNewMessageIds, getMessage, sendReply, extractEmailAddresses, threadH
 const { matchInquiry } = require('./matchingEngine');
 const { composeReply } = require('./replyComposer');
 const { signedReplyFor } = require('./signature');
-const { looksLikeAutomatedNotification } = require('./notificationFilter');
+const { looksLikeAutomatedNotification, isReplySubject } = require('./notificationFilter');
 const { fetchInquiryWithLoad } = require('./inquiryQueries');
 const { candidateMcs } = require('./mcNumbers');
 
@@ -35,7 +35,7 @@ function isFromColleague(fromHeader, accountEmail) {
 }
 
 // Waiting inquiries that are not inquiries after all (coworkers, chat and
-// other notifications, logged before these rules existed) are set aside as
+// other notifications, "Re:" replies, logged before these rules existed) are set aside as
 // rejected, so the queue only holds carriers.
 async function setAsideNonInquiries(pool, account, wsHub) {
   const [waiting] = await pool.query(
@@ -43,7 +43,10 @@ async function setAsideNonInquiries(pool, account, wsHub) {
     [account.id]
   );
   const notInquiries = waiting.filter(
-    (row) => isFromColleague(row.from_address, account.gmail_address) || looksLikeAutomatedNotification({ from: row.from_address, subject: row.subject })
+    (row) =>
+      isFromColleague(row.from_address, account.gmail_address) ||
+      looksLikeAutomatedNotification({ from: row.from_address, subject: row.subject }) ||
+      isReplySubject(row.subject)
   );
   if (notInquiries.length === 0) return 0;
   const ids = notInquiries.map((row) => row.id);
@@ -138,6 +141,9 @@ async function pollAccount(pool, account, wsHub) {
     if (looksLikeAutomatedNotification(message)) {
       continue;
     }
+
+    // "Re:" mail is a reply in a conversation, not a new inquiry.
+    if (isReplySubject(message.subject)) continue;
 
     // Your own messages are never an inquiry, and neither are a coworker's.
     if (isFromAccount(message, account.gmail_address)) continue;

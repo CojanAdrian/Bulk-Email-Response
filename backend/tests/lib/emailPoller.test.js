@@ -236,23 +236,23 @@ describe('emailPoller', () => {
     expect(gmailClient.markMessageRead).not.toHaveBeenCalled();
   });
 
-  test('does not add "Re:" twice when the original subject already has it', async () => {
+  test('a "Re:" email is a reply in a conversation, never an inquiry (no row, no reply)', async () => {
     googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
-    gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
-    gmailClient.getMessage.mockResolvedValue({
-      id: 'm1', from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: 'Re: Load 4521', body: 'Still available?',
+    gmailClient.listNewMessageIds.mockResolvedValue(['m1', 'm2']);
+    gmailClient.getMessage.mockImplementation(async (_token, id) => ({
+      id, from: 'carrier@example.com', to: 'testuser@brokerage.test', subject: id === 'm1' ? 'Re: Load 4521' : 'RE: RE: Load 4521', body: 'Still available?',
       receivedAt: new Date('2026-08-08T08:00:00Z'),
-    });
+    }));
     matchingEngine.matchInquiry.mockReturnValue({
       matchedLoad: { id: 1, load_number: '4521', origin_city: 'Dallas', origin_state: 'TX', dest_city: 'Denver', dest_state: 'CO' }, tier: 'load_number',
     });
-    gmailClient.sendReply.mockResolvedValue({ id: 'sent1' });
 
     const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
     await pollAccount(pool, accountRows[0]);
 
-    const sendArgs = gmailClient.sendReply.mock.calls[0][1];
-    expect(sendArgs.subject).toBe('Re: Load 4521');
+    const [rows] = await pool.query('SELECT id FROM email_inquiries WHERE email_account_id = ?', [accountId]);
+    expect(rows).toHaveLength(0);
+    expect(gmailClient.sendReply).not.toHaveBeenCalled();
   });
 
   test('queues (does not send) a reply for a less-confident matched tier', async () => {
@@ -421,7 +421,7 @@ describe('emailPoller', () => {
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
         id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
-        subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
+        subject: 'Lewistown, PA - Orlando, FL', body: 'Any update?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
       [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
@@ -445,7 +445,7 @@ describe('emailPoller', () => {
         }
         return {
           id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
-          subject: 'Re: Lewistown, PA - Orlando, FL', body: 'Any update?',
+          subject: 'Lewistown, PA - Orlando, FL', body: 'Any update?',
           receivedAt: new Date('2026-08-08T08:05:00Z'),
         };
       });
@@ -482,7 +482,7 @@ describe('emailPoller', () => {
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
         id: 'm2', threadId: 't1', from: 'carrierB@example.com', to: 'testuser@brokerage.test',
-        subject: 'Re: Load Available | Dallas TX -> Chicago IL | Reefer', body: 'Is this still available?',
+        subject: 'Load Available | Dallas TX -> Chicago IL | Reefer', body: 'Is this still available?',
         receivedAt: new Date('2026-08-08T08:00:05Z'),
       });
       [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
@@ -548,7 +548,7 @@ describe('emailPoller', () => {
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
         id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
-        subject: 'Re: Old Blast Email', body: 'Actually, is load 9911 available?',
+        subject: 'Old Blast Email', body: 'Actually, is load 9911 available?',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
       [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
@@ -582,7 +582,7 @@ describe('emailPoller', () => {
       gmailClient.listNewMessageIds.mockResolvedValue(['m2']);
       gmailClient.getMessage.mockResolvedValue({
         id: 'm2', threadId: 't1', from: 'carrier@example.com', to: 'testuser@brokerage.test',
-        subject: 'Re: Question', body: 'Thanks!',
+        subject: 'Question', body: 'Thanks!',
         receivedAt: new Date('2026-08-08T09:00:00Z'),
       });
       [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
@@ -1098,13 +1098,15 @@ describe('emailPoller', () => {
           [userId, accountId, msg, from, subject]
         );
       await add('chat', 'Liam Akopean <Liam@igtfreight.com>', 'Liam Akopean messaged you on Google Chat while you were away');
-      await add('carrier', 'Redline <dispatch@redline.com>', 'Re: 0094249');
+      await add('carrier', 'Redline <dispatch@redline.com>', '0094249');
+      await add('reply', 'Redline <dispatch@redline.com>', 'Re: 0094249');
       const [accountRows] = await pool.query('SELECT * FROM email_accounts WHERE id = ?', [accountId]);
-      expect(await setAsideNonInquiries(pool, accountRows[0], null)).toBe(1);
+      expect(await setAsideNonInquiries(pool, accountRows[0], null)).toBe(2);
       const [rows] = await pool.query('SELECT gmail_message_id, reply_status FROM email_inquiries ORDER BY gmail_message_id');
       expect(rows).toEqual([
         { gmail_message_id: 'carrier', reply_status: 'pending_review' },
         { gmail_message_id: 'chat', reply_status: 'rejected' },
+        { gmail_message_id: 'reply', reply_status: 'rejected' },
       ]);
     });
   });
@@ -1125,14 +1127,14 @@ describe('emailPoller', () => {
   });
 
   describe('replies to the emails sent from Find trucks on DAT', () => {
-    test('are inquiries about that load, even though you wrote first in the thread', async () => {
+    test('with their own subject, are inquiries about that load, even though you wrote first in the thread', async () => {
       const [loadRows] = await pool.query("SELECT id FROM loads WHERE load_number = '4521'");
       await pool.query('INSERT INTO carrier_offers (user_id, load_id, email, gmail_thread_id) VALUES (?, ?, ?, ?)', [userId, loadRows[0].id, 'dispatch@redline.com', 'offer-thread']);
       googleOAuth.getAccessToken.mockResolvedValue('fresh-access-token');
       gmailClient.listNewMessageIds.mockResolvedValue(['m1']);
       gmailClient.getMessage.mockResolvedValue({
         id: 'm1', threadId: 'offer-thread', from: 'Redline <dispatch@redline.com>', to: 'testuser@brokerage.test',
-        subject: 'Re: Load available', body: 'We can do 2400', receivedAt: new Date('2026-08-08T08:00:00Z'),
+        subject: 'Truck for your Dallas load', body: 'We can do 2400', receivedAt: new Date('2026-08-08T08:00:00Z'),
       });
       // Like Gmail: your email to them exists, but nothing sent after theirs.
       gmailClient.threadHasSentMessage.mockImplementation(async (_token, _thread, _sender, since) => !since);
