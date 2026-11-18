@@ -32,6 +32,7 @@ import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, hasStarRegula
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
 const HEADLINES = { active: 'loads to cover', booked: 'loads booked', covered: 'loads covered' };
 const BOARD_BUTTON = 'mat flex h-12 items-center justify-center gap-2 rounded-[20px] text-[13.5px] font-semibold text-text transition-[scale,background-color] duration-300 ease-spring hover:scale-[1.03] hover:bg-white/[0.06] active:scale-95';
+const BOARD_BUTTON_WHITE = 'flex h-12 items-center justify-center gap-2 rounded-[20px] bg-accent text-[13.5px] font-semibold text-accent-ink transition-[scale,background-color] duration-300 ease-spring hover:scale-[1.03] active:scale-95';
 const TOOL = 'rounded-full px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-text';
 const CHIP = 'rounded-full px-2.5 py-1 text-xs font-medium transition-colors';
 // Panel widths plus their margins: the map fits itself between these.
@@ -431,7 +432,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
           </svg>
           Import CSV
         </button>
-        <button type="button" onClick={() => datExport.current?.openExportFlow()} title="Bulk-post file for DAT" className={BOARD_BUTTON}>
+        <button type="button" onClick={() => datExport.current?.openExportFlow()} title="Bulk-post file for DAT" className={BOARD_BUTTON_WHITE}>
           <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M8 13.5v-8M4.5 9L8 5.5 11.5 9M3 2.5h10" />
           </svg>
