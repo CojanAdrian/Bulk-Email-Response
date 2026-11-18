@@ -31,50 +31,7 @@ import { SORTS, STATUSES, STATUS_LABELS, countByStatus, hasNoRate, hasStarRegula
 
 const STATUS_OPTIONS = STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }));
 const HEADLINES = { active: 'loads to cover', booked: 'loads booked', covered: 'loads covered' };
-// Less-used board tools, out of the way behind one button.
-function MoreMenu({ items }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!open) return undefined;
-    const onDown = (event) => ref.current && !ref.current.contains(event.target) && setOpen(false);
-    const onKey = (event) => event.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onDown);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onDown);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-  return (
-    <div ref={ref} className="relative">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((v) => !v)} className={TOOL}>
-        More
-        <span aria-hidden="true" className="ml-1 inline-block text-[9px] opacity-60">▼</span>
-      </button>
-      {open && (
-        <div role="menu" className="mat absolute right-0 top-full z-30 mt-1.5 w-[230px] rounded-[18px] p-1.5 motion-safe:animate-[pop-in_400ms_var(--spring)]">
-          {items.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setOpen(false);
-                item.onSelect();
-              }}
-              className="block w-full rounded-[12px] px-3 py-2 text-left text-[13px] font-semibold text-text hover:bg-white/10"
-            >
-              {item.label}
-              {item.hint && <span className="block text-[11px] font-normal text-text-muted">{item.hint}</span>}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
+const BOARD_BUTTON = 'mat flex h-12 items-center justify-center gap-2 rounded-[20px] text-[13.5px] font-semibold text-text transition-[scale,background-color] duration-300 ease-spring hover:scale-[1.03] hover:bg-white/[0.06] active:scale-95';
 const TOOL = 'rounded-full px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-white/10 hover:text-text';
 const CHIP = 'rounded-full px-2.5 py-1 text-xs font-medium transition-colors';
 // Panel widths plus their margins: the map fits itself between these.
@@ -287,7 +244,7 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
         aria-label="Load board"
         // Behind an open load the board cannot be clicked or tabbed into.
         inert={openLoad ? '' : undefined}
-        className={`mat relative mx-3 mb-28 mt-2 flex min-h-[70vh] origin-[50%_55%] flex-col overflow-hidden rounded-[30px] transition-[scale,filter] duration-700 ease-soft motion-safe:animate-[rise-in_1.1s_var(--spring)_both] md:fixed md:bottom-[104px] md:left-9 md:top-[84px] md:z-10 md:m-0 md:min-h-0 md:w-[540px] ${
+        className={`mat relative mx-3 mb-3 mt-2 flex min-h-[70vh] origin-[50%_55%] flex-col overflow-hidden rounded-[30px] transition-[scale,filter] duration-700 ease-soft motion-safe:animate-[rise-in_1.1s_var(--spring)_both] md:fixed md:bottom-[164px] md:left-9 md:top-[84px] md:z-10 md:m-0 md:min-h-0 md:w-[540px] ${
           openLoad ? 'scale-95 brightness-[0.45]' : ''
         }`}
       >
@@ -340,12 +297,6 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
                 Select
               </button>
             )}
-            <MoreMenu
-              items={[
-                { label: 'Import CSV', hint: 'or drop / paste it anywhere', onSelect: () => fileInput.current?.click() },
-                { label: 'DAT export', hint: 'bulk-post file for DAT', onSelect: () => datExport.current?.openExportFlow() },
-              ]}
-            />
             <input
               ref={fileInput}
               type="file"
@@ -471,6 +422,22 @@ function LoadsScreen({ refreshKey, onViewMatches }) {
         </div>
 
       </section>
+
+      {/* Import and DAT export, right under the board. */}
+      <div className={`mx-3 mb-28 grid grid-cols-2 gap-3 transition-[filter] duration-700 md:fixed md:bottom-[104px] md:left-9 md:z-10 md:m-0 md:w-[540px] ${openLoad ? 'brightness-[0.45]' : ''}`}>
+        <button type="button" onClick={() => fileInput.current?.click()} title="Or drop / paste a CSV anywhere" className={BOARD_BUTTON}>
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M3 13.5h10" />
+          </svg>
+          Import CSV
+        </button>
+        <button type="button" onClick={() => datExport.current?.openExportFlow()} title="Bulk-post file for DAT" className={BOARD_BUTTON}>
+          <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M8 13.5v-8M4.5 9L8 5.5 11.5 9M3 2.5h10" />
+          </svg>
+          DAT export
+        </button>
+      </div>
 
       {widest && (
           // The padding gives the cards room to grow on hover without being
