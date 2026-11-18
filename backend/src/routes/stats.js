@@ -73,6 +73,9 @@ function createStatsRouter(pool) {
       today,
       bookedToday: todayEntry.count,
       avgGpToday: average(todayEntry.gps),
+      // Total gross profit of today's booked loads (null: none logged yet).
+      gpToday: todayEntry.gps.length ? todayEntry.gps.reduce((sum, gp) => sum + gp, 0) : null,
+      gpLoggedToday: todayEntry.gps.length,
       series,
       // Every booked load with a logged GP in the 7 days counts once, so a
       // busy day weighs more than a quiet one.

@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getToday } from '../api/stats';
 import { subscribe } from '../lib/liveSocket';
 import { formatMoney } from '../lib/formatMoney';
-import { Ring, Sparkline, Bars } from '../ui/controls';
+import { Ring, Bars } from '../ui/controls';
 import { useSettings } from './SettingsContext';
 
 const HOURS_SHOWN = 8;
@@ -14,8 +14,8 @@ function goalLine(booked, goal) {
   return <><b className="font-semibold text-text">{left} more</b> to hit today's goal</>;
 }
 
-// Today at a glance: loads booked against the daily goal, gross profit per
-// load over the last week, and how quickly inquiries are being answered.
+// Today at a glance: loads booked against the daily goal, the margin made
+// on them so far today, and how quickly inquiries are being answered.
 // Clicking it opens Stats.
 function TodayCard() {
   const navigate = useNavigate();
@@ -46,11 +46,9 @@ function TodayCard() {
   }, []);
 
   if (!today) return null;
-  const { loadsPerDay, marginPerLoad, replyMinutes } = settings.targets;
-  const recentGp = today.series.map((day) => day.avgGp);
-  const weekAverage = recentGp.filter((v) => v !== null);
-  // Average gross profit per booked load over the last 7 days.
-  const avg = today.weekAvgGp !== undefined ? today.weekAvgGp : weekAverage.length ? Math.round(weekAverage.reduce((a, b) => a + b, 0) / weekAverage.length) : null;
+  const { loadsPerDay, replyMinutes } = settings.targets;
+  const margin = today.gpToday ?? null;
+  const unlogged = today.bookedToday - (today.gpLoggedToday ?? 0);
   const hours = new Array(HOURS_SHOWN).fill(0);
   const nowHour = new Date().getHours();
   for (const { hour, replies } of today.repliesByHour || []) {
@@ -72,13 +70,13 @@ function TodayCard() {
         <p className="mt-1.5 text-[12.5px] leading-snug text-text-muted">{goalLine(today.bookedToday, loadsPerDay)}</p>
       </div>
 
-      <div className="col-span-2 flex items-end justify-between gap-3.5 border-t border-white/[0.07] pt-3.5">
-        <div>
-          <p className="caps">Avg margin</p>
-          <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${avg !== null && avg < marginPerLoad ? 'text-hot' : ''}`}>{avg === null ? 'None yet' : formatMoney(avg)}</p>
-          <p className="text-[11.5px] text-text-muted">7 days · target {formatMoney(marginPerLoad)}</p>
-        </div>
-        <Sparkline values={recentGp} label="Average gross profit per load, last 7 days" />
+      <div className="col-span-2 border-t border-white/[0.07] pt-3.5">
+        <p className="caps">Margin today</p>
+        <p className={`mt-1 text-[26px] font-bold leading-tight tracking-[-0.045em] tabular-nums ${margin > 0 ? 'text-success' : ''}`}>{margin === null ? 'None yet' : formatMoney(margin)}</p>
+        <p className="text-[11.5px] text-text-muted">
+          {today.bookedToday === 0 ? 'Nothing booked yet today' : `From ${today.bookedToday} booked load${today.bookedToday === 1 ? '' : 's'}`}
+          {unlogged > 0 && margin !== null ? ` · ${unlogged} without a margin` : ''}
+        </p>
       </div>
 
       <div className="col-span-2 flex items-end justify-between gap-3.5 border-t border-white/[0.07] pt-3.5">

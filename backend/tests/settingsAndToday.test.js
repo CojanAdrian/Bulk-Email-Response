@@ -95,6 +95,7 @@ describe('settings, today and password routes', () => {
       expect(res.status).toBe(200);
       expect(res.body.bookedToday).toBe(3);
       expect(res.body.avgGpToday).toBe(1500);
+      expect(res.body.gpToday).toBe(3000);
       expect(res.body.series).toHaveLength(7);
       expect(res.body.series[6]).toEqual({ day: res.body.today, booked: 3, avgGp: 1500 });
       expect(res.body.series[3]).toMatchObject({ booked: 1, avgGp: 500 });
@@ -118,7 +119,7 @@ describe('settings, today and password routes', () => {
 
     test('is empty but complete for a new user', async () => {
       const res = await agent.get('/api/stats/today');
-      expect(res.body).toMatchObject({ bookedToday: 0, avgGpToday: null, repliedToday: 0, medianReplyMinutes: null });
+      expect(res.body).toMatchObject({ bookedToday: 0, avgGpToday: null, gpToday: null, repliedToday: 0, medianReplyMinutes: null });
     });
   });
 

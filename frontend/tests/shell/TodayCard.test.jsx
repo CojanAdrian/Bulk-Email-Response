@@ -35,22 +35,30 @@ describe('TodayCard', () => {
     settingsApi.getSettings.mockResolvedValue(DEFAULT_SETTINGS);
   });
 
-  test('shows loads booked against the daily goal, the week margin and reply time', async () => {
-    statsApi.getToday.mockResolvedValue({ today: '2026-11-07', bookedToday: 5, avgGpToday: 1600, series: series([1200, null, 1800, 1500, null, 1600, 2000]), repliedToday: 9, medianReplyMinutes: 4, repliesByHour: [] });
+  test("shows loads booked against the daily goal, today's margin and reply time", async () => {
+    statsApi.getToday.mockResolvedValue({ today: '2026-11-07', bookedToday: 5, avgGpToday: 1600, gpToday: 6400, gpLoggedToday: 4, series: series([1200, null, 1800, 1500, null, 1600, 2000]), repliedToday: 9, medianReplyMinutes: 4, repliesByHour: [] });
     renderCard();
     expect(await screen.findByRole('img', { name: '5 of 8 loads booked today' })).toBeInTheDocument();
     expect(screen.getByText('3 more')).toBeInTheDocument();
-    expect(screen.getByText('$1,620')).toBeInTheDocument();
+    expect(screen.getByText('$6,400')).toBeInTheDocument();
+    expect(screen.getByText(/From 5 booked loads · 1 without a margin/)).toBeInTheDocument();
+    expect(screen.queryByText(/avg margin/i)).not.toBeInTheDocument();
     expect(screen.getByText('4 min')).toBeInTheDocument();
     expect(screen.getByText('9 replied today')).toBeInTheDocument();
   });
 
-  test('says when the goal is reached, and flags slow replies and low margin', async () => {
-    statsApi.getToday.mockResolvedValue({ today: '2026-11-07', bookedToday: 9, avgGpToday: 900, series: series([900, 900, 900, 900, 900, 900, 900]), repliedToday: 2, medianReplyMinutes: 25, repliesByHour: [] });
+  test('says when the goal is reached, and flags slow replies', async () => {
+    statsApi.getToday.mockResolvedValue({ today: '2026-11-07', bookedToday: 9, avgGpToday: 900, gpToday: 8100, gpLoggedToday: 9, series: series([900, 900, 900, 900, 900, 900, 900]), repliedToday: 2, medianReplyMinutes: 25, repliesByHour: [] });
     renderCard();
     expect(await screen.findByText('Goal reached')).toBeInTheDocument();
     expect(screen.getByText('25 min')).toHaveClass('text-hot');
-    expect(screen.getByText('$900')).toHaveClass('text-hot');
+    expect(screen.getByText('$8,100')).toBeInTheDocument();
+  });
+
+  test('says when nothing is booked yet today', async () => {
+    statsApi.getToday.mockResolvedValue({ today: '2026-11-07', bookedToday: 0, avgGpToday: null, gpToday: null, gpLoggedToday: 0, series: series([null, null, null, null, null, null, null]), repliedToday: 0, medianReplyMinutes: null, repliesByHour: [] });
+    renderCard();
+    expect(await screen.findByText('Nothing booked yet today')).toBeInTheDocument();
   });
 
   test('clicking it opens Stats', async () => {
