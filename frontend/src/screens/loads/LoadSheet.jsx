@@ -6,6 +6,7 @@ import { buildLookupMessage, detectMultiStop } from '../../lib/lookupMessage';
 import DateRangeField from '../../components/DateRangeField';
 import Select from '../../components/Select';
 import CopyText from '../../ui/CopyText';
+import { useRowLayoutId } from '../../ui/Sheet';
 import Regulars from './Regulars';
 import { SHEET_SPRING, RateEye } from './BoardRow';
 import { STATUSES, STATUS_LABELS, hasNoRate, place, schedule } from './boardLogic';
@@ -49,6 +50,7 @@ function LoadSheet({
 }) {
   const [rateDraft, setRateDraft] = useState(null); // null = not editing
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const layoutId = useRowLayoutId(`load-${load.id}`);
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -83,7 +85,9 @@ function LoadSheet({
 
   return (
     <motion.div
-      layoutId={`load-${load.id}`}
+      layoutId={layoutId}
+      initial={layoutId ? undefined : { opacity: 0, scale: 0.94, y: 20 }}
+      animate={layoutId ? undefined : { opacity: 1, scale: 1, y: 0 }}
       transition={SHEET_SPRING}
       exit={{ opacity: 0, transition: { duration: 0.18 } }}
       role="dialog"

@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { FROM_ELSEWHERE } from '../../ui/Sheet';
 import RelativeTime from '../../components/RelativeTime';
 
 const SHOWN = 3;
@@ -28,7 +29,7 @@ function NeedsReply({ inquiries, onHoverLoad }) {
           <li key={inquiry.id} style={{ animationDelay: `${index * 90}ms` }} className="motion-safe:animate-[slide-in_900ms_var(--spring)_both]">
             <button
               type="button"
-              onClick={() => navigate(`/inquiries/${inquiry.id}`)}
+              onClick={() => navigate(`/inquiries/${inquiry.id}`, { state: FROM_ELSEWHERE })}
               onPointerEnter={() => onHoverLoad(inquiry.matched_load_id ?? null)}
               onPointerLeave={() => onHoverLoad(null)}
               className="mat block w-full rounded-[20px] px-4 py-[13px] text-left transition-[scale,translate] duration-300 ease-spring hover:-translate-x-1.5 hover:scale-[1.03]"

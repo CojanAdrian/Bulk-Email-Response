@@ -1,4 +1,5 @@
 import { useNavigate } from 'react-router-dom';
+import { FROM_ELSEWHERE } from '../ui/Sheet';
 
 const IDLE_SIZE = { width: 204, height: 38 };
 const NOTICE_SIZE = { width: 400, height: 38 };
@@ -17,7 +18,7 @@ function Island({ inquiry = null, onDismiss, notice = null, pendingCount = 0, gm
   // Opens this exact inquiry, not just the list.
   function view() {
     onDismiss?.();
-    navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries');
+    navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries', { state: FROM_ELSEWHERE });
   }
 
   return (

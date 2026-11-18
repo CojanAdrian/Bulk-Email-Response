@@ -8,6 +8,7 @@ import { importLoads } from '../lib/importLoads';
 import { listInquiries } from '../api/inquiries';
 import UsMap from '../map/UsMap';
 import { setDimmed } from '../map/mapStore';
+import { FROM_ELSEWHERE } from '../ui/Sheet';
 import Brand from './Brand';
 import Island from './Island';
 import AccountPill from './AccountPill';
@@ -139,7 +140,7 @@ function Shell({ username, onLogout, mapDimmed, onLoadsImported, children }) {
   const { settings } = useSettings();
   const gmailConnected = useGmailConnected();
   const pendingCount = usePendingReviewCount();
-  const [incoming, dismissIncoming] = useIncomingInquiry(settings.notifications, (inquiry) => navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries'));
+  const [incoming, dismissIncoming] = useIncomingInquiry(settings.notifications, (inquiry) => navigate(inquiry?.id ? `/inquiries/${inquiry.id}` : '/inquiries', { state: FROM_ELSEWHERE }));
   const [notice, showNotice] = useNotice();
   const [searching, setSearching] = useState(false);
   const reduced = settings.appearance.motion === 'reduced';
@@ -168,7 +169,7 @@ function Shell({ username, onLogout, mapDimmed, onLoadsImported, children }) {
     (waited, oldest) => {
       showNotice({ tone: 'error', title: `An inquiry has waited ${waited} min`, detail: 'Inquiries' });
       if (settings.notifications.sound) beep();
-      notifyDesktop('An inquiry is waiting', `It has waited ${waited} minutes.`, () => navigate(oldest?.id ? `/inquiries/${oldest.id}` : '/inquiries'));
+      notifyDesktop('An inquiry is waiting', `It has waited ${waited} minutes.`, () => navigate(oldest?.id ? `/inquiries/${oldest.id}` : '/inquiries', { state: FROM_ELSEWHERE }));
     },
     [showNotice, settings.notifications.sound, navigate]
   );
@@ -229,7 +230,7 @@ function Shell({ username, onLogout, mapDimmed, onLoadsImported, children }) {
               onClose={() => setSearching(false)}
               onGo={(to) => {
                 setSearching(false);
-                navigate(to);
+                navigate(to, { state: FROM_ELSEWHERE });
               }}
             />
           )}

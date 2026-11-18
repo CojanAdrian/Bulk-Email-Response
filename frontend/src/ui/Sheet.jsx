@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { useLocation } from 'react-router-dom';
 
 export const SHEET_SPRING = { type: 'spring', stiffness: 260, damping: 28 };
 
@@ -33,10 +34,20 @@ export function CloseButton({ onClose }) {
   );
 }
 
+// Opened from Ctrl K search or an alert (not by clicking its row): the row
+// may be far down a list, or not drawn yet, and growing out of it left the
+// sheet stuck off screen behind the dark veil. Those pop in instead.
+export const FROM_ELSEWHERE = { fromSearch: true };
+export function useRowLayoutId(layoutId) {
+  const { state } = useLocation();
+  return state?.fromSearch ? undefined : layoutId;
+}
+
 // A detail sheet over the left side of the screen. Give it the layoutId of
 // the row it came from and it grows out of that row.
-function Sheet({ layoutId, label, onClose, width = 'md', children }) {
+function Sheet({ layoutId: rowLayoutId, label, onClose, width = 'md', children }) {
   useEscape(onClose);
+  const layoutId = useRowLayoutId(rowLayoutId);
   return (
     <motion.div
       layoutId={layoutId}
